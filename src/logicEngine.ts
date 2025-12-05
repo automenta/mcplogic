@@ -7,9 +7,32 @@
 import pl, { Session } from 'tau-prolog';
 
 import { buildPrologProgram, folGoalToProlog } from './translator.js';
-import { ProveResult } from './types/index.js';
+import { getArithmeticSetup } from './arithmetic.js';
+import { parse } from './parser.js';
+import {
+    generateEqualityAxioms,
+    generateMinimalEqualityAxioms,
+    getEqualityBridge
+} from './equalityAxioms.js';
+import {
+    ProveResult,
+    Verbosity,
+    createInferenceLimitError,
+    createEngineError,
+} from './types/index.js';
 
 export type { ProveResult };
+
+/**
+ * Options for prove operation
+ */
+export interface ProveOptions {
+    verbosity?: Verbosity;
+    /** Enable arithmetic support (default: false) */
+    enableArithmetic?: boolean;
+    /** Enable equality axioms (default: false) */
+    enableEquality?: boolean;
+}
 
 /**
  * Logic Engine using Tau-Prolog
@@ -30,22 +53,63 @@ export class LogicEngine {
     /**
      * Prove a goal from given premises
      */
-    async prove(premises: string[], conclusion: string): Promise<ProveResult> {
+    async prove(
+        premises: string[],
+        conclusion: string,
+        options?: ProveOptions
+    ): Promise<ProveResult> {
+        const startTime = Date.now();
+        const verbosity = options?.verbosity || 'standard';
+        let prologProgram = '';
+        let inferenceCount = 0;
+        let hitInferenceLimit = false;
+
         try {
             // Build program from premises
-            const program = buildPrologProgram(premises);
+            prologProgram = buildPrologProgram(premises);
+
+            // Add arithmetic axioms if enabled
+            if (options?.enableArithmetic) {
+                const arithmeticSetup = getArithmeticSetup();
+                prologProgram = arithmeticSetup + '\n' + prologProgram;
+            }
+
+            // Add equality axioms if enabled
+            if (options?.enableEquality) {
+                try {
+                    const bridge = getEqualityBridge();
+                    // Always include base equality axioms (reflexivity, symmetry, transitivity)
+                    const emptySignature = { functions: new Map(), predicates: new Map(), constants: new Set<string>() };
+                    const baseAxioms = generateEqualityAxioms(emptySignature, {
+                        includeCongruence: false,
+                        includeSubstitution: false
+                    });
+
+                    // Add signature-specific axioms (congruence, substitution) only when = is used
+                    const parsedFormulas = [...premises, conclusion].map(p => parse(p));
+                    const signatureAxioms = generateMinimalEqualityAxioms(parsedFormulas);
+
+                    const allAxioms = [...bridge, ...baseAxioms, ...signatureAxioms];
+                    prologProgram = allAxioms.join('\n') + '\n' + prologProgram;
+                } catch {
+                    // If parsing fails for equality extraction, continue without equality axioms
+                    // The main validation will catch syntax errors
+                }
+            }
 
             // Create fresh session with configured inference limit
             this.session = pl.create(this.inferenceLimit);
 
             // Consult the program
-            const consultResult = await this.consultProgram(program);
+            const consultResult = await this.consultProgram(prologProgram);
             if (!consultResult.success) {
-                return {
+                return this.buildResult({
                     success: false,
                     result: 'error',
-                    error: consultResult.error
-                };
+                    error: consultResult.error,
+                    prologProgram,
+                    timeMs: Date.now() - startTime,
+                }, verbosity);
             }
 
             // Build query from conclusion
@@ -54,27 +118,104 @@ export class LogicEngine {
             // Run query
             const queryResult = await this.runQuery(query);
 
+            if (queryResult.hitLimit) {
+                hitInferenceLimit = true;
+            }
+
             if (queryResult.found) {
-                return {
+                return this.buildResult({
                     success: true,
                     result: 'proved',
-                    proof: [`Goal: ${conclusion}`, `Program: ${premises.join('; ')}`, `Result: Proved via Prolog resolution`],
-                    bindings: queryResult.bindings
-                };
+                    message: `Proved: ${conclusion}`,
+                    proof: [
+                        `Goal: ${conclusion}`,
+                        `Program: ${premises.join('; ')}`,
+                        `Result: Proved via Prolog resolution`
+                    ],
+                    bindings: queryResult.bindings,
+                    prologProgram,
+                    timeMs: Date.now() - startTime,
+                    inferenceCount,
+                }, verbosity);
             } else {
-                return {
+                // If we hit the limit, use structured error
+                if (hitInferenceLimit) {
+                    const error = createInferenceLimitError(this.inferenceLimit, conclusion);
+                    return this.buildResult({
+                        success: false,
+                        result: 'failed',
+                        message: error.message,
+                        error: error.message,
+                        prologProgram,
+                        timeMs: Date.now() - startTime,
+                        inferenceCount: this.inferenceLimit,
+                    }, verbosity);
+                }
+
+                return this.buildResult({
                     success: false,
                     result: 'failed',
-                    error: queryResult.error || 'No proof found'
-                };
+                    message: 'No proof found',
+                    error: queryResult.error || 'No proof found',
+                    prologProgram,
+                    timeMs: Date.now() - startTime,
+                    inferenceCount,
+                }, verbosity);
             }
         } catch (e) {
-            return {
+            const error = e instanceof Error ? e : createEngineError(String(e));
+            return this.buildResult({
                 success: false,
                 result: 'error',
-                error: e instanceof Error ? e.message : String(e)
+                error: error.message,
+                prologProgram,
+                timeMs: Date.now() - startTime,
+                inferenceCount,
+            }, verbosity);
+        }
+    }
+
+    /**
+     * Build result based on verbosity
+     */
+    private buildResult(
+        data: {
+            success: boolean;
+            result: 'proved' | 'failed' | 'timeout' | 'error';
+            message?: string;
+            error?: string;
+            proof?: string[];
+            bindings?: Record<string, string>[];
+            prologProgram?: string;
+            timeMs: number;
+            inferenceCount?: number;
+        },
+        verbosity: Verbosity
+    ): ProveResult {
+        const base: ProveResult = {
+            success: data.success,
+            result: data.result,
+        };
+
+        if (verbosity === 'minimal') {
+            return base;
+        }
+
+        // Standard includes message, bindings, error
+        base.message = data.message;
+        base.bindings = data.bindings;
+        base.error = data.error;
+        base.proof = data.proof;
+
+        if (verbosity === 'detailed') {
+            base.prologProgram = data.prologProgram;
+            base.statistics = {
+                timeMs: data.timeMs,
+                inferences: data.inferenceCount,
             };
         }
+
+        return base;
     }
 
     /**
@@ -95,7 +236,12 @@ export class LogicEngine {
     /**
      * Run a Prolog query and collect answers
      */
-    private runQuery(query: string): Promise<{ found: boolean; bindings?: Record<string, string>[]; error?: string }> {
+    private runQuery(query: string): Promise<{
+        found: boolean;
+        bindings?: Record<string, string>[];
+        error?: string;
+        hitLimit?: boolean;
+    }> {
         return new Promise((resolve) => {
             this.session.query(query, {
                 success: () => {
@@ -111,9 +257,14 @@ export class LogicEngine {
     /**
      * Collect all answers from a query
      */
-    private collectAnswers(): Promise<{ found: boolean; bindings: Record<string, string>[] }> {
+    private collectAnswers(): Promise<{
+        found: boolean;
+        bindings: Record<string, string>[];
+        hitLimit?: boolean;
+    }> {
         return new Promise((resolve) => {
             const bindings: Record<string, string>[] = [];
+            let hitLimit = false;
 
             const getNext = () => {
                 this.session.answer({
@@ -122,17 +273,18 @@ export class LogicEngine {
                             bindings.push(this.extractBindings(answer));
                             getNext(); // Get next answer
                         } else {
-                            resolve({ found: bindings.length > 0, bindings });
+                            resolve({ found: bindings.length > 0, bindings, hitLimit });
                         }
                     },
                     fail: () => {
-                        resolve({ found: bindings.length > 0, bindings });
+                        resolve({ found: bindings.length > 0, bindings, hitLimit });
                     },
                     error: () => {
-                        resolve({ found: bindings.length > 0, bindings });
+                        resolve({ found: bindings.length > 0, bindings, hitLimit });
                     },
                     limit: () => {
-                        resolve({ found: bindings.length > 0, bindings });
+                        hitLimit = true;
+                        resolve({ found: bindings.length > 0, bindings, hitLimit });
                     }
                 });
             };
