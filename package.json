@@ -1,0 +1,35 @@
+{
+    "name": "mcp-logic",
+    "version": "1.0.0",
+    "description": "MCP server for first-order logic reasoning with Tau-Prolog",
+    "type": "module",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "dev": "tsx src/index.ts",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "test:prover": "npm test -- --testPathPattern=prover"
+    },
+    "keywords": [
+        "mcp",
+        "logic",
+        "prolog",
+        "theorem-prover",
+        "first-order-logic"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.0",
+        "tau-prolog": "^0.3.4"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "jest": "^29.7.0",
+        "@types/jest": "^29.5.11",
+        "ts-jest": "^29.1.1",
+        "tsx": "^4.6.0",
+        "typescript": "^5.3.0"
+    }
+}
