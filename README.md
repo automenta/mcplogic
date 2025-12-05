@@ -2,6 +2,8 @@
 
 A self-contained MCP server for first-order logic reasoning, implemented in TypeScript with no external binary dependencies.
 
+Original: https://github.com/angrysky56/mcp-logic/
+
 ## Features
 
 - **Theorem Proving** - Prove logical statements using resolution
