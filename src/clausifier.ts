@@ -13,7 +13,8 @@
  * 8. Extract clauses
  */
 
-import { ASTNode, parse, astToString } from './parser.js';
+import { parse, astToString } from './parser.js';
+import type { ASTNode } from './types/index.js';
 import {
     Literal,
     Clause,

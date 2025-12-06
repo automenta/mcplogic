@@ -9,6 +9,7 @@ import pl, { Session } from 'tau-prolog';
 import { buildPrologProgram, folGoalToProlog } from './translator.js';
 import { getArithmeticSetup } from './arithmetic.js';
 import { parse } from './parser.js';
+import { extractSignature } from './astUtils.js';
 import {
     generateEqualityAxioms,
     generateMinimalEqualityAxioms,
@@ -79,7 +80,7 @@ export class LogicEngine {
                 try {
                     const bridge = getEqualityBridge();
                     // Always include base equality axioms (reflexivity, symmetry, transitivity)
-                    const emptySignature = { functions: new Map(), predicates: new Map(), constants: new Set<string>() };
+                    const emptySignature = extractSignature([]);
                     const baseAxioms = generateEqualityAxioms(emptySignature, {
                         includeCongruence: false,
                         includeSubstitution: false

@@ -4,7 +4,8 @@
  * Converts between Prover9-style formulas and Tau-Prolog compatible format.
  */
 
-import { ASTNode, parse } from './parser.js';
+import { parse } from './parser.js';
+import type { ASTNode } from './types/index.js';
 import { isHornClause } from './astUtils.js';
 
 /**

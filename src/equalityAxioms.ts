@@ -9,7 +9,8 @@
  * - Substitution: For each predicate P, ∀x∀y. x = y ∧ P(x) → P(y)
  */
 
-import { ASTNode } from './parser.js';
+import type { ASTNode } from './types/index.js';
+import { extractSignature, FormulaSignature } from './astUtils.js';
 
 /**
  * Options for equality axiom generation.
@@ -24,18 +25,6 @@ export interface EqualityAxiomsOptions {
 }
 
 /**
- * Signature of functions and predicates in a formula.
- */
-export interface Signature {
-    /** Function symbols: name → arity */
-    functions: Map<string, number>;
-    /** Predicate symbols: name → arity */
-    predicates: Map<string, number>;
-    /** Constant symbols */
-    constants: Set<string>;
-}
-
-/**
  * Generate equality axioms as Prolog clauses.
  * 
  * @param signature - Function and predicate signatures for congruence axioms
@@ -43,7 +32,7 @@ export interface Signature {
  * @returns Array of Prolog clause strings
  */
 export function generateEqualityAxioms(
-    signature: Signature,
+    signature: FormulaSignature,
     options: EqualityAxiomsOptions = {}
 ): string[] {
     const maxIter = options.maxIterations ?? 100;
@@ -123,109 +112,8 @@ function generatePredicateSubstitution(pred: string, arity: number): string {
     return `${substituted} :- ${equalities}, ${original}.`;
 }
 
-/**
- * Check if an AST contains equality (=) usage.
- */
-export function containsEquality(node: ASTNode): boolean {
-    switch (node.type) {
-        case 'equals':
-            return true;
-
-        case 'and':
-        case 'or':
-        case 'implies':
-        case 'iff':
-            return containsEquality(node.left!) || containsEquality(node.right!);
-
-        case 'not':
-            return containsEquality(node.operand!);
-
-        case 'forall':
-        case 'exists':
-            return containsEquality(node.body!);
-
-        case 'predicate':
-            // Check if any argument contains equality (shouldn't happen but be safe)
-            return node.args?.some(containsEquality) ?? false;
-
-        default:
-            return false;
-    }
-}
-
-/**
- * Extract function and predicate signatures from an AST.
- */
-export function extractSignature(node: ASTNode): Signature {
-    const functions = new Map<string, number>();
-    const predicates = new Map<string, number>();
-    const constants = new Set<string>();
-
-    function visit(n: ASTNode): void {
-        switch (n.type) {
-            case 'predicate':
-                predicates.set(n.name!, n.args?.length ?? 0);
-                n.args?.forEach(visit);
-                break;
-
-            case 'function':
-                functions.set(n.name!, n.args?.length ?? 0);
-                n.args?.forEach(visit);
-                break;
-
-            case 'constant':
-                constants.add(n.name!);
-                break;
-
-            case 'and':
-            case 'or':
-            case 'implies':
-            case 'iff':
-            case 'equals':
-                visit(n.left!);
-                visit(n.right!);
-                break;
-
-            case 'not':
-                visit(n.operand!);
-                break;
-
-            case 'forall':
-            case 'exists':
-                visit(n.body!);
-                break;
-        }
-    }
-
-    visit(node);
-    return { functions, predicates, constants };
-}
-
-/**
- * Extract signatures from multiple ASTs.
- */
-export function extractSignatures(nodes: ASTNode[]): Signature {
-    const combined: Signature = {
-        functions: new Map(),
-        predicates: new Map(),
-        constants: new Set(),
-    };
-
-    for (const node of nodes) {
-        const sig = extractSignature(node);
-        for (const [name, arity] of sig.functions) {
-            combined.functions.set(name, arity);
-        }
-        for (const [name, arity] of sig.predicates) {
-            combined.predicates.set(name, arity);
-        }
-        for (const c of sig.constants) {
-            combined.constants.add(c);
-        }
-    }
-
-    return combined;
-}
+export { containsEquality } from './astUtils.js';
+import { containsEquality } from './astUtils.js';
 
 /**
  * Generate a minimal set of equality axioms for a specific use case.
@@ -240,7 +128,7 @@ export function generateMinimalEqualityAxioms(
         return []; // No equality axioms needed
     }
 
-    const signature = extractSignatures(formulas);
+    const signature = extractSignature(formulas);
     return generateEqualityAxioms(signature, options);
 }
 
