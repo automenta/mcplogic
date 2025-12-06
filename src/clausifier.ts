@@ -22,6 +22,8 @@ import {
     SkolemEnv,
     createSkolemEnv,
     isTautology,
+    DIMACSResult,
+    atomToKey,
 } from './types/clause.js';
 import { createError } from './types/errors.js';
 
@@ -680,4 +682,54 @@ function literalToProlog(lit: Literal, useNegation: boolean): string {
         return `\\+ ${atom}`;
     }
     return atom;
+}
+
+/**
+ * Convert clauses to DIMACS CNF format.
+ * 
+ * DIMACS format is the standard input format for SAT solvers.
+ * Each clause is a line of space-separated integers ending with 0.
+ * Positive integers represent positive literals, negative represent negated.
+ * 
+ * @param clauses - Array of clauses in CNF
+ * @returns DIMACSResult with DIMACS string and variable mapping
+ */
+export function clausesToDIMACS(clauses: Clause[]): DIMACSResult {
+    const varMap = new Map<string, number>();
+    let nextVar = 1;
+
+    // First pass: assign unique positive integers to each atom
+    for (const clause of clauses) {
+        for (const lit of clause.literals) {
+            const key = atomToKey(lit);
+            if (!varMap.has(key)) {
+                varMap.set(key, nextVar++);
+            }
+        }
+    }
+
+    // Second pass: build DIMACS clauses
+    const clauseLines: string[] = [];
+    for (const clause of clauses) {
+        const literals: number[] = [];
+        for (const lit of clause.literals) {
+            const key = atomToKey(lit);
+            const varNum = varMap.get(key)!;
+            literals.push(lit.negated ? -varNum : varNum);
+        }
+        clauseLines.push(literals.join(' ') + ' 0');
+    }
+
+    // Build DIMACS output
+    const header = `p cnf ${varMap.size} ${clauses.length}`;
+    const dimacs = [header, ...clauseLines].join('\n');
+
+    return {
+        dimacs,
+        varMap,
+        stats: {
+            variables: varMap.size,
+            clauses: clauses.length,
+        },
+    };
 }

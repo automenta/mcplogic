@@ -10,6 +10,7 @@ import {
     dropUniversals,
     isHornFormula,
     clausesToProlog,
+    clausesToDIMACS,
 } from '../src/clausifier';
 import { parse } from '../src/parser';
 import { createSkolemEnv, clauseToString, cnfToString } from '../src/types/clause';
@@ -277,6 +278,51 @@ describe('Clausifier', () => {
             if (!result.success) {
                 expect(result.error?.message).toMatch(/timeout/i);
             }
+        });
+    });
+
+    describe('clausesToDIMACS', () => {
+        it('should produce valid DIMACS header', () => {
+            const result = clausify('P & Q');
+            expect(result.success).toBe(true);
+            const dimacs = clausesToDIMACS(result.clauses!);
+            expect(dimacs.dimacs).toMatch(/^p cnf \d+ \d+/);
+            expect(dimacs.stats.variables).toBe(2);
+            expect(dimacs.stats.clauses).toBe(2);
+        });
+
+        it('should handle negated literals', () => {
+            const result = clausify('P -> Q');  // ¬P ∨ Q
+            expect(result.success).toBe(true);
+            const dimacs = clausesToDIMACS(result.clauses!);
+            // Should have negative number for ¬P
+            expect(dimacs.dimacs).toMatch(/-\d+/);
+        });
+
+        it('should provide variable mapping', () => {
+            const result = clausify('foo & bar');
+            expect(result.success).toBe(true);
+            const dimacs = clausesToDIMACS(result.clauses!);
+            expect(dimacs.varMap.size).toBe(2);
+            expect(dimacs.varMap.has('foo')).toBe(true);
+            expect(dimacs.varMap.has('bar')).toBe(true);
+        });
+
+        it('should handle empty clause set', () => {
+            const result = clausify('P | -P');  // Tautology, filtered out
+            expect(result.success).toBe(true);
+            const dimacs = clausesToDIMACS(result.clauses!);
+            expect(dimacs.stats.clauses).toBe(0);
+            expect(dimacs.stats.variables).toBe(0);
+            expect(dimacs.dimacs).toBe('p cnf 0 0');
+        });
+
+        it('should handle predicates with arguments', () => {
+            const result = clausify('P(a) & Q(b)');
+            expect(result.success).toBe(true);
+            const dimacs = clausesToDIMACS(result.clauses!);
+            expect(dimacs.varMap.has('P(a)')).toBe(true);
+            expect(dimacs.varMap.has('Q(b)')).toBe(true);
         });
     });
 });

@@ -143,3 +143,25 @@ export function cnfToString(clauses: Clause[]): string {
     if (clauses.length === 0) return '⊤'; // No clauses = true
     return clauses.map(c => `(${clauseToString(c)})`).join(' ∧ ');
 }
+
+/**
+ * Result of converting clauses to DIMACS format.
+ */
+export interface DIMACSResult {
+    /** DIMACS CNF format string: "p cnf <vars> <clauses>\n<clause lines>" */
+    dimacs: string;
+    /** Mapping from atom strings to positive integer variable numbers */
+    varMap: Map<string, number>;
+    /** Statistics about the DIMACS output */
+    stats: { variables: number; clauses: number };
+}
+
+/**
+ * Convert a literal to its unique atom key (without negation).
+ */
+export function atomToKey(lit: Literal): string {
+    return lit.args.length > 0
+        ? `${lit.predicate}(${lit.args.join(',')})`
+        : lit.predicate;
+}
+

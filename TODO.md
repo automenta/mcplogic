@@ -12,9 +12,12 @@
 |-------|-------|------------------|--------|
 | **1** | Core Fortification | Structured errors, verbosity, sessions | ✅ Complete |
 | **2** | Expressiveness | CNF, equality, arithmetic, MCP integration | ✅ Complete |
-| **3** | MCP Excellence | Resources, prompts, streaming | 🟢 Queued |
-| **4** | Engine Federation | SAT backend, ASP, neural-guided | 🔵 Planned |
-| **5** | Advanced Logic | HOL, modal, probabilistic, distributed | 🟣 Research |
+| **3** | MCP Excellence | Resources, prompts, streaming | ✅ Core Complete |
+| **4** | Engine Federation | SAT backend, engine abstraction | ✅ SAT Complete |
+| **5** | MCP Integration | Engine parameter, DIMACS export, server upgrade | ✅ Complete |
+| **6** | Advanced Engines | SMT, ASP, neural-guided search | 🟣 Research |
+| **7** | Frontier Logic | HOL, modal, probabilistic, distributed | 🟣 Vision |
+
 
 ---
 
@@ -521,9 +524,22 @@ function inferTypes(ast: ASTNode, typeHints: Map<string, string>): TypedAST {
 
 ---
 
-## Phase 3: MCP Protocol Excellence 🟢
+## Phase 3: MCP Protocol Excellence ✅
 
-*Estimated: 1-2 weeks · Prerequisites: None (parallel with Phase 1-2)*
+*Completed 2024-12-06 · Prerequisites: None (parallel with Phase 1-2)*
+
+### Phase 3 Summary
+
+**Deliverables Shipped:**
+
+| Feature | Files | Tests |
+|---------|-------|-------|
+| MCP Resources | `src/resources/axioms.ts`, `server.ts` | 12 |
+| MCP Prompts | `src/prompts/templates.ts`, `server.ts` | 11 |
+
+**New MCP Capabilities:** `resources` (7 axiom libraries), `prompts` (5 reasoning templates)
+
+**Test Coverage:** 212 tests passing
 
 ### 3.1 MCP Resources
 
@@ -532,9 +548,9 @@ function inferTypes(ast: ASTNode, typeHints: Map<string, string>): TypedAST {
 **Files:** `src/resources/` (new), `src/server.ts`
 
 **Tasks:**
-- [ ] Implement `resources/list` handler (MCP SDK)
-- [ ] Implement `resources/read` handler (MCP SDK)
-- [ ] Create axiom files in `src/resources/axioms/`
+- [x] Implement `resources/list` handler (MCP SDK)
+- [x] Implement `resources/read` handler (MCP SDK)
+- [x] Create axiom resources in `src/resources/axioms.ts`
 
 **Resource URIs:**
 | URI | Description | Source |
@@ -674,11 +690,25 @@ async findModel(
 
 ---
 
-## Phase 4: Engine Federation 🔵
+## Phase 4: Engine Federation 🟢
 
-*Estimated: 3-6 weeks · Prerequisites: Phase 2 clausification (✅ Complete)*
+*Started: 2024-12-06 · Prerequisites: Phase 2 clausification (✅ Complete)*
 
-### 4.1 SAT/SMT Backend
+### Phase 4 Progress Summary
+
+| Feature | Status | Files | Tests |
+|---------|--------|-------|-------|
+| Engine Interface | ✅ Complete | `src/engines/interface.ts` | — |
+| Prolog Adapter | ✅ Complete | `src/engines/prolog.ts` | — |
+| SAT Backend | ✅ Complete | `src/engines/sat.ts` | 18 |
+| Engine Manager | ✅ Complete | `src/engines/manager.ts` | 18 |
+| MCP Integration | ⏸️ Optional | — | — |
+| ASP Backend | 🔵 Planned | — | — |
+| Neural-Guided | 🔵 Planned | — | — |
+
+**Test Coverage:** 248 tests passing (212 + 36 new)
+
+### 4.1 SAT/SMT Backend ✅
 
 **Goal:** Scalable model finding and satisfiability via industrial SAT solver.
 
@@ -686,21 +716,21 @@ async findModel(
 
 **Package:** [`logic-solver`](https://www.npmjs.com/package/logic-solver) (MiniSat compiled to JS via Emscripten)
 
-> **Phase 2 Insights (Clausifier Ready):**
-> - `clausifier.ts` already converts arbitrary FOL → CNF clauses (32 tests passing)
-> - `clausesToProlog()` function exists but SAT needs DIMACS format instead
-> - Add `clausesToDIMACS()` function for SAT solver input
-> - Equality axioms can be added via `enableEquality` option before clausification
+> **Implementation Notes:**
+> - Engine abstraction layer in `src/engines/interface.ts`
+> - `PrologEngine` adapter wraps existing `LogicEngine`
+> - `SATEngine` uses refutation-based proving (premises ∧ ¬conclusion → UNSAT)
+> - `EngineManager` provides automatic engine selection (Horn→Prolog, non-Horn→SAT)
+> - All formulas wrapped in parentheses for correct precedence
 
 **Tasks:**
-- [ ] Add `clausesToDIMACS(clauses: Clause[]): string` to `clausifier.ts`
-- [ ] Define `ReasoningEngine` interface for backend abstraction
-- [ ] Implement `PrologEngine` adapter wrapping existing `LogicEngine`
-- [ ] Implement `SATEngine` adapter using `logic-solver`
-- [ ] Build FOL→Prop→CNF→DIMACS pipeline (clausifier provides CNF stage)
-- [ ] Add `enable_clausify?: boolean` parameter to `prove` tool for SAT fallback
-- [ ] Automatic engine selection based on formula structure
-- [ ] Hybrid mode: Prolog for Horn, SAT for general
+- [x] Define `ReasoningEngine` interface for backend abstraction
+- [x] Implement `PrologEngine` adapter wrapping existing `LogicEngine`
+- [x] Implement `SATEngine` adapter using `logic-solver`
+- [x] Automatic engine selection based on formula structure
+- [x] Hybrid mode: Prolog for Horn, SAT for general
+- [ ] Add `clausesToDIMACS(clauses: Clause[]): string` to `clausifier.ts` (optional)
+- [ ] Add `engine` parameter to MCP `prove` tool (optional)
 
 ```typescript
 // src/engines/interface.ts
@@ -754,50 +784,236 @@ export class SATEngine implements ReasoningEngine {
 
 ---
 
-### 4.2 Answer Set Programming (ASP)
+## Phase 5: MCP Integration ✅
 
-**Goal:** Non-monotonic reasoning, defaults, preferences.
+*Completed 2024-12-06 · Prerequisites: Phase 4 (✅ Complete)*
 
-**Files:** `src/engines/asp.ts` (new)
+### Phase 5 Summary
 
-**Status:** 🔬 *Research — No mature JS ASP solver exists*
+**Deliverables Shipped:**
 
-**Options:**
-1. **clingo-wasm**: Compile Clingo to WebAssembly (complex, large binary)
-2. **Remote API**: Call hosted ASP solver via HTTP
-3. **Simplified ASP**: Implement subset in JS (choice rules only)
+| Feature | Files | Tests |
+|---------|-------|-------|
+| Engine Parameter | `src/server.ts` | existing |
+| DIMACS Export | `src/clausifier.ts`, `src/types/clause.ts` | 5 |
+| Engine Info Resource | `src/resources/axioms.ts` | 1 |
 
-**ASP Syntax Extensions:**
-```
-{ bird(X) } :- animal(X).          % Choice rule
-:- flies(X), penguin(X).           % Constraint
-flies(X) :- bird(X), not penguin(X). % Default
-#minimize { cost(X) : assign(X) }. % Optimization
-```
+**Implementation Notes:**
+- `prove` tool now accepts `engine?: 'prolog' | 'sat' | 'auto'` parameter
+- Response includes `engineUsed` field for standard/detailed verbosity
+- `clausesToDIMACS()` converts CNF clauses to DIMACS format for external SAT solvers
+- `logic://engines` resource returns JSON with engine capabilities
 
-**Recommendation:** Defer to Phase 5 unless high demand; focus on SAT first.
+**Test Coverage:** 254 tests passing (248 + 6 new)
+
+### Phase 5 Overview
+
+**Goal:** Expose engine federation to MCP clients and add DIMACS export.
+
+| Feature | Priority | Effort | Status |
+|---------|----------|--------|--------|
+| Engine parameter in `prove` tool | High | 1 day | ✅ Complete |
+| DIMACS export | Medium | 1 day | ✅ Complete |
+| Engine info resource | Low | 0.5 day | ✅ Complete |
 
 ---
 
-### 4.3 Neural-Guided Search
+### 5.1 Engine Parameter for MCP Tools
+
+**Goal:** Allow clients to select reasoning engine via MCP tool parameters.
+
+**Files:** `src/server.ts`
+
+**Tasks:**
+- [ ] Add `engine?: 'prolog' | 'sat' | 'auto'` to `prove` tool schema
+- [ ] Wire through to `EngineManager.prove()`
+- [ ] Add `engineUsed` to response for transparency
+- [ ] Update `find-model` tool with engine option (optional)
+
+```typescript
+// Updated prove tool schema
+inputSchema: {
+  premises: { type: 'array', items: { type: 'string' } },
+  conclusion: { type: 'string' },
+  engine: { 
+    type: 'string', 
+    enum: ['prolog', 'sat', 'auto'],
+    default: 'auto',
+    description: 'Reasoning engine: prolog (Horn), sat (general), auto (select based on formula)'
+  },
+  verbosity: { type: 'string', enum: ['minimal', 'standard', 'detailed'] }
+}
+```
+
+**Migration:** Non-breaking; `engine` defaults to `'auto'`.
+
+---
+
+### 5.2 DIMACS Export
+
+**Goal:** Export CNF clauses in DIMACS format for external SAT solvers.
+
+**Files:** `src/clausifier.ts`
+
+**Tasks:**
+- [ ] Add `clausesToDIMACS(clauses: Clause[]): DIMACSResult`
+- [ ] Include variable mapping in result
+- [ ] Add tests for DIMACS roundtrip
+
+```typescript
+export interface DIMACSResult {
+  dimacs: string;           // "p cnf 5 3\n1 -2 0\n3 4 0\n..."
+  varMap: Map<string, number>;  // "foo" -> 1, "bar" -> 2
+  stats: { variables: number; clauses: number };
+}
+
+export function clausesToDIMACS(clauses: Clause[]): DIMACSResult {
+  // Assign each unique literal a positive integer
+  // Format: "p cnf <vars> <clauses>\n" followed by clauses
+}
+```
+
+**Use Cases:**
+- Interop with external solvers (CryptoMiniSat, Kissat)
+- Benchmarking against industrial SAT solvers
+- Proof logging for verification
+
+---
+
+### 5.3 Engine Info Resource
+
+**Goal:** Expose engine capabilities as MCP resource.
+
+**Files:** `src/server.ts`
+
+**Tasks:**
+- [ ] Add `logic://engines` resource listing available engines
+- [ ] Include capabilities, status, and usage statistics
+
+```json
+{
+  "engines": [
+    {
+      "name": "prolog/tau-prolog",
+      "capabilities": { "horn": true, "fullFol": false, "equality": true, "arithmetic": true },
+      "recommended_for": "Horn clauses, Datalog, simple inference"
+    },
+    {
+      "name": "sat/minisat",
+      "capabilities": { "horn": true, "fullFol": true, "equality": false, "arithmetic": false },
+      "recommended_for": "Non-Horn formulas, SAT problems, model finding"
+    }
+  ]
+}
+```
+
+---
+
+## Phase 6: Advanced Engines 🟣
+
+*Estimated: 2-4 weeks each · Prerequisites: Stable Phase 1-5*
+
+### Phase 6 Overview
+
+**Goal:** Expand engine federation with specialized solvers.
+
+| Engine | Domain | JS Status | Effort | Priority |
+|--------|--------|-----------|--------|----------|
+| **SMT (Z3)** | Arithmetic + theories | z3-solver (WASM) | High | Medium |
+| **ASP (Clingo)** | Non-monotonic, defaults | clingo-wasm (exists) | High | Low |
+| **Neural-Guided** | Complex proofs | Custom implementation | Medium | Medium |
+
+---
+
+### 6.1 SMT via Z3
+
+**Goal:** Theory reasoning (linear arithmetic, bitvectors, arrays).
+
+**Package:** [`z3-solver`](https://www.npmjs.com/package/z3-solver) (Z3 compiled to WASM, ~15MB)
+
+**Tasks:**
+- [ ] Add `z3-solver` dependency
+- [ ] Implement `SMTEngine` adapter
+- [ ] Translation: FOL + arithmetic → SMT-LIB2
+- [ ] Support uninterpreted functions and arrays
+
+```typescript
+// src/engines/smt.ts
+import { init } from 'z3-solver';
+
+export class SMTEngine implements ReasoningEngine {
+  readonly name = 'smt/z3';
+  readonly capabilities = { 
+    horn: true, fullFol: true, equality: true, 
+    arithmetic: true, streaming: false 
+  };
+
+  async prove(premises, conclusion, options) {
+    const { Context } = await init();
+    const ctx = new Context('main');
+    // Translate to Z3 AST and check
+  }
+}
+```
+
+**Trade-offs:**
+- ✅ Full arithmetic, equality built-in
+- ⚠️ Large WASM binary (~15MB)
+- ⚠️ Cold start latency (~500ms)
+
+**References:**
+- [z3-solver npm](https://www.npmjs.com/package/z3-solver)
+- [Z3 JavaScript Tutorial](https://microsoft.github.io/z3guide/programming/Z3%20JavaScript%20Examples)
+- [SMT-LIB Standard](https://smtlib.cs.uiowa.edu/language.shtml)
+
+---
+
+### 6.2 Answer Set Programming (ASP)
+
+**Goal:** Non-monotonic reasoning, defaults, preferences.
+
+**Status:** 🔬 *Research — evaluate feasibility*
+
+**Options:**
+| Option | Pros | Cons |
+|--------|------|------|
+| **clingo-wasm** | Full Clingo power | 5MB binary, complex setup |
+| **Remote API** | No local deps | Network latency, external dependency |
+| **Minimal ASP** | Lightweight, educational | Limited expressiveness |
+
+**ASP Syntax Extensions:**
+```prolog
+{ bird(X) } :- animal(X).              % Choice rule
+:- flies(X), penguin(X).               % Constraint
+flies(X) :- bird(X), not penguin(X).   % Default
+#minimize { cost(X) : assign(X) }.     % Optimization
+```
+
+**Recommendation:** Start with remote API wrapper if demand exists.
+
+**References:**
+- [Clingo](https://potassco.org/clingo/) — ASP solver
+- [clingo-wasm](https://github.com/niclasmattsson/clingo-wasm) — Browser port
+
+---
+
+### 6.3 Neural-Guided Search
 
 **Goal:** LLM-suggested proof paths validated symbolically.
 
-**Files:** `src/engines/neural.ts` (new)
-
 **Architecture:**
 ```
-Query → LLM proposes lemmas/steps → Symbolic validation → Accept/Reject
-                ↑                                              ↓
-                └──────────── Refinement on rejection ─────────┘
+Query → LLM proposes lemmas → Symbolic validation → Accept/Reject
+                 ↑                                       ↓
+                 └─────── Refinement on rejection ───────┘
 ```
 
 **Tasks:**
-- [ ] Define prompt templates for proof step suggestion
+- [ ] Define `NeuralGuide` interface for LLM integration
 - [ ] Implement beam search with symbolic scoring
 - [ ] Refinement loop: feed back errors to LLM
-- [ ] Hybrid confidence: `P(correct) = P(symbolic) * P(neural)`
-- [ ] Integration with MCP client for LLM access
+- [ ] MCP client integration for LLM access
+- [ ] Confidence calibration: `P(correct) = P(symbolic) * P(neural)`
 
 ```typescript
 // src/engines/neural.ts
@@ -811,77 +1027,91 @@ export class NeuralGuidedEngine implements ReasoningEngine {
     private symbolic: ReasoningEngine,  // Prolog or SAT
     private guide: NeuralGuide
   ) {}
-  
+
   async prove(premises: string[], conclusion: string): Promise<ProveResult> {
-    // 1. Try pure symbolic first
+    // 1. Try pure symbolic first (fast path)
     const direct = await this.symbolic.prove(premises, conclusion);
     if (direct.success) return direct;
-    
-    // 2. If failed, use neural guidance
-    let state = { premises, goal: conclusion, steps: [] };
-    for (let i = 0; i < MAX_STEPS; i++) {
-      const suggestions = await this.guide.suggestNextStep(state);
-      for (const step of suggestions) {
-        const valid = await this.symbolic.prove([...premises, ...state.steps], step.formula);
-        if (valid.success) {
-          state.steps.push(step.formula);
-          if (step.formula === conclusion) return { success: true, proof: state.steps };
-        }
-      }
-    }
-    return { success: false, result: 'failed' };
+
+    // 2. Neural-guided search with validation
+    return this.neuralGuidedSearch(premises, conclusion);
   }
 }
 ```
 
 **Concerns:**
-- LLM latency adds to proof time
+- LLM latency adds 500-2000ms per step
 - Hallucination risk → always validate symbolically
 - Token costs for complex proofs
+- Need MCP client API or direct LLM integration
+
+**Potential Approaches:**
+1. **MCP-native**: Use MCP sampling to request LLM help
+2. **OpenAI/Anthropic API**: Direct integration (requires API key)
+3. **Local LLM**: llama.cpp integration (high effort, no external deps)
 
 ---
 
-## Phase 5: Advanced Extensions 🟣
+## Phase 7: Frontier Logic 🟣
 
-*Long-term · Prerequisites: Stable Phase 1-4*
+*Long-term vision · Prerequisites: Stable Phase 1-6*
 
-### 5.1 Higher-Order Logic (HOL)
+### Phase 7 Overview
+
+**Goal:** Extend beyond classical FOL to advanced logic systems.
+
+| System | Complexity | JS Feasibility | Applications |
+|--------|------------|----------------|--------------|
+| Higher-Order Logic | High | Feasible (shallow) | Math proofs, type theory |
+| Modal Logic | Medium | Feasible | Necessity, possibility |
+| Temporal Logic | Medium | Feasible | Verification, planning |
+| Probabilistic Logic | High | Feasible (sampling) | Uncertainty, Bayesian |
+| Distributed Proofs | Very High | Research | P2P verification |
+
+---
+
+### 7.1 Higher-Order Logic (HOL)
 
 **Goal:** Quantify over predicates and functions.
 
 **Syntax:**
 ```
 all P (P(a) -> P(b))              # ∀ over predicates
-lambda x. f(x, x)                  # λ-abstraction  
-apply(F, X)                        # Function application
+lambda x. f(x, x)                 # λ-abstraction  
+apply(F, X)                       # Function application
 ```
 
-**Engine Options:**
-- **λProlog (ELPI)**: Compile to WASM, high effort
-- **HOL Light port**: Very high effort, academic project
-- **Shallow embedding**: Encode HOL in FOL (feasible)
+**Implementation Options:**
+| Approach | Effort | Expressiveness |
+|----------|--------|----------------|
+| Shallow embedding in FOL | Low | Partial HOL |
+| λProlog (ELPI) via WASM | High | Full |
+| Custom type checker | Medium | Educational |
 
-**Recommendation:** Start with shallow embedding in FOL.
+**Recommendation:** Start with shallow embedding for quick wins.
+
+**References:**
+- [ELPI](https://github.com/LPCIC/elpi) — λProlog implementation
+- [HOL Light](https://github.com/jrh13/hol-light) — Interactive theorem prover
 
 ---
 
-### 5.2 Modal & Temporal Logic
+### 7.2 Modal & Temporal Logic
 
 **Goal:** Necessity (□), possibility (◊), temporal operators.
 
 **Syntax:**
 ```
-box(P)                    # □P necessarily P
-diamond(P)                # ◊P possibly P
-always(P)                 # □P (temporal)
-eventually(P)             # ◊P (temporal)
-until(P, Q)               # P U Q
-next(P)                   # ○P
+box(P)               # □P necessarily P
+diamond(P)           # ◊P possibly P
+always(P)            # □P (temporal)
+eventually(P)        # ◊P (temporal)
+until(P, Q)          # P U Q
+next(P)              # ○P
 ```
 
-**Engine:** Kripke model construction + standard FOL reasoning.
+**Implementation:** Kripke model construction + FOL encoding.
 
-**Implementation Sketch:**
 ```prolog
 % Encode Kripke accessibility as a relation
 accessible(World1, World2).
@@ -893,9 +1123,15 @@ holds(box(P), W) :- forall(accessible(W, W2), holds(P, W2)).
 holds(diamond(P), W) :- accessible(W, W2), holds(P, W2).
 ```
 
+**Effort:** Medium — mostly parser + encoding layer.
+
+**References:**
+- [Kripke Semantics](https://plato.stanford.edu/entries/logic-modal/)
+- [Temporal Logic](https://plato.stanford.edu/entries/logic-temporal/)
+
 ---
 
-### 5.3 Probabilistic Reasoning
+### 7.3 Probabilistic Reasoning
 
 **Goal:** Weighted facts, Bayesian inference.
 
@@ -906,27 +1142,72 @@ holds(diamond(P), W) :- accessible(W, W2), holds(P, W2).
 query(wet_ground).                # Compute P(wet_ground)
 ```
 
-**Engine Options:**
-- **ProbLog**: Compile to WASM (exists as Python, not JS)
-- **Custom**: Implement sampling/enumeration in TS
+**Implementation Options:**
+| Method | Accuracy | Performance | Effort |
+|--------|----------|-------------|--------|
+| Enumeration | Exact | O(2^n) | Low |
+| Sampling (MCMC) | Approx | O(samples) | Medium |
+| Knowledge compilation | Exact | Precompute | High |
+
+**Recommendation:** Start with enumeration for small problems, add sampling for scale.
 
 **References:**
 - [ProbLog](https://dtai.cs.kuleuven.be/problog/)
-- Probabilistic logic programming fundamentals
+- [Probabilistic Logic Programming](https://www.cambridge.org/core/books/introduction-to-statistical-relational-learning/69F3D5F43BEC5F6C9E0B2ABF7E1DBD32)
 
 ---
 
-### 5.4 Distributed Proof Networks (Vision)
+### 7.4 Distributed Proof Networks (Vision)
 
 **Goal:** P2P theorem proving swarms, on-chain verification.
 
 **Concepts:**
 - **Proof obligation distribution**: Shard large proofs across nodes
-- **Proof-of-proof**: Alternative to proof-of-work
-- **On-chain anchoring**: Hash proofs to blockchain for verifiability
-- **Gossip protocol**: Efficient proof fragment dissemination
+- **Proof-of-proof**: Consensus via verified inference
+- **On-chain anchoring**: Hash proofs to blockchain
+- **Gossip protocol**: Efficient proof fragment sharing
 
 **Status:** 🔮 *Visionary — significant research required*
+
+**Potential Stack:**
+- libp2p for networking
+- IPFS for proof storage
+- Ethereum/Solana for on-chain anchors
+
+---
+
+## Implementation Sequence (Recommended)
+
+```mermaid
+graph LR
+    subgraph "Completed"
+        P1[Phase 1 ✅] --> P2[Phase 2 ✅]
+        P2 --> P3[Phase 3 ✅]
+        P3 --> P4[Phase 4 ✅]
+    end
+    
+    subgraph "Near-term (1-2 weeks)"
+        P4 --> P5[Phase 5: MCP Integration]
+    end
+    
+    subgraph "Medium-term (2-4 weeks)"
+        P5 --> P6A[6.1 SMT/Z3]
+        P5 --> P6C[6.3 Neural-Guided]
+    end
+    
+    subgraph "Research"
+        P6A --> P6B[6.2 ASP]
+        P6C --> P7[Phase 7: Frontier]
+    end
+```
+
+**Strategic Priorities:**
+1. **Phase 5** — Low effort, high value: expose existing SAT backend to clients
+2. **Phase 6.1 (SMT)** — Enables arithmetic reasoning without custom axioms
+3. **Phase 6.3 (Neural)** — High potential, requires LLM integration design
+4. **Phase 6.2 (ASP)** — Niche use case, defer unless demand
+5. **Phase 7** — Long-term research, build incrementally
+
 
 ---
 

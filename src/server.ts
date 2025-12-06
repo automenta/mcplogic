@@ -11,10 +11,16 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
     CallToolRequestSchema,
     ListToolsRequestSchema,
+    ListResourcesRequestSchema,
+    ReadResourceRequestSchema,
+    ListPromptsRequestSchema,
+    GetPromptRequestSchema,
     Tool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { listResources, getResourceContent } from './resources/index.js';
+import { listPrompts, getPrompt } from './prompts/index.js';
 
-import { LogicEngine, createLogicEngine } from './logicEngine.js';
+// LogicEngine is now accessed via EngineManager
 import { validateFormulas } from './syntaxValidator.js';
 import { CategoricalHelpers, monoidAxioms, groupAxioms } from './categoricalHelpers.js';
 import { ModelFinder, createModelFinder } from './modelFinder.js';
@@ -26,6 +32,7 @@ import {
     ProveResult,
     ModelResult,
 } from './types/index.js';
+import { createEngineManager, EngineSelection } from './engines/manager.js';
 
 /**
  * Verbosity parameter schema for tools
@@ -139,15 +146,17 @@ export function createServer(): Server {
         {
             capabilities: {
                 tools: {},
+                resources: {},
+                prompts: {},
             },
         }
     );
 
     // Initialize engines and managers
-    const logicEngine = createLogicEngine();
     const modelFinder = createModelFinder();
     const categoricalHelpers = new CategoricalHelpers();
     const sessionManager = createSessionManager();
+    const engineManager = createEngineManager();
 
     // Define available tools
     const tools: Tool[] = [
@@ -190,6 +199,11 @@ export function createServer(): Server {
                     enable_equality: {
                         type: 'boolean',
                         description: 'Auto-inject equality axioms (reflexivity, symmetry, transitivity, congruence). Default: false.',
+                    },
+                    engine: {
+                        type: 'string',
+                        enum: ['prolog', 'sat', 'auto'],
+                        description: "Reasoning engine: 'prolog' (Horn clauses), 'sat' (general FOL), 'auto' (select based on formula). Default: 'auto'.",
                     },
                     verbosity: verbositySchema,
                 },
@@ -554,6 +568,69 @@ If found, proves the conclusion doesn't logically follow.`,
         return { tools };
     });
 
+    // ==================== MCP RESOURCES HANDLERS ====================
+
+    // Handle list_resources request
+    server.setRequestHandler(ListResourcesRequestSchema, async () => {
+        return {
+            resources: listResources().map(r => ({
+                uri: r.uri,
+                name: r.name,
+                description: r.description,
+                mimeType: r.mimeType,
+            })),
+        };
+    });
+
+    // Handle read_resource request
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+        const { uri } = request.params;
+        const content = getResourceContent(uri);
+
+        if (content === null) {
+            throw new Error(`Resource not found: ${uri}`);
+        }
+
+        return {
+            contents: [
+                {
+                    uri,
+                    mimeType: 'text/plain',
+                    text: content,
+                },
+            ],
+        };
+    });
+
+    // ==================== MCP PROMPTS HANDLERS ====================
+
+    // Handle list_prompts request
+    server.setRequestHandler(ListPromptsRequestSchema, async () => {
+        return {
+            prompts: listPrompts().map(p => ({
+                name: p.name,
+                description: p.description,
+                arguments: p.arguments,
+            })),
+        };
+    });
+
+    // Handle get_prompt request
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+        const { name, arguments: promptArgs } = request.params;
+        const result = getPrompt(name, promptArgs || {});
+
+        if (result === null) {
+            throw new Error(`Prompt not found: ${name}`);
+        }
+
+        // Return in MCP format: description + messages array
+        return {
+            description: result.description,
+            messages: result.messages,
+        };
+    });
+
     // Handle call_tool request
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: args } = request.params;
@@ -565,12 +642,13 @@ If found, proves the conclusion doesn't logically follow.`,
             switch (name) {
                 // ==================== CORE REASONING TOOLS ====================
                 case 'prove': {
-                    const { premises, conclusion, inference_limit, enable_arithmetic, enable_equality } = args as {
+                    const { premises, conclusion, inference_limit, enable_arithmetic, enable_equality, engine: engineParam } = args as {
                         premises: string[];
                         conclusion: string;
                         inference_limit?: number;
                         enable_arithmetic?: boolean;
                         enable_equality?: boolean;
+                        engine?: EngineSelection;
                     };
 
                     // Validate syntax first
@@ -582,14 +660,20 @@ If found, proves the conclusion doesn't logically follow.`,
                         break;
                     }
 
-                    // Create engine with custom inference limit if specified
-                    const engine = inference_limit ? createLogicEngine(undefined, inference_limit) : logicEngine;
-                    const proveResult = await engine.prove(premises, conclusion, {
+                    // Use engineManager for engine-federated proving
+                    const proveResult = await engineManager.prove(premises, conclusion, {
                         verbosity,
                         enableArithmetic: enable_arithmetic,
                         enableEquality: enable_equality,
+                        engine: engineParam ?? 'auto',
                     });
-                    result = buildProveResponse(proveResult, verbosity);
+
+                    // Include engineUsed in response for standard/detailed verbosity
+                    const response = buildProveResponse(proveResult, verbosity);
+                    if (verbosity !== 'minimal' && proveResult.engineUsed) {
+                        (response as any).engineUsed = proveResult.engineUsed;
+                    }
+                    result = response;
                     break;
                 }
 
@@ -749,11 +833,9 @@ If found, proves the conclusion doesn't logically follow.`,
                     }
 
                     const session = sessionManager.get(session_id);
-                    const engine = inference_limit
-                        ? createLogicEngine(undefined, inference_limit)
-                        : logicEngine;
 
-                    const proveResult = await engine.prove(session.premises, goal, { verbosity });
+                    // Use engineManager for consistent engine selection
+                    const proveResult = await engineManager.prove(session.premises, goal, { verbosity });
                     result = {
                         session_id: session.id,
                         premise_count: session.premises.length,

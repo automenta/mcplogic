@@ -6,14 +6,34 @@ Original: https://github.com/angrysky56/mcp-logic/
 
 ## Features
 
-- **Theorem Proving** - Prove logical statements using resolution
-- **Model Finding** - Find finite models satisfying premises
-- **Counterexample Detection** - Find models showing conclusions don't follow
-- **Syntax Validation** - Pre-validate formulas with detailed error messages
-- **Categorical Reasoning** - Built-in support for category theory proofs
-- **Session-Based Reasoning** - Incremental knowledge base construction
-- **Verbosity Control** - Token-efficient responses for LLM chains
-- **Self-Contained** - Pure npm dependencies, no external binaries
+### Core Reasoning
+- **Theorem Proving** — Prove logical statements using resolution
+- **Model Finding** — Find finite models satisfying premises
+- **Counterexample Detection** — Find models showing conclusions don't follow
+- **Syntax Validation** — Pre-validate formulas with detailed error messages
+
+### Engine Federation
+- **Multi-Engine Architecture** — Automatic engine selection based on formula structure
+- **Prolog Engine** (Tau-Prolog) — Efficient for Horn clauses, Datalog, equality reasoning
+- **SAT Engine** (MiniSat) — Handles general FOL and non-Horn formulas
+- **Engine Parameter** — Explicit engine selection: `'prolog'`, `'sat'`, or `'auto'`
+
+### Advanced Logic
+- **Arithmetic Support** — Built-in predicates: `lt`, `gt`, `plus`, `minus`, `times`, `divides`
+- **Equality Reasoning** — Reflexivity, symmetry, transitivity, congruence axioms
+- **CNF Clausification** — Transform FOL to Conjunctive Normal Form
+- **DIMACS Export** — Export CNF for external SAT solvers
+
+### MCP Protocol
+- **Session-Based Reasoning** — Incremental knowledge base construction
+- **Axiom Resources** — Browsable axiom libraries (category theory, Peano, ZFC, etc.)
+- **Reasoning Prompts** — Templates for proof by contradiction, formalization, etc.
+- **Verbosity Control** — Token-efficient responses for LLM chains
+
+### Infrastructure
+- **Self-Contained** — Pure npm dependencies, no external binaries
+- **Structured Errors** — Machine-readable error information with suggestions
+- **254 Tests** — Comprehensive test coverage
 
 ## Quick Start
 
@@ -21,7 +41,7 @@ Original: https://github.com/angrysky56/mcp-logic/
 
 ```bash
 git clone <repository>
-cd nodejs
+cd mcplogic
 npm install
 npm run build
 ```
@@ -46,7 +66,7 @@ Add to your MCP configuration:
   "mcpServers": {
     "mcp-logic": {
       "command": "node",
-      "args": ["/path/to/nodejs/dist/index.js"]
+      "args": ["/path/to/mcplogic/dist/index.js"]
     }
   }
 }
@@ -58,7 +78,7 @@ Add to your MCP configuration:
 
 | Tool | Description |
 |------|-------------|
-| **prove** | Prove statements using resolution |
+| **prove** | Prove statements using resolution with engine selection |
 | **check-well-formed** | Validate formula syntax with detailed errors |
 | **find-model** | Find finite models satisfying premises |
 | **find-counterexample** | Find counterexamples showing statements don't follow |
@@ -77,14 +97,103 @@ Add to your MCP configuration:
 | **clear-session** | Clear all premises (keeps session alive) |
 | **delete-session** | Delete a session entirely |
 
+## Engine Selection
+
+The `prove` tool supports automatic or explicit engine selection:
+
+```json
+{
+  "name": "prove",
+  "arguments": {
+    "premises": ["foo | bar", "-foo"],
+    "conclusion": "bar",
+    "engine": "auto"
+  }
+}
+```
+
+| Engine | Best For | Capabilities |
+|--------|----------|--------------|
+| `prolog` | Horn clauses, Datalog | Equality, arithmetic, efficient unification |
+| `sat` | Non-Horn formulas, SAT problems | Full FOL, CNF solving |
+| `auto` | Default — selects based on formula | Analyzes clause structure |
+
+The response includes `engineUsed` to show which engine was selected:
+```json
+{ "success": true, "result": "proved", "engineUsed": "sat/minisat" }
+```
+
+## Arithmetic and Equality
+
+### Arithmetic Support
+
+Enable with `enable_arithmetic: true`:
+
+```json
+{
+  "name": "prove",
+  "arguments": {
+    "premises": ["lt(1, 2)", "lt(2, 3)", "all x all y all z ((lt(x,y) & lt(y,z)) -> lt(x,z))"],
+    "conclusion": "lt(1, 3)",
+    "enable_arithmetic": true
+  }
+}
+```
+
+**Built-in predicates:** `lt`, `gt`, `le`, `ge`, `plus`, `minus`, `times`, `divides`, `mod`
+
+### Equality Reasoning
+
+Enable with `enable_equality: true`:
+
+```json
+{
+  "name": "prove",
+  "arguments": {
+    "premises": ["a = b", "P(a)"],
+    "conclusion": "P(b)",
+    "enable_equality": true
+  }
+}
+```
+
+Automatically injects reflexivity, symmetry, transitivity, and congruence axioms.
+
+## MCP Resources
+
+Browse axiom libraries via the MCP resources protocol:
+
+| Resource URI | Description |
+|--------------|-------------|
+| `logic://axioms/category` | Category theory axioms |
+| `logic://axioms/monoid` | Monoid structure |
+| `logic://axioms/group` | Group axioms |
+| `logic://axioms/peano` | Peano arithmetic |
+| `logic://axioms/set-zfc` | ZFC set theory basics |
+| `logic://axioms/propositional` | Propositional tautologies |
+| `logic://templates/syllogism` | Aristotelian syllogism patterns |
+| `logic://engines` | Available reasoning engines (JSON) |
+
+## MCP Prompts
+
+Reasoning templates for common tasks:
+
+| Prompt | Description |
+|--------|-------------|
+| `prove-by-contradiction` | Set up proof by contradiction |
+| `verify-equivalence` | Check formula equivalence |
+| `formalize` | Natural language to FOL translation guide |
+| `diagnose-unsat` | Diagnose unsatisfiable premises |
+| `explain-proof` | Explain proven theorem |
+
 ## Verbosity Control
 
-All tools support a `verbosity` parameter to control response size:
+All tools support a `verbosity` parameter:
 
 | Level | Description | Use Case |
 |-------|-------------|----------|
 | `minimal` | Just success/result | Token-efficient LLM chains |
-| `standard` | + message, bindings | Default balance |
+| `standard` | + message, bindings, engineUsed | Default balance |
 | `detailed` | + Prolog program, statistics | Debugging |
 
 ```json
@@ -100,22 +209,20 @@ All tools support a `verbosity` parameter to control response size:
 
 **Minimal response:** `{ "success": true, "result": "proved" }`
 
-**Detailed response:** Includes `prologProgram`, `statistics.timeMs`, etc.
-
 ## Formula Syntax
 
 This server uses first-order logic (FOL) syntax compatible with Prover9:
 
 ### Quantifiers
-- `all x (...)` - Universal quantification (∀x)
-- `exists x (...)` - Existential quantification (∃x)
+- `all x (...)` — Universal quantification (∀x)
+- `exists x (...)` — Existential quantification (∃x)
 
 ### Connectives
-- `->` - Implication (→)
-- `<->` - Biconditional (↔)
-- `&` - Conjunction (∧)
-- `|` - Disjunction (∨)
-- `-` - Negation (¬)
+- `->` — Implication (→)
+- `<->` — Biconditional (↔)
+- `&` — Conjunction (∧)
+- `|` — Disjunction (∨)
+- `-` — Negation (¬)
 
 ### Predicates and Terms
 - Predicates: `man(x)`, `loves(x, y)`, `greater(x, y)`
@@ -140,7 +247,7 @@ all x all y all z ((greater(x, y) & greater(y, z)) -> greater(x, z))
 
 ## Tool Usage Examples
 
-### 1. Prove a Theorem
+### 1. Prove a Theorem (with Engine Selection)
 
 ```json
 {
@@ -150,14 +257,26 @@ all x all y all z ((greater(x, y) & greater(y, z)) -> greater(x, z))
       "all x (man(x) -> mortal(x))",
       "man(socrates)"
     ],
-    "conclusion": "mortal(socrates)"
+    "conclusion": "mortal(socrates)",
+    "engine": "prolog"
   }
 }
 ```
 
-**Expected Result:** Theorem proved ✓
+### 2. Prove with SAT Engine (Non-Horn)
 
-### 2. Find a Counterexample
+```json
+{
+  "name": "prove",
+  "arguments": {
+    "premises": ["alpha | beta", "alpha -> gamma", "beta -> gamma"],
+    "conclusion": "gamma",
+    "engine": "sat"
+  }
+}
+```
+
+### 3. Find a Counterexample
 
 ```json
 {
@@ -169,41 +288,16 @@ all x all y all z ((greater(x, y) & greater(y, z)) -> greater(x, z))
 }
 ```
 
-**Expected Result:** Model found where `P(a)` is true but `P(b)` is false.
-
-### 3. Validate Syntax
-
-```json
-{
-  "name": "check-well-formed",
-  "arguments": {
-    "statements": [
-      "all x (P(x) -> Q(x))",
-      "P(a) &"
-    ]
-  }
-}
-```
-
-**Expected Result:** First formula valid, second has syntax error.
-
 ### 4. Session-Based Reasoning
-
-Build up a knowledge base incrementally:
 
 ```json
 // 1. Create a session
 { "name": "create-session", "arguments": { "ttl_minutes": 30 } }
-// → { "session_id": "abc-123...", "expires_at": "2024-..." }
 
 // 2. Assert premises
 { "name": "assert-premise", "arguments": { 
     "session_id": "abc-123...", 
     "formula": "all x (man(x) -> mortal(x))" 
-}}
-{ "name": "assert-premise", "arguments": { 
-    "session_id": "abc-123...", 
-    "formula": "man(socrates)" 
 }}
 
 // 3. Query the KB
@@ -211,120 +305,80 @@ Build up a knowledge base incrementally:
     "session_id": "abc-123...", 
     "goal": "mortal(socrates)" 
 }}
-// → { "success": true, "result": "proved" }
 
 // 4. Cleanup
 { "name": "delete-session", "arguments": { "session_id": "abc-123..." } }
 ```
 
-### 5. Verify Categorical Diagram
-
-```json
-{
-  "name": "verify-commutativity",
-  "arguments": {
-    "path_a": ["f", "g"],
-    "path_b": ["h"],
-    "object_start": "A",
-    "object_end": "C",
-    "with_category_axioms": true
-  }
-}
-```
-
-**Expected Result:** FOL premises and conclusion for proving `g ∘ f = h`.
-
-### 6. Get Category Theory Axioms
-
-```json
-{
-  "name": "get-category-axioms",
-  "arguments": {
-    "concept": "category"
-  }
-}
-```
-
-**Expected Result:** 6 axioms defining a category (identity, composition, associativity).
-
 ## Project Structure
 
 ```
-nodejs/
-├── package.json           # Project configuration
-├── tsconfig.json          # TypeScript configuration
-├── jest.config.js         # Test configuration
+mcplogic/
+├── package.json
+├── tsconfig.json
 ├── src/
-│   ├── index.ts           # CLI entry point
-│   ├── server.ts          # MCP server (13 tools)
-│   ├── parser.ts          # FOL tokenizer & parser
-│   ├── translator.ts      # FOL ↔ Prolog conversion
-│   ├── logicEngine.ts     # Tau-Prolog wrapper
-│   ├── syntaxValidator.ts # Syntax validation
+│   ├── index.ts              # CLI entry point
+│   ├── server.ts             # MCP server (13 tools)
+│   ├── parser.ts             # FOL tokenizer & parser
+│   ├── translator.ts         # FOL ↔ Prolog conversion
+│   ├── logicEngine.ts        # Tau-Prolog wrapper
+│   ├── clausifier.ts         # CNF clausification & DIMACS export
+│   ├── syntaxValidator.ts    # Syntax validation
 │   ├── categoricalHelpers.ts # Category theory
-│   ├── modelFinder.ts     # Finite model enumeration
-│   ├── sessionManager.ts  # Session lifecycle management
+│   ├── modelFinder.ts        # Finite model enumeration
+│   ├── sessionManager.ts     # Session lifecycle
+│   ├── equalityAxioms.ts     # Equality reasoning
+│   ├── engines/
+│   │   ├── interface.ts      # ReasoningEngine interface
+│   │   ├── manager.ts        # Engine federation
+│   │   ├── prolog.ts         # Prolog engine adapter
+│   │   └── sat.ts            # SAT engine adapter
+│   ├── resources/
+│   │   └── axioms.ts         # MCP resources
+│   ├── prompts/
+│   │   └── index.ts          # MCP prompts
 │   └── types/
-│       ├── index.ts       # Shared types & verbosity
-│       ├── errors.ts      # Structured error system
-│       └── tau-prolog.d.ts
-├── tests/
-│   ├── basic.test.ts
-│   ├── parser.test.ts
-│   ├── prover.test.ts
-│   ├── errors.test.ts     # Error system tests
-│   ├── session.test.ts    # Session management tests
-│   └── verbosity.test.ts  # Verbosity control tests
-└── dist/                  # Compiled output (after build)
-```
-
-## Development
-
-### Run Tests
-
-```bash
-npm test
-```
-
-### Build
-
-```bash
-npm run build
-```
-
-### Type Checking
-
-```bash
-npx tsc --noEmit
+│       ├── index.ts          # Shared types
+│       ├── errors.ts         # Structured errors
+│       └── clause.ts         # CNF clause types
+└── tests/                    # 254 tests
 ```
 
 ## Technical Details
 
-### Logic Engine
+### Engine Federation
 
-The server uses **Tau-Prolog** as its core inference engine. Tau-Prolog is an ISO-compliant Prolog interpreter written entirely in JavaScript, enabling:
+The `EngineManager` automatically selects the best engine:
 
-- Resolution-based theorem proving
-- Unification and backtracking
-- No external binary dependencies
+1. **Formula Analysis** — Clausifies input to determine structure
+2. **Horn Check** — If all clauses are Horn, uses Prolog
+3. **SAT Fallback** — Non-Horn formulas route to MiniSat
+4. **Explicit Override** — `engine` parameter forces specific engine
 
-### Model Finder
+### CNF Clausification
 
-For counterexample detection and model finding, the server includes a custom **finite model enumerator** that:
+The clausifier transforms arbitrary FOL to CNF:
 
-- Searches domains of increasing size (2-10 elements)
-- Enumerates all possible interpretations
-- Checks formula satisfaction
-- Returns the first satisfying model
+1. Eliminate biconditionals and implications
+2. Push negations inward (NNF)
+3. Standardize variable names
+4. Skolemize existentials
+5. Drop universal quantifiers
+6. Distribute OR over AND
+7. Extract clauses
 
-### Session Manager
+### DIMACS Export
 
-Sessions enable incremental knowledge base construction:
+For external SAT solver interop:
 
-- **TTL-based expiration** - Sessions auto-expire (default: 30 minutes)
-- **Garbage collection** - Expired sessions cleaned up every minute
-- **Memory protection** - Maximum 1000 concurrent sessions
-- **CRUD operations** - Assert, retract, list, clear premises
+```typescript
+import { clausify, clausesToDIMACS } from './clausifier';
+
+const result = clausify('(P -> Q) & P');
+const dimacs = clausesToDIMACS(result.clauses);
+// dimacs.dimacs = "p cnf 2 2\n-1 2 0\n1 0"
+// dimacs.varMap = Map { 'P' => 1, 'Q' => 2 }
+```
 
 ### Structured Errors
 
@@ -335,76 +389,43 @@ interface LogicError {
   code: LogicErrorCode;    // 'PARSE_ERROR' | 'INFERENCE_LIMIT' | ...
   message: string;
   span?: { start, end, line, col };
-  suggestion?: string;     // How to fix
-  context?: string;        // The problematic input
+  suggestion?: string;
+  context?: string;
 }
 ```
-
-### Syntax Translation
-
-Since Tau-Prolog uses Prolog syntax, the server includes a translator that converts between:
-
-- **Input:** Prover9-style FOL (`all x (man(x) -> mortal(x))`)
-- **Internal:** Prolog rules (`mortal(X) :- man(X).`)
-
-This translation is transparent to users.
-
-## Limitations
-
-1. **Inference Depth:** Complex proofs may exceed inference limits
-2. **Model Size:** Model finder is limited to small finite domains (≤10 elements)
-3. **Function Symbols:** Limited support for complex function terms
-4. **Higher-Order Logic:** Only first-order logic is supported
-
-## Troubleshooting
-
-### "No proof found" for valid theorem
-- Try simpler premises
-- Check for syntax errors with `check-well-formed`
-- Increase `inference_limit` for complex proofs (default: 1000)
-
-### Model finder returns "no_model"
-- Increase `max_domain_size` parameter (default: 10)
-- Simplify the formula
-- Check for contradictory premises
-
-### Syntax validation warnings
-- Use lowercase for predicates/functions
-- Add spaces around operators for readability
-- Ensure balanced parentheses
-
-### Session errors
-- Check session hasn't expired (default TTL: 30 minutes)
-- Verify session_id is correct
-- Use `list-premises` to inspect session state
 
 ## API Reference
 
 ### prove
+
 ```typescript
 interface ProveArgs {
-  premises: string[];       // List of FOL premises
-  conclusion: string;       // Goal to prove
-  inference_limit?: number; // Max inference steps (default: 1000)
+  premises: string[];
+  conclusion: string;
+  inference_limit?: number;     // Max steps (default: 1000)
+  engine?: 'prolog' | 'sat' | 'auto';  // Engine selection
+  enable_arithmetic?: boolean;  // Enable arithmetic predicates
+  enable_equality?: boolean;    // Inject equality axioms
   verbosity?: 'minimal' | 'standard' | 'detailed';
 }
 
 interface ProveResult {
   success: boolean;
   result: 'proved' | 'failed' | 'timeout' | 'error';
-  message?: string;         // Human-readable message
-  proof?: string[];
+  message?: string;
+  engineUsed?: string;          // Which engine was used
   bindings?: Record<string, string>[];
-  error?: string;
-  prologProgram?: string;   // (detailed only)
-  statistics?: { timeMs: number; inferences?: number };  // (detailed only)
+  proof?: string[];
+  prologProgram?: string;       // (detailed only)
+  statistics?: { timeMs: number; inferences?: number };
 }
 ```
 
 ### check-well-formed
+
 ```typescript
 interface CheckArgs {
-  statements: string[];  // Formulas to validate
+  statements: string[];
   verbosity?: 'minimal' | 'standard' | 'detailed';
 }
 
@@ -419,12 +440,13 @@ interface ValidationResult {
 }
 ```
 
-### find-model
+### find-model / find-counterexample
+
 ```typescript
 interface FindModelArgs {
-  premises: string[];         // Formulas to satisfy
-  domain_size?: number;       // Specific size or search 2-max
-  max_domain_size?: number;   // Maximum domain size to try (default: 10)
+  premises: string[];
+  domain_size?: number;
+  max_domain_size?: number;     // Default: 10
   verbosity?: 'minimal' | 'standard' | 'detailed';
 }
 
@@ -436,109 +458,53 @@ interface ModelResult {
     predicates: Record<string, string[]>;
     constants: Record<string, number>;
   };
-  interpretation?: string;
-  statistics?: { domainSize: number; searchedSizes: number[]; timeMs: number };
 }
-```
-
-### find-counterexample
-```typescript
-interface CounterexampleArgs {
-  premises: string[];
-  conclusion: string;
-  domain_size?: number;
-  max_domain_size?: number;  // Maximum domain size to try (default: 10)
-  verbosity?: 'minimal' | 'standard' | 'detailed';
-}
-// Returns ModelResult with counterexample interpretation
 ```
 
 ### Session Tools
 
 ```typescript
 // create-session
-interface CreateSessionArgs {
-  ttl_minutes?: number;  // Session lifetime (default: 30, max: 1440)
-}
-interface CreateSessionResult {
-  session_id: string;
-  created_at: string;
-  expires_at: string;
-  ttl_minutes: number;
-  active_sessions: number;
-}
+{ session_id: string; expires_at: string; ttl_minutes: number }
 
 // assert-premise
-interface AssertPremiseArgs {
-  session_id: string;
-  formula: string;
-}
+{ success: boolean; premise_count: number }
 
 // query-session
-interface QuerySessionArgs {
-  session_id: string;
-  goal: string;
-  inference_limit?: number;
-  verbosity?: 'minimal' | 'standard' | 'detailed';
-}
-
-// retract-premise
-interface RetractPremiseArgs {
-  session_id: string;
-  formula: string;  // Exact formula to remove
-}
+{ success: boolean; result: string; engineUsed?: string }
 
 // list-premises
-interface ListPremisesArgs {
-  session_id: string;
-}
-interface ListPremisesResult {
-  session_id: string;
-  premise_count: number;
-  premises: string[];
-}
-
-// clear-session
-interface ClearSessionArgs {
-  session_id: string;
-}
-
-// delete-session
-interface DeleteSessionArgs {
-  session_id: string;
-}
+{ premises: string[]; premise_count: number }
 ```
 
-### verify-commutativity
-```typescript
-interface CommutativityArgs {
-  path_a: string[];          // Morphisms in first path
-  path_b: string[];          // Morphisms in second path
-  object_start: string;      // Starting object
-  object_end: string;        // Ending object
-  with_category_axioms?: boolean;  // Include category axioms (default: true)
-  verbosity?: 'minimal' | 'standard' | 'detailed';
-}
+## Limitations
 
-interface CommutativityResult {
-  premises: string[];
-  conclusion: string;
-  note: string;
-}
-```
+1. **Inference Depth** — Complex proofs may exceed limits
+2. **Model Size** — Finder limited to domains ≤10 elements
+3. **SAT Variables** — Arithmetic not supported in SAT engine
+4. **Higher-Order** — Only first-order logic supported
 
-### get-category-axioms
-```typescript
-interface AxiomsArgs {
-  concept: 'category' | 'functor' | 'natural-transformation' | 'monoid' | 'group';
-  functor_name?: string;     // For functor axioms (default: 'F')
-  verbosity?: 'minimal' | 'standard' | 'detailed';
-}
+## Troubleshooting
 
-interface AxiomsResult {
-  concept: string;
-  axioms: string[];
-}
+### "No proof found" for valid theorem
+- Increase `inference_limit` for complex proofs
+- Try `engine: 'sat'` for non-Horn formulas
+- Enable `enable_equality` if using equality
+
+### Model finder returns "no_model"
+- Increase `max_domain_size`
+- Check for contradictory premises
+
+### Session errors
+- Check session hasn't expired (default: 30 min)
+- Use `list-premises` to inspect state
+
+## Development
+
+```bash
+npm test          # Run 254 tests
+npm run build     # Compile TypeScript
+npx tsc --noEmit  # Type check only
 ```
 
 ## License

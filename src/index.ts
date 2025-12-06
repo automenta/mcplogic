@@ -20,7 +20,7 @@ Options:
   --help, -h     Show this help message
   --version, -v  Show version information
 
-This server provides the following tools via MCP:
+Core Tools:
   - prove              Prove statements using resolution
   - check-well-formed  Validate formula syntax
   - find-model         Find finite models satisfying premises
@@ -28,13 +28,26 @@ This server provides the following tools via MCP:
   - verify-commutativity Generate categorical diagram verification
   - get-category-axioms Get axioms for category theory concepts
 
+Session Tools:
+  - create-session     Create a reasoning session
+  - assert-premise     Add formula to session KB
+  - query-session      Query session knowledge base
+  - retract-premise    Remove formula from session
+  - list-premises      List session premises
+  - clear-session      Clear session premises
+  - delete-session     Delete session
+
+MCP Capabilities:
+  - Resources: Browsable axiom libraries (category, group, peano, etc.)
+  - Prompts: Reasoning templates (prove-by-contradiction, formalize, etc.)
+
 The server communicates via stdio using the Model Context Protocol.
 `);
         process.exit(0);
     }
 
     if (args.includes('--version') || args.includes('-v')) {
-        console.log('mcp-logic version 1.0.0');
+        console.log('mcp-logic version 1.1.0');
         process.exit(0);
     }
 
