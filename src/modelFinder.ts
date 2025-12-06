@@ -6,6 +6,7 @@
 
 import { parse, ASTNode } from './parser.js';
 import { Model, ModelResult } from './types/index.js';
+import { extractSignature } from './astUtils.js';
 
 export type { Model, ModelResult };
 
@@ -37,7 +38,18 @@ export class ModelFinder {
             const asts = premises.map(p => parse(p));
 
             // Extract signature (predicates, constants)
-            const signature = this.extractSignature(asts);
+            const baseSignature = extractSignature(asts);
+
+            // Adapt signature for ModelFinder: functions are treated as predicates with arity + 1
+            const signature = {
+                predicates: new Map(baseSignature.predicates),
+                constants: baseSignature.constants,
+                variables: baseSignature.variables
+            };
+
+            for (const [name, arity] of baseSignature.functions) {
+                signature.predicates.set(name, arity + 1);
+            }
 
             // Try increasing domain sizes
             for (let size = startSize; size <= endSize; size++) {
@@ -90,66 +102,15 @@ export class ModelFinder {
     }
 
     /**
-     * Extract signature (predicates, constants, arities) from ASTs
-     */
-    private extractSignature(asts: ASTNode[]): {
-        predicates: Map<string, number>;
-        constants: Set<string>;
-        variables: Set<string>;
-    } {
-        const predicates = new Map<string, number>();
-        const constants = new Set<string>();
-        const variables = new Set<string>();
-
-        const visit = (node: ASTNode): void => {
-            switch (node.type) {
-                case 'predicate':
-                    predicates.set(node.name!, node.args?.length || 0);
-                    node.args?.forEach(visit);
-                    break;
-                case 'function':
-                    // Treat functions as predicates for model finding
-                    predicates.set(node.name!, (node.args?.length || 0) + 1);
-                    node.args?.forEach(visit);
-                    break;
-                case 'constant':
-                    constants.add(node.name!);
-                    break;
-                case 'variable':
-                    variables.add(node.name!);
-                    break;
-                case 'forall':
-                case 'exists':
-                    variables.add(node.variable!);
-                    visit(node.body!);
-                    break;
-                case 'and':
-                case 'or':
-                case 'implies':
-                case 'iff':
-                    visit(node.left!);
-                    visit(node.right!);
-                    break;
-                case 'not':
-                    visit(node.operand!);
-                    break;
-                case 'equals':
-                    visit(node.left!);
-                    visit(node.right!);
-                    break;
-            }
-        };
-
-        asts.forEach(visit);
-        return { predicates, constants, variables };
-    }
-
-    /**
      * Try to find a model of given domain size
      */
     private tryDomainSize(
         asts: ASTNode[],
-        signature: ReturnType<typeof this.extractSignature>,
+        signature: {
+            predicates: Map<string, number>;
+            constants: Set<string>;
+            variables: Set<string>;
+        },
         size: number
     ): Model | null {
         const domain = Array.from({ length: size }, (_, i) => i);
@@ -176,7 +137,7 @@ export class ModelFinder {
                     interpretation: ''
                 };
 
-                if (this.checkAllFormulas(asts, model, signature.variables)) {
+                if (this.checkAllFormulas(asts, model)) {
                     model.interpretation = this.formatModel(model);
                     return model;
                 }
@@ -277,8 +238,7 @@ export class ModelFinder {
      */
     private checkAllFormulas(
         asts: ASTNode[],
-        model: Model,
-        _variables: Set<string>
+        model: Model
     ): boolean {
         for (const ast of asts) {
             if (!this.evaluate(ast, model, new Map())) {
