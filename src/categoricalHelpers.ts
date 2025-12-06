@@ -60,33 +60,18 @@ export class CategoricalHelpers {
     ): CommutativityResult {
         const premises: string[] = [];
 
-        // Define morphisms in path A
-        for (let i = 0; i < pathA.length; i++) {
-            const morph = pathA[i];
-            if (i === 0) {
+        // Define morphisms for both paths
+        [pathA, pathB].forEach(path => {
+            path.forEach((morph, i) => {
                 premises.push(`morphism(${morph})`);
-                premises.push(`source(${morph}, ${objectStart})`);
-            } else {
-                premises.push(`morphism(${morph})`);
-            }
-            if (i === pathA.length - 1) {
-                premises.push(`target(${morph}, ${objectEnd})`);
-            }
-        }
-
-        // Define morphisms in path B
-        for (let i = 0; i < pathB.length; i++) {
-            const morph = pathB[i];
-            if (i === 0) {
-                premises.push(`morphism(${morph})`);
-                premises.push(`source(${morph}, ${objectStart})`);
-            } else {
-                premises.push(`morphism(${morph})`);
-            }
-            if (i === pathB.length - 1) {
-                premises.push(`target(${morph}, ${objectEnd})`);
-            }
-        }
+                if (i === 0) {
+                    premises.push(`source(${morph}, ${objectStart})`);
+                }
+                if (i === path.length - 1) {
+                    premises.push(`target(${morph}, ${objectEnd})`);
+                }
+            });
+        });
 
         // Compose paths
         const compA = this.composePathHelper(pathA, 'comp_a');

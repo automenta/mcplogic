@@ -76,51 +76,25 @@ export class Tokenizer {
             const char = this.input[this.pos];
 
             // Two-character operators
-            if (this.input.slice(this.pos, this.pos + 3) === '<->') {
-                this.tokens.push({ type: 'IFF', value: '<->', position: this.pos });
-                this.pos += 3;
+            if (this.match('<->')) {
+                this.addToken('IFF', '<->');
                 continue;
             }
-            if (this.input.slice(this.pos, this.pos + 2) === '->') {
-                this.tokens.push({ type: 'IMPLIES', value: '->', position: this.pos });
-                this.pos += 2;
+            if (this.match('->')) {
+                this.addToken('IMPLIES', '->');
                 continue;
             }
 
             // Single character tokens
             switch (char) {
-                case '(':
-                    this.tokens.push({ type: 'LPAREN', value: '(', position: this.pos });
-                    this.pos++;
-                    continue;
-                case ')':
-                    this.tokens.push({ type: 'RPAREN', value: ')', position: this.pos });
-                    this.pos++;
-                    continue;
-                case '&':
-                    this.tokens.push({ type: 'AND', value: '&', position: this.pos });
-                    this.pos++;
-                    continue;
-                case '|':
-                    this.tokens.push({ type: 'OR', value: '|', position: this.pos });
-                    this.pos++;
-                    continue;
-                case '-':
-                    this.tokens.push({ type: 'NOT', value: '-', position: this.pos });
-                    this.pos++;
-                    continue;
-                case '=':
-                    this.tokens.push({ type: 'EQUALS', value: '=', position: this.pos });
-                    this.pos++;
-                    continue;
-                case ',':
-                    this.tokens.push({ type: 'COMMA', value: ',', position: this.pos });
-                    this.pos++;
-                    continue;
-                case '.':
-                    this.tokens.push({ type: 'DOT', value: '.', position: this.pos });
-                    this.pos++;
-                    continue;
+                case '(': this.addToken('LPAREN', '('); this.pos++; continue;
+                case ')': this.addToken('RPAREN', ')'); this.pos++; continue;
+                case '&': this.addToken('AND', '&'); this.pos++; continue;
+                case '|': this.addToken('OR', '|'); this.pos++; continue;
+                case '-': this.addToken('NOT', '-'); this.pos++; continue;
+                case '=': this.addToken('EQUALS', '='); this.pos++; continue;
+                case ',': this.addToken('COMMA', ','); this.pos++; continue;
+                case '.': this.addToken('DOT', '.'); this.pos++; continue;
             }
 
             // Identifiers (predicates, variables, quantifiers, constants)
@@ -152,6 +126,18 @@ export class Tokenizer {
         while (this.pos < this.input.length && /\s/.test(this.input[this.pos])) {
             this.pos++;
         }
+    }
+
+    private match(str: string): boolean {
+        if (this.input.slice(this.pos, this.pos + str.length) === str) {
+            this.pos += str.length;
+            return true;
+        }
+        return false;
+    }
+
+    private addToken(type: TokenType, value: string): void {
+        this.tokens.push({ type, value, position: this.pos - (value.length > 1 ? value.length : 0) });
     }
 }
 

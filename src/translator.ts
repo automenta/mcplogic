@@ -5,6 +5,7 @@
  */
 
 import { ASTNode, parse } from './parser.js';
+import { isHornClause } from './astUtils.js';
 
 /**
  * Convert a Prover9-style formula to Prolog
@@ -67,38 +68,6 @@ function translateToProlog(node: ASTNode): string[] {
     }
 
     return clauses;
-}
-
-/**
- * Check if the node represents a Horn clause (forall vars. (body -> head))
- */
-function isHornClause(node: ASTNode): boolean {
-    // Unwrap quantifiers
-    let current = node;
-    while (current.type === 'forall') {
-        current = current.body!;
-    }
-
-    // Must be an implication
-    if (current.type !== 'implies') {
-        return false;
-    }
-
-    // Head must be a single predicate
-    if (current.right!.type !== 'predicate') {
-        return false;
-    }
-
-    // Body must be a conjunction of predicates or a single predicate
-    return isConjunctionOfPredicates(current.left!);
-}
-
-function isConjunctionOfPredicates(node: ASTNode): boolean {
-    if (node.type === 'predicate') return true;
-    if (node.type === 'and') {
-        return isConjunctionOfPredicates(node.left!) && isConjunctionOfPredicates(node.right!);
-    }
-    return false;
 }
 
 /**
