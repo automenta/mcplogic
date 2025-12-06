@@ -5,7 +5,7 @@
  * Used by parser, translator, clausifier, and model finder.
  */
 
-import { ASTNode } from './parser.js';
+import type { ASTNode } from './types/index.js';
 
 /**
  * Signature extracted from formulas

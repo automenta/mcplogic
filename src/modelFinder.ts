@@ -4,8 +4,9 @@
  * Equivalent to Mace4 - finds finite models or counterexamples.
  */
 
-import { parse, ASTNode } from './parser.js';
+import { parse } from './parser.js';
 import { Model, ModelResult } from './types/index.js';
+import type { ASTNode } from './types/index.js';
 import { extractSignature } from './astUtils.js';
 
 export type { Model, ModelResult };

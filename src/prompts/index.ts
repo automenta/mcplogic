@@ -5,11 +5,14 @@
  */
 
 export {
+    PROMPTS,
+    listPrompts,
+    getPrompt
+} from './templates.js';
+
+export type {
     Prompt,
     PromptArgument,
     PromptMessage,
     GetPromptResult,
-    PROMPTS,
-    listPrompts,
-    getPrompt
 } from './templates.js';

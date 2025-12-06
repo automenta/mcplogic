@@ -8,6 +8,9 @@ export * from './errors.js';
 // Re-export clause types for CNF
 export * from './clause.js';
 
+// Re-export AST types
+export * from './ast.js';
+
 /**
  * Verbosity level for responses
  */

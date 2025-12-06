@@ -5,12 +5,10 @@
 import {
     generateEqualityAxioms,
     containsEquality,
-    extractSignature,
-    extractSignatures,
     generateMinimalEqualityAxioms,
     getEqualityBridge,
-    Signature,
 } from '../src/equalityAxioms';
+import { extractSignature, FormulaSignature as Signature } from '../src/astUtils';
 import { parse } from '../src/parser';
 
 describe('Equality Axioms', () => {
@@ -20,6 +18,7 @@ describe('Equality Axioms', () => {
                 functions: new Map(),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
             expect(axioms.some(a => a.includes('eq(X, X).'))).toBe(true);
@@ -30,6 +29,7 @@ describe('Equality Axioms', () => {
                 functions: new Map(),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
             expect(axioms.some(a => a.includes('eq(X, Y)') && a.includes('eq(Y, X)'))).toBe(true);
@@ -40,6 +40,7 @@ describe('Equality Axioms', () => {
                 functions: new Map(),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
             expect(axioms.some(a =>
@@ -54,6 +55,7 @@ describe('Equality Axioms', () => {
                 functions: new Map([['f', 1]]),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
             // eq(f(X1), f(Y1)) :- eq(X1, Y1).
@@ -68,6 +70,7 @@ describe('Equality Axioms', () => {
                 functions: new Map([['g', 2]]),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
             // eq(g(X1, X2), g(Y1, Y2)) :- eq(X1, Y1), eq(X2, Y2).
@@ -84,6 +87,7 @@ describe('Equality Axioms', () => {
                 functions: new Map(),
                 predicates: new Map([['P', 1]]),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
             // P(Y1) :- eq(X1, Y1), P(X1).
@@ -99,6 +103,7 @@ describe('Equality Axioms', () => {
                 functions: new Map([['f', 1]]),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig, { includeCongruence: false });
             expect(axioms.some(a => a.includes('f(X1)'))).toBe(false);
@@ -109,6 +114,7 @@ describe('Equality Axioms', () => {
                 functions: new Map(),
                 predicates: new Map([['P', 1]]),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig, { includeSubstitution: false });
             expect(axioms.some(a => a.startsWith('P(Y1)'))).toBe(false);
@@ -150,27 +156,27 @@ describe('Equality Axioms', () => {
     describe('extractSignature', () => {
         it('should extract predicates with correct arity', () => {
             const ast = parse('P(x, y) & Q(z)');
-            const sig = extractSignature(ast);
+            const sig = extractSignature([ast]);
             expect(sig.predicates.get('P')).toBe(2);
             expect(sig.predicates.get('Q')).toBe(1);
         });
 
         it('should extract functions with correct arity', () => {
             const ast = parse('P(f(x), g(x, y))');
-            const sig = extractSignature(ast);
+            const sig = extractSignature([ast]);
             expect(sig.functions.get('f')).toBe(1);
             expect(sig.functions.get('g')).toBe(2);
         });
 
         it('should extract constants', () => {
             const ast = parse('P(socrates)');
-            const sig = extractSignature(ast);
+            const sig = extractSignature([ast]);
             expect(sig.constants.has('socrates')).toBe(true);
         });
 
         it('should handle complex nested formulas', () => {
             const ast = parse('all x exists y (P(x, f(y)) -> Q(g(x, y)))');
-            const sig = extractSignature(ast);
+            const sig = extractSignature([ast]);
             expect(sig.predicates.get('P')).toBe(2);
             expect(sig.predicates.get('Q')).toBe(1);
             expect(sig.functions.get('f')).toBe(1);
@@ -178,14 +184,14 @@ describe('Equality Axioms', () => {
         });
     });
 
-    describe('extractSignatures', () => {
+    describe('extractSignature (multiple)', () => {
         it('should combine signatures from multiple formulas', () => {
             const asts = [
                 parse('P(x)'),
                 parse('Q(x, y)'),
                 parse('R(f(x))'),
             ];
-            const sig = extractSignatures(asts);
+            const sig = extractSignature(asts);
             expect(sig.predicates.size).toBe(3);
             expect(sig.functions.size).toBe(1);
         });
