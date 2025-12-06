@@ -21,18 +21,16 @@ import { listResources, getResourceContent } from './resources/index.js';
 import { listPrompts, getPrompt } from './prompts/index.js';
 
 // LogicEngine is now accessed via EngineManager
-import { validateFormulas } from './syntaxValidator.js';
-import { CategoricalHelpers, monoidAxioms, groupAxioms } from './categoricalHelpers.js';
-import { ModelFinder, createModelFinder } from './modelFinder.js';
-import { SessionManager, createSessionManager } from './sessionManager.js';
+import { CategoricalHelpers } from './categoricalHelpers.js';
+import { createModelFinder } from './modelFinder.js';
+import { createSessionManager } from './sessionManager.js';
 import {
     LogicException,
     serializeLogicError,
     Verbosity,
-    ProveResult,
-    ModelResult,
 } from './types/index.js';
 import { createEngineManager, EngineSelection } from './engines/manager.js';
+import * as Handlers from './handlers/index.js';
 
 /**
  * Verbosity parameter schema for tools
@@ -42,97 +40,6 @@ const verbositySchema = {
     enum: ['minimal', 'standard', 'detailed'],
     description: "Response verbosity: 'minimal' (token-efficient), 'standard' (default), 'detailed' (debug info)",
 };
-
-/**
- * Build response based on verbosity level
- */
-function buildProveResponse(result: ProveResult, verbosity: Verbosity = 'standard'): object {
-    if (verbosity === 'minimal') {
-        return {
-            success: result.success,
-            result: result.result,
-        };
-    }
-
-    if (verbosity === 'standard') {
-        return {
-            success: result.success,
-            result: result.result,
-            message: result.message || (result.success ? 'Proof found' : result.error || 'No proof found'),
-            ...(result.bindings && { bindings: result.bindings }),
-        };
-    }
-
-    // detailed
-    return {
-        success: result.success,
-        result: result.result,
-        message: result.message || (result.success ? 'Proof found' : result.error || 'No proof found'),
-        ...(result.bindings && { bindings: result.bindings }),
-        ...(result.prologProgram && { prologProgram: result.prologProgram }),
-        ...(result.inferenceSteps && { inferenceSteps: result.inferenceSteps }),
-        ...(result.statistics && { statistics: result.statistics }),
-        ...(result.proof && { proof: result.proof }),
-    };
-}
-
-/**
- * Build model response based on verbosity level
- */
-function buildModelResponse(result: ModelResult, verbosity: Verbosity = 'standard'): object {
-    // Convert model predicates to serializable format
-    const serializeModel = (model: ModelResult['model']) => {
-        if (!model) return undefined;
-        const predicates: Record<string, string[]> = {};
-        for (const [name, tuples] of model.predicates) {
-            predicates[name] = Array.from(tuples);
-        }
-        return {
-            domainSize: model.domainSize,
-            domain: model.domain,
-            predicates,
-            constants: Object.fromEntries(model.constants),
-        };
-    };
-
-    if (verbosity === 'minimal') {
-        return {
-            success: result.success,
-            result: result.result,
-            ...(result.model && {
-                model: {
-                    predicates: (() => {
-                        const p: Record<string, string[]> = {};
-                        for (const [name, tuples] of result.model.predicates) {
-                            p[name] = Array.from(tuples);
-                        }
-                        return p;
-                    })()
-                }
-            }),
-        };
-    }
-
-    if (verbosity === 'standard') {
-        return {
-            success: result.success,
-            result: result.result,
-            message: result.message || (result.success ? 'Model found' : result.error || 'No model found'),
-            ...(result.model && { model: serializeModel(result.model) }),
-            ...(result.interpretation && { interpretation: result.interpretation }),
-        };
-    }
-
-    // detailed
-    return {
-        success: result.success,
-        result: result.result,
-        message: result.message || (result.success ? 'Model found' : result.error || 'No model found'),
-        ...(result.model && { model: serializeModel(result.model) }),
-        ...(result.interpretation && { interpretation: result.interpretation }),
-        ...(result.statistics && { statistics: result.statistics }),
-    };
-}
 
 /**
  * Create and configure the MCP server
@@ -641,273 +548,58 @@ If found, proves the conclusion doesn't logically follow.`,
 
             switch (name) {
                 // ==================== CORE REASONING TOOLS ====================
-                case 'prove': {
-                    const { premises, conclusion, inference_limit, enable_arithmetic, enable_equality, engine: engineParam } = args as {
-                        premises: string[];
-                        conclusion: string;
-                        inference_limit?: number;
-                        enable_arithmetic?: boolean;
-                        enable_equality?: boolean;
-                        engine?: EngineSelection;
-                    };
-
-                    // Validate syntax first
-                    const allFormulas = [...premises, conclusion];
-                    const validation = validateFormulas(allFormulas);
-
-                    if (!validation.valid) {
-                        result = { result: 'syntax_error', validation };
-                        break;
-                    }
-
-                    // Use engineManager for engine-federated proving
-                    const proveResult = await engineManager.prove(premises, conclusion, {
-                        verbosity,
-                        enableArithmetic: enable_arithmetic,
-                        enableEquality: enable_equality,
-                        engine: engineParam ?? 'auto',
-                    });
-
-                    // Include engineUsed in response for standard/detailed verbosity
-                    const response = buildProveResponse(proveResult, verbosity);
-                    if (verbosity !== 'minimal' && proveResult.engineUsed) {
-                        (response as any).engineUsed = proveResult.engineUsed;
-                    }
-                    result = response;
+                case 'prove':
+                    result = await Handlers.proveHandler(args as any, engineManager, verbosity);
                     break;
-                }
 
-                case 'check-well-formed': {
-                    const { statements } = args as { statements: string[] };
-                    result = validateFormulas(statements);
+                case 'check-well-formed':
+                    result = Handlers.checkWellFormedHandler(args as any);
                     break;
-                }
 
-                case 'find-model': {
-                    const { premises, domain_size, max_domain_size } = args as {
-                        premises: string[];
-                        domain_size?: number;
-                        max_domain_size?: number;
-                    };
-                    // Create finder with custom max domain size if specified
-                    const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : modelFinder;
-                    const modelResult = await finder.findModel(premises, domain_size);
-                    result = buildModelResponse(modelResult, verbosity);
+                case 'find-model':
+                    result = await Handlers.findModelHandler(args as any, modelFinder, verbosity);
                     break;
-                }
 
-                case 'find-counterexample': {
-                    const { premises, conclusion, domain_size, max_domain_size } = args as {
-                        premises: string[];
-                        conclusion: string;
-                        domain_size?: number;
-                        max_domain_size?: number;
-                    };
-                    // Create finder with custom max domain size if specified
-                    const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : modelFinder;
-                    const modelResult = await finder.findCounterexample(premises, conclusion, domain_size);
-                    result = buildModelResponse(modelResult, verbosity);
+                case 'find-counterexample':
+                    result = await Handlers.findCounterexampleHandler(args as any, modelFinder, verbosity);
                     break;
-                }
 
-                case 'verify-commutativity': {
-                    const { path_a, path_b, object_start, object_end, with_category_axioms = true } = args as {
-                        path_a: string[];
-                        path_b: string[];
-                        object_start: string;
-                        object_end: string;
-                        with_category_axioms?: boolean;
-                    };
-
-                    const { premises, conclusion } = categoricalHelpers.verifyCommutativity(
-                        path_a,
-                        path_b,
-                        object_start,
-                        object_end
-                    );
-
-                    let allPremises = premises;
-                    if (with_category_axioms) {
-                        allPremises = [...categoricalHelpers.categoryAxioms(), ...premises];
-                    }
-
-                    result = {
-                        premises: allPremises,
-                        conclusion,
-                        note: "Use the 'prove' tool with these premises and conclusion to verify commutativity",
-                    };
+                case 'verify-commutativity':
+                    result = Handlers.verifyCommutativityHandler(args as any, categoricalHelpers);
                     break;
-                }
 
-                case 'get-category-axioms': {
-                    const { concept, functor_name = 'F' } = args as {
-                        concept: string;
-                        functor_name?: string;
-                    };
-
-                    let axioms: string[];
-
-                    switch (concept) {
-                        case 'category':
-                            axioms = categoricalHelpers.categoryAxioms();
-                            break;
-                        case 'functor':
-                            axioms = categoricalHelpers.functorAxioms(functor_name);
-                            break;
-                        case 'natural-transformation':
-                            axioms = categoricalHelpers.naturalTransformationCondition();
-                            break;
-                        case 'monoid':
-                            axioms = monoidAxioms();
-                            break;
-                        case 'group':
-                            axioms = groupAxioms();
-                            break;
-                        default:
-                            axioms = [];
-                    }
-
-                    result = { concept, axioms };
+                case 'get-category-axioms':
+                    result = Handlers.getCategoryAxiomsHandler(args as any, categoricalHelpers);
                     break;
-                }
 
                 // ==================== SESSION MANAGEMENT TOOLS ====================
-                case 'create-session': {
-                    const { ttl_minutes } = args as { ttl_minutes?: number };
-                    const ttlMs = ttl_minutes
-                        ? Math.min(ttl_minutes, 1440) * 60 * 1000  // Max 24 hours
-                        : undefined;
-
-                    const session = sessionManager.create({ ttlMs });
-                    const info = sessionManager.getInfo(session.id);
-
-                    result = {
-                        session_id: session.id,
-                        created_at: new Date(info.createdAt).toISOString(),
-                        expires_at: new Date(info.expiresAt).toISOString(),
-                        ttl_minutes: Math.round(info.ttlMs / 60000),
-                        active_sessions: sessionManager.count,
-                    };
+                case 'create-session':
+                    result = Handlers.createSessionHandler(args as any, sessionManager);
                     break;
-                }
 
-                case 'assert-premise': {
-                    const { session_id, formula } = args as {
-                        session_id: string;
-                        formula: string;
-                    };
-
-                    // Validate formula syntax first
-                    const validation = validateFormulas([formula]);
-                    if (!validation.valid) {
-                        result = {
-                            success: false,
-                            result: 'syntax_error',
-                            validation,
-                        };
-                        break;
-                    }
-
-                    const session = sessionManager.assertPremise(session_id, formula);
-                    result = {
-                        success: true,
-                        session_id: session.id,
-                        premise_count: session.premises.length,
-                        formula_added: formula,
-                    };
+                case 'assert-premise':
+                    result = Handlers.assertPremiseHandler(args as any, sessionManager);
                     break;
-                }
 
-                case 'query-session': {
-                    const { session_id, goal, inference_limit } = args as {
-                        session_id: string;
-                        goal: string;
-                        inference_limit?: number;
-                    };
-
-                    // Validate goal syntax
-                    const validation = validateFormulas([goal]);
-                    if (!validation.valid) {
-                        result = { result: 'syntax_error', validation };
-                        break;
-                    }
-
-                    const session = sessionManager.get(session_id);
-
-                    // Use engineManager for consistent engine selection
-                    const proveResult = await engineManager.prove(session.premises, goal, { verbosity });
-                    result = {
-                        session_id: session.id,
-                        premise_count: session.premises.length,
-                        ...buildProveResponse(proveResult, verbosity),
-                    };
+                case 'query-session':
+                    result = await Handlers.querySessionHandler(args as any, sessionManager, engineManager, verbosity);
                     break;
-                }
 
-                case 'retract-premise': {
-                    const { session_id, formula } = args as {
-                        session_id: string;
-                        formula: string;
-                    };
-
-                    const removed = sessionManager.retractPremise(session_id, formula);
-                    const session = sessionManager.get(session_id);
-
-                    result = {
-                        success: removed,
-                        session_id: session.id,
-                        premise_count: session.premises.length,
-                        message: removed
-                            ? `Removed: ${formula}`
-                            : `Formula not found in session: ${formula}`,
-                    };
+                case 'retract-premise':
+                    result = Handlers.retractPremiseHandler(args as any, sessionManager);
                     break;
-                }
 
-                case 'list-premises': {
-                    const { session_id } = args as { session_id: string };
-
-                    const premises = sessionManager.listPremises(session_id);
-                    const info = sessionManager.getInfo(session_id);
-
-                    result = {
-                        session_id,
-                        premise_count: premises.length,
-                        premises,
-                        ...(verbosity === 'detailed' && {
-                            created_at: new Date(info.createdAt).toISOString(),
-                            expires_at: new Date(info.expiresAt).toISOString(),
-                        }),
-                    };
+                case 'list-premises':
+                    result = Handlers.listPremisesHandler(args as any, sessionManager, verbosity);
                     break;
-                }
 
-                case 'clear-session': {
-                    const { session_id } = args as { session_id: string };
-
-                    const session = sessionManager.clear(session_id);
-
-                    result = {
-                        success: true,
-                        session_id: session.id,
-                        message: 'Session cleared',
-                        premise_count: 0,
-                    };
+                case 'clear-session':
+                    result = Handlers.clearSessionHandler(args as any, sessionManager);
                     break;
-                }
 
-                case 'delete-session': {
-                    const { session_id } = args as { session_id: string };
-
-                    sessionManager.delete(session_id);
-
-                    result = {
-                        success: true,
-                        message: `Session ${session_id} deleted`,
-                        active_sessions: sessionManager.count,
-                    };
+                case 'delete-session':
+                    result = Handlers.deleteSessionHandler(args as any, sessionManager);
                     break;
-                }
 
                 default:
                     throw new Error(`Unknown tool: ${name}`);
