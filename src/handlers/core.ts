@@ -1,42 +1,51 @@
 import {
     ProveResult,
     Verbosity,
-    EngineSelection
+    EngineSelection,
+    ProveResponse,
+    MinimalProveResponse,
+    StandardProveResponse,
+    DetailedProveResponse
 } from '../types/index.js';
-import { validateFormulas } from '../syntaxValidator.js';
+import { validateFormulas, ValidationReport } from '../syntaxValidator.js';
 import { EngineManager } from '../engines/manager.js';
 
 /**
  * Build response based on verbosity level
  */
-export function buildProveResponse(result: ProveResult, verbosity: Verbosity = 'standard'): object {
+export function buildProveResponse(result: ProveResult, verbosity: Verbosity = 'standard'): ProveResponse {
     if (verbosity === 'minimal') {
-        return {
+        const response: MinimalProveResponse = {
             success: result.success,
             result: result.result,
         };
+        return response;
     }
 
     if (verbosity === 'standard') {
-        return {
+        const response: StandardProveResponse = {
             success: result.success,
             result: result.result,
             message: result.message || (result.success ? 'Proof found' : result.error || 'No proof found'),
             ...(result.bindings && { bindings: result.bindings }),
+            ...(result.engineUsed && { engineUsed: result.engineUsed }),
         };
+        return response;
     }
 
     // detailed
-    return {
+    const response: DetailedProveResponse = {
         success: result.success,
         result: result.result,
         message: result.message || (result.success ? 'Proof found' : result.error || 'No proof found'),
         ...(result.bindings && { bindings: result.bindings }),
-        ...(result.prologProgram && { prologProgram: result.prologProgram }),
+        ...(result.engineUsed && { engineUsed: result.engineUsed }),
+        prologProgram: result.prologProgram || '',
         ...(result.inferenceSteps && { inferenceSteps: result.inferenceSteps }),
-        ...(result.statistics && { statistics: result.statistics }),
+        statistics: result.statistics || { timeMs: 0 },
         ...(result.proof && { proof: result.proof }),
     };
+    return response;
 }
 
 export async function proveHandler(
@@ -50,7 +59,7 @@ export async function proveHandler(
     },
     engineManager: EngineManager,
     verbosity: Verbosity
-): Promise<object> {
+): Promise<ProveResponse | { result: 'syntax_error'; validation: ValidationReport }> {
     const { premises, conclusion, enable_arithmetic, enable_equality, engine: engineParam } = args;
 
     // Validate syntax first
@@ -69,17 +78,13 @@ export async function proveHandler(
         engine: engineParam ?? 'auto',
     });
 
-    // Include engineUsed in response for standard/detailed verbosity
-    const response = buildProveResponse(proveResult, verbosity);
-    if (verbosity !== 'minimal' && proveResult.engineUsed) {
-        (response as any).engineUsed = proveResult.engineUsed;
-    }
-    return response;
+    // engineUsed is now handled in buildProveResponse
+    return buildProveResponse(proveResult, verbosity);
 }
 
 export function checkWellFormedHandler(
     args: { statements: string[] }
-): object {
+): ValidationReport {
     const { statements } = args;
     return validateFormulas(statements);
 }

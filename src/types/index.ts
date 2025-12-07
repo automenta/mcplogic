@@ -30,6 +30,7 @@ export interface MinimalProveResponse {
 export interface StandardProveResponse extends MinimalProveResponse {
     message: string;
     bindings?: Record<string, string>[];
+    engineUsed?: string;
 }
 
 /**
@@ -42,7 +43,13 @@ export interface DetailedProveResponse extends StandardProveResponse {
         inferences?: number;
         timeMs: number;
     };
+    proof?: string[];
 }
+
+/**
+ * Union type for Prove responses
+ */
+export type ProveResponse = MinimalProveResponse | StandardProveResponse | DetailedProveResponse;
 
 /**
  * Result of a proof operation (legacy format, extended for verbosity)
@@ -54,6 +61,7 @@ export interface ProveResult {
     proof?: string[];
     bindings?: Record<string, string>[];
     error?: string;
+    engineUsed?: string;
     // Detailed mode fields
     prologProgram?: string;
     inferenceSteps?: string[];
@@ -92,6 +100,11 @@ export interface DetailedModelResponse extends StandardModelResponse {
         timeMs: number;
     };
 }
+
+/**
+ * Union type for Model responses
+ */
+export type ModelResponse = MinimalModelResponse | StandardModelResponse | DetailedModelResponse;
 
 /**
  * A finite model with domain, predicates, and constant interpretations
