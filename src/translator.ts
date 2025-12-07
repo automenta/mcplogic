@@ -1,13 +1,8 @@
-/**
- * Translator: Prover9 FOL Syntax ↔ Prolog Syntax
- * 
- * Converts between Prover9-style formulas and Tau-Prolog compatible format.
- */
 
 import { parse } from './parser.js';
 import type { ASTNode } from './types/index.js';
-import { createError, LogicException } from './types/errors.js';
-import { clausify, clausesToProlog } from './clausifier.js';
+import { createError, createClausificationError, createParseError, createEngineError, LogicException } from './types/errors.js';
+import { clausify, clausesToProlog, toNNF } from './clausifier.js';
 
 /**
  * Convert a Prover9-style formula to Prolog
@@ -27,16 +22,17 @@ export function folToProlog(formula: string): string[] {
 
     // If clausification failed entirely (e.g. syntax error or timeout caught inside clausify)
     if (result.error) {
+        // Re-throw the error as a LogicException
         throw new LogicException(result.error);
     }
 
     // Should not happen if clausify respects its contract
-    throw new LogicException(createError('CLAUSIFICATION_ERROR', 'Unknown clausification error'));
+    throw createClausificationError('Unknown clausification error');
 }
 
 function predicateToProlog(node: ASTNode): string {
     if (node.type !== 'predicate') {
-        throw new LogicException(createError('PARSE_ERROR', `Expected predicate, got ${node.type}`));
+        throw createParseError(`Expected predicate, got ${node.type}`, '');
     }
 
     if (!node.args || node.args.length === 0) {
@@ -59,7 +55,7 @@ function termToProlog(node: ASTNode): string {
             const args = node.args!.map(termToProlog).join(', ');
             return `${node.name!.toLowerCase()}(${args})`;
         default:
-            throw new LogicException(createError('PARSE_ERROR', `Cannot convert ${node.type} to Prolog term`));
+            throw createParseError(`Cannot convert ${node.type} to Prolog term`, '');
     }
 }
 
@@ -82,12 +78,10 @@ function astToMetaProlog(node: ASTNode): string | null {
         case 'not':
             return `\\+ ${astToMetaProlog(node.operand!)}`;
 
-        case 'implies':
-            // P -> Q is equivalent to ¬P ∨ Q, but in Prolog we can represent as rule-like
-            return `(${astToMetaProlog(node.left!)} -> ${astToMetaProlog(node.right!)}; true)`;
-
         case 'equals':
             return `${astToMetaProlog(node.left!)} = ${astToMetaProlog(node.right!)}`;
+
+        // implies and iff are handled by NNF conversion before calling this
 
         case 'variable':
             return node.name!.toUpperCase();
@@ -130,19 +124,21 @@ export function folGoalToProlog(goal: string): string {
 
     // Check for universal quantifiers which Prolog cannot directly prove via goal query
     if (containsUniversal(ast)) {
-        throw new LogicException(createError(
-            'ENGINE_ERROR',
+        throw createEngineError(
             'Universal quantification (all/forall) in goals is not supported by the Prolog engine. ' +
             'Try using the SAT engine or refutation (negating the goal and checking for contradiction).'
-        ));
+        );
     }
 
-    if (ast.type === 'predicate') {
-        return predicateToProlog(ast) + '.';
+    // Convert to NNF first to simplify structure (removes ->, <->)
+    const nnfAst = toNNF(ast);
+
+    if (nnfAst.type === 'predicate') {
+        return predicateToProlog(nnfAst) + '.';
     }
 
     // For complex goals, use meta-representation
-    const meta = astToMetaProlog(ast);
+    const meta = astToMetaProlog(nnfAst);
     return meta ? meta + '.' : '';
 }
 
