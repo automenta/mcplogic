@@ -5,7 +5,7 @@
  */
 
 import { parse } from './parser.js';
-import { Model, ModelResult } from './types/index.js';
+import { Model, ModelResult, LogicException } from './types/index.js';
 import type { ASTNode } from './types/index.js';
 import { extractSignature } from './astUtils.js';
 
@@ -71,10 +71,12 @@ export class ModelFinder {
 
             return { success: false, result: 'no_model' };
         } catch (e) {
+            // Unwrap LogicException for clean error messages
+            const message = e instanceof LogicException ? e.error.message : (e instanceof Error ? e.message : String(e));
             return {
                 success: false,
                 result: 'error',
-                error: e instanceof Error ? e.message : String(e)
+                error: message
             };
         }
     }
