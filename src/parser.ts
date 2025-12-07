@@ -339,17 +339,18 @@ export class Parser {
     }
 
     private classifyTerm(name: string): ASTNode {
-        // If it's a bound variable, it's a variable
+        // 1. If it's in the scope of a quantifier binding this name, it's a variable
         if (this.boundVariables.has(name)) {
             return { type: 'variable', name };
         }
 
-        // Single lowercase letters are typically variables in FOL
+        // 2. Convention: Single lowercase letters (x, y, z, a, b...) are treated as free variables
+        // This follows Prover9/Mace4 convention where free variables are implicitly universal
         if (name.length === 1 && /[a-z]/.test(name)) {
             return { type: 'variable', name };
         }
 
-        // Otherwise it's a constant
+        // 3. Otherwise it's a constant (e.g., "socrates", "zero", "sk0")
         return { type: 'constant', name };
     }
 }

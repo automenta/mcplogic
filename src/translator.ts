@@ -227,6 +227,15 @@ export function prologResultToFol(result: Record<string, string>): Record<string
 export function folGoalToProlog(goal: string): string {
     const ast = parse(goal);
 
+    // Check for universal quantifiers which Prolog cannot directly prove via goal query
+    if (containsUniversal(ast)) {
+        throw new LogicException(createError(
+            'ENGINE_ERROR',
+            'Universal quantification (all/forall) in goals is not supported by the Prolog engine. ' +
+            'Try using the SAT engine or refutation (negating the goal and checking for contradiction).'
+        ));
+    }
+
     if (ast.type === 'predicate') {
         return predicateToProlog(ast) + '.';
     }
@@ -234,6 +243,23 @@ export function folGoalToProlog(goal: string): string {
     // For complex goals, use meta-representation
     const meta = astToMetaProlog(ast);
     return meta ? meta + '.' : '';
+}
+
+/**
+ * Check if AST contains universal quantifiers
+ */
+function containsUniversal(node: ASTNode): boolean {
+    if (node.type === 'forall') return true;
+
+    if (node.left && containsUniversal(node.left)) return true;
+    if (node.right && containsUniversal(node.right)) return true;
+    if (node.operand && containsUniversal(node.operand)) return true;
+    if (node.body && containsUniversal(node.body)) return true;
+
+    // Note: forall inside existential is also problematic for Prolog goals
+    // unless Skolemized, but Prolog goals generally don't support quantifiers well.
+
+    return false;
 }
 
 /**
