@@ -1,13 +1,17 @@
 import {
     ModelResult,
     Verbosity,
+    ModelResponse,
+    MinimalModelResponse,
+    StandardModelResponse,
+    DetailedModelResponse
 } from '../types/index.js';
 import { ModelFinder, createModelFinder } from '../modelFinder.js';
 
 /**
  * Build model response based on verbosity level
  */
-export function buildModelResponse(result: ModelResult, verbosity: Verbosity = 'standard'): object {
+export function buildModelResponse(result: ModelResult, verbosity: Verbosity = 'standard'): ModelResponse {
     // Convert model predicates to serializable format
     const serializeModel = (model: ModelResult['model']) => {
         if (!model) return undefined;
@@ -24,7 +28,7 @@ export function buildModelResponse(result: ModelResult, verbosity: Verbosity = '
     };
 
     if (verbosity === 'minimal') {
-        return {
+        const response: MinimalModelResponse = {
             success: result.success,
             result: result.result,
             ...(result.model && {
@@ -39,27 +43,30 @@ export function buildModelResponse(result: ModelResult, verbosity: Verbosity = '
                 }
             }),
         };
+        return response;
     }
 
     if (verbosity === 'standard') {
-        return {
+        const response: StandardModelResponse = {
             success: result.success,
             result: result.result,
             message: result.message || (result.success ? 'Model found' : result.error || 'No model found'),
             ...(result.model && { model: serializeModel(result.model) }),
             ...(result.interpretation && { interpretation: result.interpretation }),
         };
+        return response;
     }
 
     // detailed
-    return {
+    const response: DetailedModelResponse = {
         success: result.success,
         result: result.result,
         message: result.message || (result.success ? 'Model found' : result.error || 'No model found'),
         ...(result.model && { model: serializeModel(result.model) }),
         ...(result.interpretation && { interpretation: result.interpretation }),
-        ...(result.statistics && { statistics: result.statistics }),
+        statistics: result.statistics || { domainSize: 0, searchedSizes: [], timeMs: 0 },
     };
+    return response;
 }
 
 export async function findModelHandler(
@@ -70,7 +77,7 @@ export async function findModelHandler(
     },
     defaultFinder: ModelFinder,
     verbosity: Verbosity
-): Promise<object> {
+): Promise<ModelResponse> {
     const { premises, domain_size, max_domain_size } = args;
     // Create finder with custom max domain size if specified
     const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;
@@ -87,7 +94,7 @@ export async function findCounterexampleHandler(
     },
     defaultFinder: ModelFinder,
     verbosity: Verbosity
-): Promise<object> {
+): Promise<ModelResponse> {
     const { premises, conclusion, domain_size, max_domain_size } = args;
     // Create finder with custom max domain size if specified
     const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;

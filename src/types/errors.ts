@@ -234,6 +234,61 @@ export function createEngineError(
 }
 
 /**
+ * Create an unsatisfiable error
+ */
+export function createUnsatisfiableError(
+  message: string = 'The premises are unsatisfiable'
+): LogicException {
+  return new LogicException({
+    code: 'UNSATISFIABLE',
+    message,
+    suggestion: 'Check for contradictory premises',
+  });
+}
+
+/**
+ * Create a timeout error
+ */
+export function createTimeoutError(
+  limitMs: number,
+  operation: string = 'Operation'
+): LogicException {
+  return new LogicException({
+    code: 'TIMEOUT',
+    message: `${operation} timed out after ${limitMs}ms`,
+    suggestion: 'Try simplifying the problem or increasing the timeout',
+    details: { limitMs },
+  });
+}
+
+/**
+ * Create an invalid domain error
+ */
+export function createInvalidDomainError(
+  message: string
+): LogicException {
+  return new LogicException({
+    code: 'INVALID_DOMAIN',
+    message,
+    suggestion: 'Ensure domain size is positive and within limits',
+  });
+}
+
+/**
+ * Create a clausification error
+ */
+export function createClausificationError(
+  message: string,
+  details?: Record<string, unknown>
+): LogicException {
+  return new LogicException({
+    code: 'CLAUSIFICATION_ERROR',
+    message: `Clausification failed: ${message}`,
+    details,
+  });
+}
+
+/**
  * Get line number from position in string
  */
 function getLineNumber(input: string, position: number): number {

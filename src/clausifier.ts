@@ -13,7 +13,8 @@
  * 8. Extract clauses
  */
 
-import { ASTNode, parse, astToString } from './parser.js';
+import { parse, astToString } from './parser.js';
+import type { ASTNode } from './types/index.js';
 import {
     Literal,
     Clause,
@@ -25,7 +26,7 @@ import {
     DIMACSResult,
     atomToKey,
 } from './types/clause.js';
-import { createError } from './types/errors.js';
+import { createClausificationError } from './types/errors.js';
 
 /** Default clausification options */
 const DEFAULT_OPTIONS: Required<ClausifyOptions> = {
@@ -91,7 +92,7 @@ export function clausify(formula: string, options: ClausifyOptions = {}): Clausi
 
         return {
             success: false,
-            error: createError('CLAUSIFICATION_ERROR', error.message),
+            error: createClausificationError(error.message),
             statistics: {
                 originalSize: 0,
                 clauseCount: 0,
@@ -674,8 +675,37 @@ export function clausesToProlog(clauses: Clause[]): string[] {
  * Convert a literal to Prolog format.
  */
 function literalToProlog(lit: Literal, useNegation: boolean): string {
+    const formatArg = (arg: string): string => {
+        // Variables start with _ or Uppercase
+        // Constants (including Skolem constants) start with lowercase
+        // Clausifier generates variables as _v...
+        // Clausifier generates skolem constants as sk...
+        if (arg.startsWith('_v')) {
+            // It's a variable, ensure uppercase for Prolog
+            return arg.toUpperCase();
+        } else if (arg.startsWith('sk')) {
+            // Skolem constant, ensure lowercase
+            return arg.toLowerCase();
+        } else if (/^[a-z]/.test(arg)) {
+            // Standard lowercase constant/variable
+            // If it was a bound variable, it would have been renamed to _v...
+            // So this must be a constant.
+            return arg;
+        } else {
+            // Uppercase identifier in input - treat as variable?
+            // But parser classifies uppercase as variable?
+            // If it remains here, it's likely a constant that happens to be uppercase?
+            // Or maybe a variable that wasn't bound?
+            // Safest to lowercase it if it's meant to be a constant,
+            // but if the user input P(X) and X is free, it stays X.
+            // However, standardizeVariables handles free variables too?
+            // Let's check standardizeVariables.
+            return arg.toLowerCase();
+        }
+    };
+
     const atom = lit.args.length > 0
-        ? `${lit.predicate}(${lit.args.map(a => a.toUpperCase()).join(', ')})`
+        ? `${lit.predicate}(${lit.args.map(formatArg).join(', ')})`
         : lit.predicate;
 
     if (useNegation && lit.negated) {

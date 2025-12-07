@@ -4,4 +4,5 @@
  * Exports resource handlers for the MCP protocol.
  */
 
-export { RESOURCES, Resource, listResources, getResourceContent } from './axioms.js';
+export { RESOURCES, listResources, getResourceContent } from './axioms.js';
+export type { Resource } from './axioms.js';

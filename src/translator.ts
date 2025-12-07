@@ -4,8 +4,11 @@
  * Converts between Prover9-style formulas and Tau-Prolog compatible format.
  */
 
-import { ASTNode, parse } from './parser.js';
+import { parse } from './parser.js';
+import type { ASTNode } from './types/index.js';
 import { isHornClause } from './astUtils.js';
+import { createError, LogicException } from './types/errors.js';
+import { clausify, clausesToProlog } from './clausifier.js';
 
 /**
  * Convert a Prover9-style formula to Prolog
@@ -13,15 +16,31 @@ import { isHornClause } from './astUtils.js';
  * Prover9: all x (man(x) -> mortal(x))
  * Prolog:  mortal(X) :- man(X).
  * 
- * For complex formulas, we represent them as meta-predicates.
+ * Uses clausification to handle Skolemization and normalization.
+ * If the formula results in non-Horn clauses, it falls back to legacy translation
+ * (which may produce meta-logical terms like (A;B) that are valid Prolog syntax
+ * but not executable clauses).
  */
 export function folToProlog(formula: string): string[] {
+    // 1. Try to use clausifier (handles Skolemization, NNF, etc.)
+    const result = clausify(formula);
+    if (result.success && result.clauses) {
+        try {
+            return clausesToProlog(result.clauses);
+        } catch (e) {
+            // Not Horn clauses.
+            // Fallback to legacy translation for backward compatibility
+            // (though it likely produces inert meta-terms)
+        }
+    }
+
+    // 2. Fallback to direct AST translation
     const ast = parse(formula);
     return translateToProlog(ast);
 }
 
 /**
- * Translate AST to Prolog clauses
+ * Translate AST to Prolog clauses (Legacy/Fallback)
  */
 function translateToProlog(node: ASTNode): string[] {
     const clauses: string[] = [];
@@ -41,9 +60,11 @@ function translateToProlog(node: ASTNode): string[] {
         return clauses;
     }
 
-    // Handle existentially quantified formulas
+    // Handle existentially quantified formulas - Legacy behavior
     if (node.type === 'exists') {
-        // In Prolog, existential is implicit in queries
+        // Warning: This legacy path does NOT skolemize correctly for premises.
+        // It relies on implicit Prolog variables which are universally quantified in facts.
+        // Only reached if clausification fails.
         return translateToProlog(node.body!);
     }
 
@@ -101,7 +122,7 @@ function extractHornClause(node: ASTNode): string | null {
 
 function predicateToProlog(node: ASTNode): string {
     if (node.type !== 'predicate') {
-        throw new Error(`Expected predicate, got ${node.type}`);
+        throw new LogicException(createError('PARSE_ERROR', `Expected predicate, got ${node.type}`));
     }
 
     if (!node.args || node.args.length === 0) {
@@ -124,7 +145,7 @@ function termToProlog(node: ASTNode): string {
             const args = node.args!.map(termToProlog).join(', ');
             return `${node.name!.toLowerCase()}(${args})`;
         default:
-            throw new Error(`Cannot convert ${node.type} to Prolog term`);
+            throw new LogicException(createError('PARSE_ERROR', `Cannot convert ${node.type} to Prolog term`));
     }
 }
 
@@ -139,7 +160,7 @@ function conjunctionToProlog(node: ASTNode): string {
         return `${left}, ${right}`;
     }
 
-    throw new Error(`Cannot convert ${node.type} to Prolog body`);
+    throw new LogicException(createError('PARSE_ERROR', `Cannot convert ${node.type} to Prolog body`));
 }
 
 /**

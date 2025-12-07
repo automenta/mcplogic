@@ -5,7 +5,7 @@
  * Used by parser, translator, clausifier, and model finder.
  */
 
-import { ASTNode } from './parser.js';
+import type { ASTNode } from './types/index.js';
 
 /**
  * Signature extracted from formulas
@@ -36,14 +36,22 @@ export function extractSignature(asts: ASTNode[]): FormulaSignature {
                 if (node.name) {
                     predicates.set(node.name, node.args?.length ?? 0);
                 }
-                node.args?.forEach(visit);
+                if (node.args) {
+                    for (const arg of node.args) {
+                        visit(arg);
+                    }
+                }
                 break;
 
             case 'function':
                 if (node.name) {
                     functions.set(node.name, node.args?.length ?? 0);
                 }
-                node.args?.forEach(visit);
+                if (node.args) {
+                    for (const arg of node.args) {
+                        visit(arg);
+                    }
+                }
                 break;
 
             case 'constant':
@@ -81,7 +89,9 @@ export function extractSignature(asts: ASTNode[]): FormulaSignature {
         }
     }
 
-    asts.forEach(visit);
+    for (const ast of asts) {
+        visit(ast);
+    }
 
     return { predicates, constants, variables, functions };
 }
@@ -130,7 +140,11 @@ export function getFreeVariables(ast: ASTNode, bound: Set<string> = new Set()): 
 
             case 'predicate':
             case 'function':
-                node.args?.forEach(arg => visit(arg, boundVars));
+                if (node.args) {
+                    for (const arg of node.args) {
+                        visit(arg, boundVars);
+                    }
+                }
                 break;
 
             case 'not':
