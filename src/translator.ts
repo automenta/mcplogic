@@ -6,7 +6,6 @@
 
 import { parse } from './parser.js';
 import type { ASTNode } from './types/index.js';
-import { isHornClause } from './astUtils.js';
 import { createError, LogicException } from './types/errors.js';
 import { clausify, clausesToProlog } from './clausifier.js';
 
@@ -17,107 +16,22 @@ import { clausify, clausesToProlog } from './clausifier.js';
  * Prolog:  mortal(X) :- man(X).
  * 
  * Uses clausification to handle Skolemization and normalization.
- * If the formula results in non-Horn clauses, it falls back to legacy translation
- * (which may produce meta-logical terms like (A;B) that are valid Prolog syntax
- * but not executable clauses).
  */
 export function folToProlog(formula: string): string[] {
-    // 1. Try to use clausifier (handles Skolemization, NNF, etc.)
+    // 1. Use clausifier (handles Skolemization, NNF, etc.)
     const result = clausify(formula);
     if (result.success && result.clauses) {
-        try {
-            return clausesToProlog(result.clauses);
-        } catch (e) {
-            // Not Horn clauses.
-            // Fallback to legacy translation for backward compatibility
-            // (though it likely produces inert meta-terms)
-        }
+        // This will throw LogicException if clauses are not Horn
+        return clausesToProlog(result.clauses);
     }
 
-    // 2. Fallback to direct AST translation
-    const ast = parse(formula);
-    return translateToProlog(ast);
-}
-
-/**
- * Translate AST to Prolog clauses (Legacy/Fallback)
- */
-function translateToProlog(node: ASTNode): string[] {
-    const clauses: string[] = [];
-
-    // Handle universally quantified implications (rules)
-    if (isHornClause(node)) {
-        const clause = extractHornClause(node);
-        if (clause) {
-            clauses.push(clause);
-            return clauses;
-        }
+    // If clausification failed entirely (e.g. syntax error or timeout caught inside clausify)
+    if (result.error) {
+        throw new LogicException(result.error);
     }
 
-    // Handle simple predicates (facts)
-    if (node.type === 'predicate') {
-        clauses.push(predicateToProlog(node) + '.');
-        return clauses;
-    }
-
-    // Handle existentially quantified formulas - Legacy behavior
-    if (node.type === 'exists') {
-        // Warning: This legacy path does NOT skolemize correctly for premises.
-        // It relies on implicit Prolog variables which are universally quantified in facts.
-        // Only reached if clausification fails.
-        return translateToProlog(node.body!);
-    }
-
-    // Handle forall with non-implication body
-    if (node.type === 'forall') {
-        // Strip outer quantifiers and translate body
-        return translateToProlog(node.body!);
-    }
-
-    // Handle conjunctions (multiple facts/rules)
-    if (node.type === 'and') {
-        clauses.push(...translateToProlog(node.left!));
-        clauses.push(...translateToProlog(node.right!));
-        return clauses;
-    }
-
-    // For other constructs, use meta-representation
-    // This represents the formula as Prolog-evaluable logic
-    const meta = astToMetaProlog(node);
-    if (meta) {
-        clauses.push(meta + '.');
-    }
-
-    return clauses;
-}
-
-/**
- * Extract Horn clause as Prolog rule
- */
-function extractHornClause(node: ASTNode): string | null {
-    // Collect quantified variables
-    const quantifiedVars: string[] = [];
-    let current = node;
-
-    while (current.type === 'forall') {
-        quantifiedVars.push(current.variable!);
-        current = current.body!;
-    }
-
-    if (current.type !== 'implies') {
-        return null;
-    }
-
-    const body = current.left!;
-    const head = current.right!;
-
-    // Convert head
-    const headProlog = predicateToProlog(head);
-
-    // Convert body
-    const bodyProlog = conjunctionToProlog(body);
-
-    return `${headProlog} :- ${bodyProlog}.`;
+    // Should not happen if clausify respects its contract
+    throw new LogicException(createError('CLAUSIFICATION_ERROR', 'Unknown clausification error'));
 }
 
 function predicateToProlog(node: ASTNode): string {
@@ -149,23 +63,10 @@ function termToProlog(node: ASTNode): string {
     }
 }
 
-function conjunctionToProlog(node: ASTNode): string {
-    if (node.type === 'predicate') {
-        return predicateToProlog(node);
-    }
-
-    if (node.type === 'and') {
-        const left = conjunctionToProlog(node.left!);
-        const right = conjunctionToProlog(node.right!);
-        return `${left}, ${right}`;
-    }
-
-    throw new LogicException(createError('PARSE_ERROR', `Cannot convert ${node.type} to Prolog body`));
-}
-
 /**
  * Convert arbitrary FOL to meta-representation in Prolog
  * This allows representing complex formulas that don't fit Horn clause form.
+ * Used primarily for GOALS, not premises.
  */
 function astToMetaProlog(node: ASTNode): string | null {
     switch (node.type) {

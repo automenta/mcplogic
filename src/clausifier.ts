@@ -26,7 +26,7 @@ import {
     DIMACSResult,
     atomToKey,
 } from './types/clause.js';
-import { createClausificationError } from './types/errors.js';
+import { createClausificationError, createError, LogicException } from './types/errors.js';
 
 /** Default clausification options */
 const DEFAULT_OPTIONS: Required<ClausifyOptions> = {
@@ -664,7 +664,10 @@ export function clausesToProlog(clauses: Clause[]): string[] {
             }
         } else {
             // Not a Horn clause - cannot directly convert
-            throw new Error('Cannot convert non-Horn clause to Prolog');
+            throw new LogicException(createError(
+                'ENGINE_ERROR',
+                'Cannot convert non-Horn clause to Prolog. Try using the SAT engine.'
+            ));
         }
     }
 
