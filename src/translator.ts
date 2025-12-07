@@ -7,6 +7,7 @@
 import { parse } from './parser.js';
 import type { ASTNode } from './types/index.js';
 import { isHornClause } from './astUtils.js';
+import { createError, LogicException } from './types/errors.js';
 
 /**
  * Convert a Prover9-style formula to Prolog
@@ -102,7 +103,7 @@ function extractHornClause(node: ASTNode): string | null {
 
 function predicateToProlog(node: ASTNode): string {
     if (node.type !== 'predicate') {
-        throw new Error(`Expected predicate, got ${node.type}`);
+        throw new LogicException(createError('PARSE_ERROR', `Expected predicate, got ${node.type}`));
     }
 
     if (!node.args || node.args.length === 0) {
@@ -125,7 +126,7 @@ function termToProlog(node: ASTNode): string {
             const args = node.args!.map(termToProlog).join(', ');
             return `${node.name!.toLowerCase()}(${args})`;
         default:
-            throw new Error(`Cannot convert ${node.type} to Prolog term`);
+            throw new LogicException(createError('PARSE_ERROR', `Cannot convert ${node.type} to Prolog term`));
     }
 }
 
@@ -140,7 +141,7 @@ function conjunctionToProlog(node: ASTNode): string {
         return `${left}, ${right}`;
     }
 
-    throw new Error(`Cannot convert ${node.type} to Prolog body`);
+    throw new LogicException(createError('PARSE_ERROR', `Cannot convert ${node.type} to Prolog body`));
 }
 
 /**
