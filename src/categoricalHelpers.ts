@@ -61,8 +61,9 @@ export class CategoricalHelpers {
         const premises: string[] = [];
 
         // Define morphisms for both paths
-        [pathA, pathB].forEach(path => {
-            path.forEach((morph, i) => {
+        for (const path of [pathA, pathB]) {
+            let i = 0;
+            for (const morph of path) {
                 premises.push(`morphism(${morph})`);
                 if (i === 0) {
                     premises.push(`source(${morph}, ${objectStart})`);
@@ -70,8 +71,9 @@ export class CategoricalHelpers {
                 if (i === path.length - 1) {
                     premises.push(`target(${morph}, ${objectEnd})`);
                 }
-            });
-        });
+                i++;
+            }
+        }
 
         // Compose paths
         const compA = this.composePathHelper(pathA, 'comp_a');
