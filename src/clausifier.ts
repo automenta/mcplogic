@@ -686,20 +686,19 @@ function literalToProlog(lit: Literal, useNegation: boolean): string {
         } else if (arg.startsWith('sk')) {
             // Skolem constant, ensure lowercase
             return arg.toLowerCase();
+        } else if (arg.length === 1 && /^[a-z]/.test(arg)) {
+            // Single lowercase letter: Free variable (implicitly universal)
+            // Example: p(x) -> p(X) in Prolog
+            // Note: This matches the parser's convention where single lowercase chars are variables.
+            // If the user intends a constant, they must use a longer name (e.g. 'aa' or 'c_a').
+            return arg.toUpperCase();
         } else if (/^[a-z]/.test(arg)) {
-            // Standard lowercase constant/variable
-            // If it was a bound variable, it would have been renamed to _v...
-            // So this must be a constant.
+            // Lowercase string (length > 1): Constant
+            // Example: man(socrates) -> man(socrates)
             return arg;
         } else {
-            // Uppercase identifier in input - treat as variable?
-            // But parser classifies uppercase as variable?
-            // If it remains here, it's likely a constant that happens to be uppercase?
-            // Or maybe a variable that wasn't bound?
-            // Safest to lowercase it if it's meant to be a constant,
-            // but if the user input P(X) and X is free, it stays X.
-            // However, standardizeVariables handles free variables too?
-            // Let's check standardizeVariables.
+            // Uppercase string: Constant (Prover9 convention)
+            // Example: P(Socrates) -> p(socrates)
             return arg.toLowerCase();
         }
     };

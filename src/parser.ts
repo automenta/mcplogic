@@ -5,34 +5,10 @@
  * Supports: all, exists, ->, <->, &, |, -, =, predicates, functions, variables
  */
 
-// Token types
-export type TokenType =
-    | 'QUANTIFIER'    // all, exists
-    | 'VARIABLE'      // x, y, z (lowercase starting)
-    | 'CONSTANT'      // socrates, a, b (lowercase in predicate args)
-    | 'PREDICATE'     // man, mortal (lowercase with parens)
-    | 'FUNCTION'      // f, g (lowercase with parens, nested in predicate)
-    | 'IMPLIES'       // ->
-    | 'IFF'           // <->
-    | 'AND'           // &
-    | 'OR'            // |
-    | 'NOT'           // -
-    | 'EQUALS'        // =
-    | 'LPAREN'        // (
-    | 'RPAREN'        // )
-    | 'COMMA'         // ,
-    | 'DOT'           // .
-    | 'EOF';
-
-export interface Token {
-    type: TokenType;
-    value: string;
-    position: number;
-}
-
 import type { ASTNode, ASTNodeType } from './types/index.js';
+import type { TokenType, Token } from './types/parser.js';
 
-export type { ASTNode, ASTNodeType };
+export type { ASTNode, ASTNodeType, TokenType, Token };
 
 /**
  * Tokenizer for FOL formulas
@@ -339,7 +315,7 @@ export class Parser {
     }
 
     private classifyTerm(name: string): ASTNode {
-        // 1. If it's in the scope of a quantifier binding this name, it's a variable
+        // 1. If it's a bound variable, return variable
         if (this.boundVariables.has(name)) {
             return { type: 'variable', name };
         }
