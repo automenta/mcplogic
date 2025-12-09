@@ -571,7 +571,7 @@ function nodeToLiteral(node: ASTNode): Literal {
                 negated: true,
             };
         }
-        throw new Error(`Cannot convert ${inner.type} to literal`);
+        throw createClausificationError(`Cannot convert ${inner.type} to literal`);
     }
 
     if (node.type === 'predicate') {
@@ -590,7 +590,7 @@ function nodeToLiteral(node: ASTNode): Literal {
         };
     }
 
-    throw new Error(`Cannot convert ${node.type} to literal`);
+    throw createClausificationError(`Cannot convert ${node.type} to literal`);
 }
 
 /**

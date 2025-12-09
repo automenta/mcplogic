@@ -44,7 +44,7 @@ export class LogicEngine {
     private inferenceLimit: number;
 
     /**
-     * @param timeout Timeout in milliseconds (reserved for future use)
+     * @param _timeout Timeout in milliseconds (reserved for future use)
      * @param inferenceLimit Maximum inference steps before giving up (default: 1000)
      */
     constructor(_timeout: number = 5000, inferenceLimit: number = 1000) {
