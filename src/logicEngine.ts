@@ -21,6 +21,7 @@ import {
     createInferenceLimitError,
     createEngineError,
 } from './types/index.js';
+import { buildProveResult } from './responseUtils.js';
 
 export type { ProveResult };
 
@@ -85,7 +86,7 @@ export class LogicEngine {
             // Consult the program
             const consultResult = await this.consultProgram(prologProgram);
             if (!consultResult.success) {
-                return this.buildResult({
+                return buildProveResult({
                     success: false,
                     result: 'error',
                     error: consultResult.error,
@@ -105,7 +106,7 @@ export class LogicEngine {
             }
 
             if (queryResult.found) {
-                return this.buildResult({
+                return buildProveResult({
                     success: true,
                     result: 'proved',
                     message: `Proved: ${conclusion}`,
@@ -123,7 +124,7 @@ export class LogicEngine {
                 // If we hit the limit, use structured error
                 if (hitInferenceLimit) {
                     const error = createInferenceLimitError(this.inferenceLimit, conclusion);
-                    return this.buildResult({
+                    return buildProveResult({
                         success: false,
                         result: 'failed',
                         message: error.message,
@@ -134,7 +135,7 @@ export class LogicEngine {
                     }, verbosity);
                 }
 
-                return this.buildResult({
+                return buildProveResult({
                     success: false,
                     result: 'failed',
                     message: 'No proof found',
@@ -146,7 +147,7 @@ export class LogicEngine {
             }
         } catch (e) {
             const error = e instanceof Error ? e : createEngineError(String(e));
-            return this.buildResult({
+            return buildProveResult({
                 success: false,
                 result: 'error',
                 error: error.message,
@@ -189,49 +190,6 @@ export class LogicEngine {
             // The main validation will catch syntax errors
             return program;
         }
-    }
-
-    /**
-     * Build result based on verbosity
-     */
-    private buildResult(
-        data: {
-            success: boolean;
-            result: 'proved' | 'failed' | 'timeout' | 'error';
-            message?: string;
-            error?: string;
-            proof?: string[];
-            bindings?: Record<string, string>[];
-            prologProgram?: string;
-            timeMs: number;
-            inferenceCount?: number;
-        },
-        verbosity: Verbosity
-    ): ProveResult {
-        const base: ProveResult = {
-            success: data.success,
-            result: data.result,
-        };
-
-        if (verbosity === 'minimal') {
-            return base;
-        }
-
-        // Standard includes message, bindings, error
-        base.message = data.message;
-        base.bindings = data.bindings;
-        base.error = data.error;
-        base.proof = data.proof;
-
-        if (verbosity === 'detailed') {
-            base.prologProgram = data.prologProgram;
-            base.statistics = {
-                timeMs: data.timeMs,
-                inferences: data.inferenceCount,
-            };
-        }
-
-        return base;
     }
 
     /**

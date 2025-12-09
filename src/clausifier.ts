@@ -93,7 +93,7 @@ export function clausify(formula: string, options: ClausifyOptions = {}): Clausi
 
         return {
             success: false,
-            error: createClausificationError(error.message),
+            error: createClausificationError(error.message).error,
             statistics: {
                 originalSize: 0,
                 clauseCount: 0,

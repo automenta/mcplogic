@@ -1,14 +1,13 @@
 import {
     ProveResult,
     Verbosity,
-    EngineSelection,
     ProveResponse,
     MinimalProveResponse,
     StandardProveResponse,
     DetailedProveResponse
 } from '../types/index.js';
 import { validateFormulas, ValidationReport } from '../syntaxValidator.js';
-import { EngineManager } from '../engines/manager.js';
+import { EngineManager, EngineSelection } from '../engines/manager.js';
 
 /**
  * Build response based on verbosity level

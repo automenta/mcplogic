@@ -64,7 +64,11 @@ export function buildModelResponse(result: ModelResult, verbosity: Verbosity = '
         message: result.message || (result.success ? 'Model found' : result.error || 'No model found'),
         ...(result.model && { model: serializeModel(result.model) }),
         ...(result.interpretation && { interpretation: result.interpretation }),
-        statistics: result.statistics || { domainSize: 0, searchedSizes: [], timeMs: 0 },
+        statistics: {
+            domainSize: result.statistics?.domainSize ?? 0,
+            searchedSizes: result.statistics?.searchedSizes ?? [],
+            timeMs: result.statistics?.timeMs ?? 0
+        },
     };
     return response;
 }
@@ -81,6 +85,7 @@ export async function findModelHandler(
     const { premises, domain_size, max_domain_size } = args;
     // Create finder with custom max domain size if specified
     const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;
+    // findModel expects domainSize (camelCase), but args has domain_size (snake_case)
     const modelResult = await finder.findModel(premises, domain_size);
     return buildModelResponse(modelResult, verbosity);
 }
