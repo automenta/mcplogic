@@ -3,16 +3,69 @@
  */
 
 // Re-export error types
-export * from './errors.js';
+export {
+    LogicException,
+    createParseError,
+    createInferenceLimitError,
+    createNoModelError,
+    createSessionNotFoundError,
+    createSessionLimitError,
+    createEngineError,
+    createUnsatisfiableError,
+    createTimeoutError,
+    createInvalidDomainError,
+    createClausificationError,
+    serializeLogicError,
+    createError,
+    createGenericError,
+} from './errors.js';
+
+export type {
+    LogicErrorCode,
+    ErrorSpan,
+    LogicError,
+} from './errors.js';
 
 // Re-export clause types for CNF
-export * from './clause.js';
+export {
+    createSkolemEnv,
+    isTautology,
+    atomToKey,
+    clauseToString,
+    cnfToString,
+    literalToString,
+} from './clause.js';
+
+export type {
+    Literal,
+    Clause,
+    ClausifyOptions,
+    ClausifyResult,
+    SkolemEnv,
+    DIMACSResult,
+} from './clause.js';
 
 // Re-export AST types
-export * from './ast.js';
+export type {
+    ASTNodeType,
+    ASTNode,
+} from './ast.js';
 
 // Re-export parser types
-export * from './parser.js';
+export type {
+    TokenType,
+    Token,
+} from './parser.js';
 
 // Re-export response types
-export * from './responses.js';
+export type {
+    Verbosity,
+    Model,
+    ModelResult,
+    ProveResult,
+    ResponseStatistics,
+    MinimalResponse,
+    StandardResponse,
+    DetailedResponse,
+    LogicResponse,
+} from './responses.js';
