@@ -71,31 +71,12 @@ export class LogicEngine {
 
             // Add arithmetic axioms if enabled
             if (options?.enableArithmetic) {
-                const arithmeticSetup = getArithmeticSetup();
-                prologProgram = arithmeticSetup + '\n' + prologProgram;
+                prologProgram = this.setupArithmetic(prologProgram);
             }
 
             // Add equality axioms if enabled
             if (options?.enableEquality) {
-                try {
-                    const bridge = getEqualityBridge();
-                    // Always include base equality axioms (reflexivity, symmetry, transitivity)
-                    const emptySignature = extractSignature([]);
-                    const baseAxioms = generateEqualityAxioms(emptySignature, {
-                        includeCongruence: false,
-                        includeSubstitution: false
-                    });
-
-                    // Add signature-specific axioms (congruence, substitution) only when = is used
-                    const parsedFormulas = [...premises, conclusion].map(p => parse(p));
-                    const signatureAxioms = generateMinimalEqualityAxioms(parsedFormulas);
-
-                    const allAxioms = [...bridge, ...baseAxioms, ...signatureAxioms];
-                    prologProgram = allAxioms.join('\n') + '\n' + prologProgram;
-                } catch {
-                    // If parsing fails for equality extraction, continue without equality axioms
-                    // The main validation will catch syntax errors
-                }
+                prologProgram = this.setupEquality(prologProgram, premises, conclusion);
             }
 
             // Create fresh session with configured inference limit
@@ -173,6 +154,40 @@ export class LogicEngine {
                 timeMs: Date.now() - startTime,
                 inferenceCount,
             }, verbosity);
+        }
+    }
+
+    /**
+     * Setup arithmetic axioms
+     */
+    private setupArithmetic(program: string): string {
+        const arithmeticSetup = getArithmeticSetup();
+        return arithmeticSetup + '\n' + program;
+    }
+
+    /**
+     * Setup equality axioms
+     */
+    private setupEquality(program: string, premises: string[], conclusion: string): string {
+        try {
+            const bridge = getEqualityBridge();
+            // Always include base equality axioms (reflexivity, symmetry, transitivity)
+            const emptySignature = extractSignature([]);
+            const baseAxioms = generateEqualityAxioms(emptySignature, {
+                includeCongruence: false,
+                includeSubstitution: false
+            });
+
+            // Add signature-specific axioms (congruence, substitution) only when = is used
+            const parsedFormulas = [...premises, conclusion].map(p => parse(p));
+            const signatureAxioms = generateMinimalEqualityAxioms(parsedFormulas);
+
+            const allAxioms = [...bridge, ...baseAxioms, ...signatureAxioms];
+            return allAxioms.join('\n') + '\n' + program;
+        } catch {
+            // If parsing fails for equality extraction, continue without equality axioms
+            // The main validation will catch syntax errors
+            return program;
         }
     }
 

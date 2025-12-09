@@ -332,3 +332,19 @@ export function createError(
     details,
   };
 }
+
+/**
+ * Create a generic logic error exception.
+ * Use this when no specific factory is available.
+ */
+export function createGenericError(
+  code: LogicErrorCode,
+  message: string,
+  details?: Record<string, unknown>
+): LogicException {
+  return new LogicException({
+    code,
+    message,
+    details,
+  });
+}
