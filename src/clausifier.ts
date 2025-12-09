@@ -14,6 +14,7 @@
  */
 
 import { parse, astToString } from './parser.js';
+import { countNodes } from './astUtils.js';
 import type { ASTNode } from './types/index.js';
 import {
     Literal,
@@ -101,23 +102,6 @@ export function clausify(formula: string, options: ClausifyOptions = {}): Clausi
             },
         };
     }
-}
-
-/**
- * Count AST nodes for statistics.
- */
-function countNodes(node: ASTNode): number {
-    let count = 1;
-    if (node.left) count += countNodes(node.left);
-    if (node.right) count += countNodes(node.right);
-    if (node.operand) count += countNodes(node.operand);
-    if (node.body) count += countNodes(node.body);
-    if (node.args) {
-        for (const arg of node.args) {
-            count += countNodes(arg);
-        }
-    }
-    return count;
 }
 
 /**
