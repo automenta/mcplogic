@@ -13,8 +13,8 @@
  * 8. Extract clauses
  */
 
-import { parse, astToString } from './parser.js';
-import { countNodes } from './astUtils.js';
+import { parse } from './parser.js';
+import { countNodes, astToString } from './astUtils.js';
 import type { ASTNode } from './types/index.js';
 import {
     Literal,
@@ -560,14 +560,14 @@ function nodeToLiteral(node: ASTNode): Literal {
         if (inner.type === 'predicate') {
             return {
                 predicate: inner.name!,
-                args: (inner.args || []).map(termToString),
+                args: (inner.args || []).map(astToString),
                 negated: true,
             };
         } else if (inner.type === 'equals') {
             // ¬(a = b) represented as special predicate
             return {
                 predicate: '=',
-                args: [termToString(inner.left!), termToString(inner.right!)],
+                args: [astToString(inner.left!), astToString(inner.right!)],
                 negated: true,
             };
         }
@@ -577,7 +577,7 @@ function nodeToLiteral(node: ASTNode): Literal {
     if (node.type === 'predicate') {
         return {
             predicate: node.name!,
-            args: (node.args || []).map(termToString),
+            args: (node.args || []).map(astToString),
             negated: false,
         };
     }
@@ -585,27 +585,12 @@ function nodeToLiteral(node: ASTNode): Literal {
     if (node.type === 'equals') {
         return {
             predicate: '=',
-            args: [termToString(node.left!), termToString(node.right!)],
+            args: [astToString(node.left!), astToString(node.right!)],
             negated: false,
         };
     }
 
     throw createClausificationError(`Cannot convert ${node.type} to literal`);
-}
-
-/**
- * Convert a term AST to a string representation.
- */
-function termToString(node: ASTNode): string {
-    switch (node.type) {
-        case 'variable':
-        case 'constant':
-            return node.name!;
-        case 'function':
-            return `${node.name}(${(node.args || []).map(termToString).join(',')})`;
-        default:
-            return astToString(node);
-    }
 }
 
 /**
@@ -618,83 +603,6 @@ export function isHornFormula(clauses: Clause[]): boolean {
         if (positiveCount > 1) return false;
     }
     return true;
-}
-
-/**
- * Convert clauses to Prolog-compatible format.
- * Only works for Horn clauses.
- */
-export function clausesToProlog(clauses: Clause[]): string[] {
-    const prologClauses: string[] = [];
-
-    for (const clause of clauses) {
-        const positive = clause.literals.filter(l => !l.negated);
-        const negative = clause.literals.filter(l => l.negated);
-
-        if (positive.length === 0) {
-            // Goal clause (all negative) - represents a query
-            // :- p, q. means "prove p and q"
-            const body = negative.map(l => literalToProlog(l, false)).join(', ');
-            prologClauses.push(`:- ${body}.`);
-        } else if (positive.length === 1) {
-            const head = literalToProlog(positive[0], false);
-            if (negative.length === 0) {
-                // Fact
-                prologClauses.push(`${head}.`);
-            } else {
-                // Rule
-                const body = negative.map(l => literalToProlog(l, false)).join(', ');
-                prologClauses.push(`${head} :- ${body}.`);
-            }
-        } else {
-            // Not a Horn clause - cannot directly convert
-            throw new Error('Cannot convert non-Horn clause to Prolog');
-        }
-    }
-
-    return prologClauses;
-}
-
-/**
- * Convert a literal to Prolog format.
- */
-function literalToProlog(lit: Literal, useNegation: boolean): string {
-    const formatArg = (arg: string): string => {
-        // Variables start with _ or Uppercase
-        // Constants (including Skolem constants) start with lowercase
-        // Clausifier generates variables as _v...
-        // Clausifier generates skolem constants as sk...
-        if (arg.startsWith('_v')) {
-            // It's a variable, ensure uppercase for Prolog
-            return arg.toUpperCase();
-        } else if (arg.startsWith('sk')) {
-            // Skolem constant, ensure lowercase
-            return arg.toLowerCase();
-        } else if (arg.length === 1 && /^[a-z]/.test(arg)) {
-            // Single lowercase letter: Free variable (implicitly universal)
-            // Example: p(x) -> p(X) in Prolog
-            // Note: This matches the parser's convention where single lowercase chars are variables.
-            // If the user intends a constant, they must use a longer name (e.g. 'aa' or 'c_a').
-            return arg.toUpperCase();
-        } else if (/^[a-z]/.test(arg)) {
-            // Lowercase string (length > 1): Constant
-            // Example: man(socrates) -> man(socrates)
-            return arg;
-        } else {
-            // Uppercase string: Constant (Prover9 convention)
-            // Example: P(Socrates) -> p(socrates)
-            return arg.toLowerCase();
-        }
-    };
-
-    const atom = lit.args.length > 0
-        ? `${lit.predicate}(${lit.args.map(formatArg).join(', ')})`
-        : lit.predicate;
-
-    if (useNegation && lit.negated) {
-        return `\\+ ${atom}`;
-    }
-    return atom;
 }
 
 /**

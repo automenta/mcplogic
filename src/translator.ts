@@ -10,7 +10,8 @@ import {
     createClausificationError,
     createEngineError,
 } from './types/errors.js';
-import { clausify, clausesToProlog } from './clausifier.js';
+import { clausify } from './clausifier.js';
+import { Clause, Literal } from './types/clause.js';
 
 /**
  * Convert a Prover9-style formula to Prolog
@@ -45,6 +46,88 @@ export function folToProlog(formula: string): string[] {
     }
 }
 
+/**
+ * Convert clauses to Prolog-compatible format.
+ * Only works for Horn clauses.
+ */
+export function clausesToProlog(clauses: Clause[]): string[] {
+    const prologClauses: string[] = [];
+
+    for (const clause of clauses) {
+        const positive = clause.literals.filter(l => !l.negated);
+        const negative = clause.literals.filter(l => l.negated);
+
+        if (positive.length === 0) {
+            // Goal clause (all negative) - represents a query
+            // :- p, q. means "prove p and q"
+            const body = negative.map(l => literalToProlog(l, false)).join(', ');
+            prologClauses.push(`:- ${body}.`);
+        } else if (positive.length === 1) {
+            const head = literalToProlog(positive[0], false);
+            if (negative.length === 0) {
+                // Fact
+                prologClauses.push(`${head}.`);
+            } else {
+                // Rule
+                const body = negative.map(l => literalToProlog(l, false)).join(', ');
+                prologClauses.push(`${head} :- ${body}.`);
+            }
+        } else {
+            // Not a Horn clause - cannot directly convert
+            throw new Error('Cannot convert non-Horn clause to Prolog');
+        }
+    }
+
+    return prologClauses;
+}
+
+/**
+ * Convert a literal to Prolog format.
+ */
+function literalToProlog(lit: Literal, useNegation: boolean): string {
+    const formatArg = (arg: string): string => {
+        return formatPrologTerm(arg);
+    };
+
+    const atom = lit.args.length > 0
+        ? `${lit.predicate}(${lit.args.map(formatArg).join(', ')})`
+        : lit.predicate;
+
+    if (useNegation && lit.negated) {
+        return `\\+ ${atom}`;
+    }
+    return atom;
+}
+
+/**
+ * Formats a term string (variable or constant) for Prolog.
+ *
+ * Rules:
+ * - Variables (start with _ or uppercase) -> Uppercase
+ * - Skolem constants (start with sk) -> Lowercase
+ * - Free variables (single lowercase letter) -> Uppercase (implicit universal)
+ * - Constants (lowercase or uppercase) -> Lowercase
+ */
+function formatPrologTerm(term: string): string {
+    if (term.startsWith('_v')) {
+        // It's a variable from Clausifier, ensure uppercase for Prolog
+        return term.toUpperCase();
+    } else if (term.startsWith('sk')) {
+        // Skolem constant, ensure lowercase
+        return term.toLowerCase();
+    } else if (term.length === 1 && /^[a-z]/.test(term)) {
+        // Single lowercase letter: Free variable (implicitly universal)
+        return term.toUpperCase();
+    } else if (/^[a-z]/.test(term)) {
+        // Lowercase string (length > 1): Constant
+        return term;
+    } else {
+        // Uppercase string or other: Constant
+        // Example: Socrates -> socrates
+        return term.toLowerCase();
+    }
+}
+
 function predicateToProlog(node: ASTNode): string {
     if (node.type !== 'predicate') {
         throw createEngineError(`Expected predicate, got ${node.type} during translation`);
@@ -61,10 +144,12 @@ function predicateToProlog(node: ASTNode): string {
 function termToProlog(node: ASTNode): string {
     switch (node.type) {
         case 'variable':
-            // Prolog variables are uppercase
+            // Explicit variable node: must be uppercase in Prolog
+            // Even if the name doesn't follow strict conventions, if the parser
+            // identified it as a variable, we treat it as such.
             return node.name!.toUpperCase();
         case 'constant':
-            // Prolog constants are lowercase
+             // Explicit constant node: must be lowercase in Prolog
             return node.name!.toLowerCase();
         case 'function':
             const args = node.args!.map(termToProlog).join(', ');

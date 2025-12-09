@@ -9,9 +9,9 @@ import {
     skolemize,
     dropUniversals,
     isHornFormula,
-    clausesToProlog,
     clausesToDIMACS,
 } from '../src/clausifier';
+import { clausesToProlog } from '../src/translator';
 import { parse } from '../src/parser';
 import { createSkolemEnv, clauseToString, cnfToString } from '../src/types/clause';
 
