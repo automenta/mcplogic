@@ -273,6 +273,6 @@ export function astToString(node: ASTNode): string {
         case 'constant':
             return node.name!;
         default:
-            throw new Error(`Unknown node type: ${node.type}`);
+            throw new Error(`Unknown node type: ${(node as any).type}`);
     }
 }

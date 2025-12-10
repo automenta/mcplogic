@@ -27,7 +27,7 @@ import {
     DIMACSResult,
     atomToKey,
 } from './types/clause.js';
-import { createClausificationError } from './types/errors.js';
+import { createClausificationError, createTimeoutError } from './types/errors.js';
 
 /** Default clausification options */
 const DEFAULT_OPTIONS: Required<ClausifyOptions> = {
@@ -471,7 +471,7 @@ function distribute(
 ): ASTNode {
     // Check timeout
     if (Date.now() - startTime > options.timeout) {
-        throw new Error('Clausification timeout');
+        throw createTimeoutError(options.timeout, 'Clausification');
     }
 
     switch (node.type) {
