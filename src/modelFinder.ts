@@ -8,6 +8,7 @@ import { parse } from './parser.js';
 import { Model, ModelResult } from './types/index.js';
 import type { ASTNode } from './types/index.js';
 import { extractSignature } from './utils/ast.js';
+import { createGenericError } from './types/errors.js';
 
 export type { Model, ModelResult };
 
@@ -71,10 +72,11 @@ export class ModelFinder {
 
             return { success: false, result: 'no_model' };
         } catch (e) {
+            const error = e instanceof Error ? e : createGenericError('ENGINE_ERROR', String(e));
             return {
                 success: false,
                 result: 'error',
-                error: e instanceof Error ? e.message : String(e)
+                error: error.message
             };
         }
     }

@@ -6,6 +6,7 @@
  */
 
 import type { ASTNode } from '../types/index.js';
+import { createGenericError } from '../types/errors.js';
 
 /**
  * Generic AST Visitor
@@ -257,6 +258,6 @@ export function astToString(node: ASTNode): string {
         case 'constant':
             return node.name!;
         default:
-            throw new Error(`Unknown node type: ${(node as any).type}`);
+            throw createGenericError('PARSE_ERROR', `Unknown node type: ${(node as any).type}`);
     }
 }

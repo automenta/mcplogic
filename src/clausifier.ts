@@ -31,7 +31,7 @@ import {
     dropUniversals,
     distribute,
 } from './utils/transform.js';
-import { createClausificationError } from './types/errors.js';
+import { createClausificationError, createGenericError } from './types/errors.js';
 
 /** Default clausification options */
 const DEFAULT_OPTIONS: Required<ClausifyOptions> = {
@@ -93,7 +93,7 @@ export function clausify(formula: string, options: ClausifyOptions = {}): Clausi
         };
     } catch (e) {
         const timeMs = Date.now() - startTime;
-        const error = e instanceof Error ? e : new Error(String(e));
+        const error = e instanceof Error ? e : createGenericError('CLAUSIFICATION_ERROR', String(e));
 
         return {
             success: false,
