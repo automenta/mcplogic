@@ -1,51 +1,10 @@
 import {
-    ProveResult,
     Verbosity,
     ProveResponse,
-    MinimalProveResponse,
-    StandardProveResponse,
-    DetailedProveResponse
 } from '../types/index.js';
 import { validateFormulas, ValidationReport } from '../syntaxValidator.js';
 import { EngineManager, EngineSelection } from '../engines/manager.js';
-
-/**
- * Build response based on verbosity level
- */
-export function buildProveResponse(result: ProveResult, verbosity: Verbosity = 'standard'): ProveResponse {
-    if (verbosity === 'minimal') {
-        const response: MinimalProveResponse = {
-            success: result.success,
-            result: result.result,
-        };
-        return response;
-    }
-
-    if (verbosity === 'standard') {
-        const response: StandardProveResponse = {
-            success: result.success,
-            result: result.result,
-            message: result.message || (result.success ? 'Proof found' : result.error || 'No proof found'),
-            ...(result.bindings && { bindings: result.bindings }),
-            ...(result.engineUsed && { engineUsed: result.engineUsed }),
-        };
-        return response;
-    }
-
-    // detailed
-    const response: DetailedProveResponse = {
-        success: result.success,
-        result: result.result,
-        message: result.message || (result.success ? 'Proof found' : result.error || 'No proof found'),
-        ...(result.bindings && { bindings: result.bindings }),
-        ...(result.engineUsed && { engineUsed: result.engineUsed }),
-        prologProgram: result.prologProgram || '',
-        ...(result.inferenceSteps && { inferenceSteps: result.inferenceSteps }),
-        statistics: result.statistics || { timeMs: 0 },
-        ...(result.proof && { proof: result.proof }),
-    };
-    return response;
-}
+import { buildProveResponse } from './utils.js';
 
 export async function proveHandler(
     args: {

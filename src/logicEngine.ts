@@ -7,21 +7,21 @@
 import pl, { Session } from 'tau-prolog';
 
 import { buildPrologProgram, folGoalToProlog } from './translator.js';
-import { getArithmeticSetup } from './arithmetic.js';
+import { getArithmeticSetup } from './axioms/arithmetic.js';
 import { parse } from './parser.js';
-import { extractSignature } from './astUtils.js';
+import { extractSignature } from './utils/ast.js';
 import {
     generateEqualityAxioms,
     generateMinimalEqualityAxioms,
     getEqualityBridge
-} from './equalityAxioms.js';
+} from './axioms/equality.js';
 import {
     ProveResult,
     Verbosity,
     createInferenceLimitError,
     createEngineError,
 } from './types/index.js';
-import { buildProveResult } from './responseUtils.js';
+import { buildProveResult } from './utils/response.js';
 
 export type { ProveResult };
 

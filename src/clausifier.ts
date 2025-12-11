@@ -14,7 +14,7 @@
  */
 
 import { parse } from './parser.js';
-import { countNodes, astToString } from './astUtils.js';
+import { countNodes, astToString } from './utils/ast.js';
 import type { ASTNode } from './types/index.js';
 import {
     Literal,

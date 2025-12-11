@@ -21,7 +21,7 @@ import { listResources, getResourceContent } from './resources/index.js';
 import { listPrompts, getPrompt } from './prompts/index.js';
 
 // LogicEngine is now accessed via EngineManager
-import { CategoricalHelpers } from './categoricalHelpers.js';
+import { CategoricalHelpers } from './axioms/categorical.js';
 import { createModelFinder } from './modelFinder.js';
 import { createSessionManager } from './sessionManager.js';
 import {

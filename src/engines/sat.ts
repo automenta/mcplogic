@@ -8,7 +8,7 @@
 import Logic from 'logic-solver';
 import { Clause } from '../types/clause.js';
 import { ProveResult, Verbosity } from '../types/index.js';
-import { buildProveResult } from '../responseUtils.js';
+import { buildProveResult } from '../utils/response.js';
 import { clausify, isHornFormula } from '../clausifier.js';
 import {
     ReasoningEngine,

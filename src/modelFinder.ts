@@ -7,7 +7,7 @@
 import { parse } from './parser.js';
 import { Model, ModelResult } from './types/index.js';
 import type { ASTNode } from './types/index.js';
-import { extractSignature } from './astUtils.js';
+import { extractSignature } from './utils/ast.js';
 
 export type { Model, ModelResult };
 

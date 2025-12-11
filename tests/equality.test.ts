@@ -7,8 +7,8 @@ import {
     containsEquality,
     generateMinimalEqualityAxioms,
     getEqualityBridge,
-} from '../src/equalityAxioms';
-import { extractSignature, FormulaSignature as Signature } from '../src/astUtils';
+} from '../src/axioms/equality';
+import { extractSignature, FormulaSignature as Signature } from '../src/utils/ast';
 import { parse } from '../src/parser';
 
 describe('Equality Axioms', () => {

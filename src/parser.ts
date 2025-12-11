@@ -8,7 +8,7 @@
 import type { ASTNode, ASTNodeType } from './types/index.js';
 import type { TokenType, Token } from './types/parser.js';
 import { createParseError } from './types/errors.js';
-import { astToString } from './astUtils.js';
+import { astToString } from './utils/ast.js';
 
 export type { ASTNode, ASTNodeType, TokenType, Token };
 export { astToString };
