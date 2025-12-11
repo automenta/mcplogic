@@ -5,7 +5,24 @@
  * Used by parser, translator, clausifier, and model finder.
  */
 
-import type { ASTNode } from './types/index.js';
+import type { ASTNode } from '../types/index.js';
+
+/**
+ * Generic AST Visitor
+ */
+export function traverse(node: ASTNode, visitor: (node: ASTNode) => void): void {
+    visitor(node);
+
+    if (node.args) {
+        for (const arg of node.args) {
+            traverse(arg, visitor);
+        }
+    }
+    if (node.left) traverse(node.left, visitor);
+    if (node.right) traverse(node.right, visitor);
+    if (node.operand) traverse(node.operand, visitor);
+    if (node.body) traverse(node.body, visitor);
+}
 
 /**
  * Signature extracted from formulas
@@ -30,67 +47,39 @@ export function extractSignature(asts: ASTNode[]): FormulaSignature {
     const variables = new Set<string>();
     const functions = new Map<string, number>();
 
-    function visit(node: ASTNode): void {
+    const visitor = (node: ASTNode) => {
         switch (node.type) {
             case 'predicate':
                 if (node.name) {
                     predicates.set(node.name, node.args?.length ?? 0);
                 }
-                if (node.args) {
-                    for (const arg of node.args) {
-                        visit(arg);
-                    }
-                }
                 break;
-
             case 'function':
                 if (node.name) {
                     functions.set(node.name, node.args?.length ?? 0);
                 }
-                if (node.args) {
-                    for (const arg of node.args) {
-                        visit(arg);
-                    }
-                }
                 break;
-
             case 'constant':
                 if (node.name) {
                     constants.add(node.name);
                 }
                 break;
-
             case 'variable':
                 if (node.name) {
                     variables.add(node.name);
                 }
                 break;
-
             case 'forall':
             case 'exists':
                 if (node.variable) {
                     variables.add(node.variable);
                 }
-                if (node.body) visit(node.body);
-                break;
-
-            case 'not':
-                if (node.operand) visit(node.operand);
-                break;
-
-            case 'and':
-            case 'or':
-            case 'implies':
-            case 'iff':
-            case 'equals':
-                if (node.left) visit(node.left);
-                if (node.right) visit(node.right);
                 break;
         }
-    }
+    };
 
     for (const ast of asts) {
-        visit(ast);
+        traverse(ast, visitor);
     }
 
     return { predicates, constants, variables, functions };
@@ -100,18 +89,8 @@ export function extractSignature(asts: ASTNode[]): FormulaSignature {
  * Count nodes in an AST (for complexity estimation)
  */
 export function countNodes(ast: ASTNode): number {
-    let count = 1;
-
-    if (ast.args) {
-        for (const arg of ast.args) {
-            count += countNodes(arg);
-        }
-    }
-    if (ast.left) count += countNodes(ast.left);
-    if (ast.right) count += countNodes(ast.right);
-    if (ast.operand) count += countNodes(ast.operand);
-    if (ast.body) count += countNodes(ast.body);
-
+    let count = 0;
+    traverse(ast, () => { count++; });
     return count;
 }
 
@@ -121,6 +100,9 @@ export function countNodes(ast: ASTNode): number {
 export function getFreeVariables(ast: ASTNode, bound: Set<string> = new Set()): Set<string> {
     const free = new Set<string>();
 
+    // This one requires context (bound vars), so we can't use the simple traverse
+    // without modification or a custom recursive function.
+    // Keeping custom recursion for correct scoping.
     function visit(node: ASTNode, boundVars: Set<string>): void {
         switch (node.type) {
             case 'variable':
@@ -170,22 +152,23 @@ export function getFreeVariables(ast: ASTNode, bound: Set<string> = new Set()): 
  * Check if formula contains equality (for auto axiom injection)
  */
 export function containsEquality(ast: ASTNode): boolean {
-    if (ast.type === 'equals') return true;
-    if (ast.type === 'predicate' && (ast.name === 'eq' || ast.name === 'equals')) {
-        return true;
+    let found = false;
+    try {
+        traverse(ast, (node) => {
+            if (node.type === 'equals') {
+                found = true;
+                throw 'Found'; // Early exit hack
+            }
+            if (node.type === 'predicate' && (node.name === 'eq' || node.name === 'equals')) {
+                found = true;
+                throw 'Found';
+            }
+        });
+    } catch (e) {
+        if (e === 'Found') return true;
+        throw e;
     }
-
-    if (ast.args) {
-        for (const arg of ast.args) {
-            if (containsEquality(arg)) return true;
-        }
-    }
-    if (ast.left && containsEquality(ast.left)) return true;
-    if (ast.right && containsEquality(ast.right)) return true;
-    if (ast.operand && containsEquality(ast.operand)) return true;
-    if (ast.body && containsEquality(ast.body)) return true;
-
-    return false;
+    return found;
 }
 
 /**
@@ -228,6 +211,7 @@ function isConjunctionOfAtoms(node: ASTNode): boolean {
  * Deep clone an AST node
  */
 export function cloneAST(node: ASTNode): ASTNode {
+    // Traverse cannot be easily used for cloning since we need to rebuild the structure.
     const clone: ASTNode = { type: node.type };
 
     if (node.name !== undefined) clone.name = node.name;
