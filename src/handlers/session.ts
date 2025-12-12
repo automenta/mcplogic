@@ -1,5 +1,11 @@
 import {
     Verbosity,
+    SessionInfo,
+    PremiseAssertResponse,
+    PremiseRetractResponse,
+    SessionListResponse,
+    SessionClearResponse,
+    SessionDeleteResponse,
 } from '../types/index.js';
 import { validateFormulas } from '../syntaxValidator.js';
 import { SessionManager } from '../sessionManager.js';
@@ -9,7 +15,7 @@ import { buildProveResponse } from './core.js';
 export function createSessionHandler(
     args: { ttl_minutes?: number },
     sessionManager: SessionManager
-): object {
+): SessionInfo {
     const { ttl_minutes } = args;
     const ttlMs = ttl_minutes
         ? Math.min(ttl_minutes, 1440) * 60 * 1000  // Max 24 hours
@@ -33,7 +39,7 @@ export function assertPremiseHandler(
         formula: string;
     },
     sessionManager: SessionManager
-): object {
+): PremiseAssertResponse {
     const { session_id, formula } = args;
 
     // Validate formula syntax first
@@ -41,6 +47,9 @@ export function assertPremiseHandler(
     if (!validation.valid) {
         return {
             success: false,
+            session_id,
+            premise_count: sessionManager.get(session_id)?.premises.length ?? 0,
+            formula_added: '',
             result: 'syntax_error',
             validation,
         };
@@ -70,7 +79,11 @@ export async function querySessionHandler(
     // Validate goal syntax
     const validation = validateFormulas([goal]);
     if (!validation.valid) {
-        return { result: 'syntax_error', validation };
+        return {
+            success: false,
+            result: 'syntax_error',
+            validation
+        };
     }
 
     const session = sessionManager.get(session_id);
@@ -90,7 +103,7 @@ export function retractPremiseHandler(
         formula: string;
     },
     sessionManager: SessionManager
-): object {
+): PremiseRetractResponse {
     const { session_id, formula } = args;
 
     const removed = sessionManager.retractPremise(session_id, formula);
@@ -110,7 +123,7 @@ export function listPremisesHandler(
     args: { session_id: string },
     sessionManager: SessionManager,
     verbosity: Verbosity
-): object {
+): SessionListResponse {
     const { session_id } = args;
 
     const premises = sessionManager.listPremises(session_id);
@@ -130,7 +143,7 @@ export function listPremisesHandler(
 export function clearSessionHandler(
     args: { session_id: string },
     sessionManager: SessionManager
-): object {
+): SessionClearResponse {
     const { session_id } = args;
 
     const session = sessionManager.clear(session_id);
@@ -146,7 +159,7 @@ export function clearSessionHandler(
 export function deleteSessionHandler(
     args: { session_id: string },
     sessionManager: SessionManager
-): object {
+): SessionDeleteResponse {
     const { session_id } = args;
 
     sessionManager.delete(session_id);

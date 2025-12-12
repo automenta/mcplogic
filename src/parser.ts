@@ -121,6 +121,7 @@ export class Parser {
     private tokens: Token[];
     private originalInput: string;
     private pos: number = 0;
+    // Track bound variables as a set for efficient lookup
     private boundVariables: Set<string> = new Set();
 
     constructor(tokens: Token[], originalInput: string) {
@@ -231,16 +232,28 @@ export class Parser {
             const varToken = this.expect('VARIABLE');
             const variable = varToken.value;
 
+            // Handle scoping: add variable to bound set for parsing body, then remove
+            const wasBound = this.boundVariables.has(variable);
             this.boundVariables.add(variable);
 
-            // Parse the body - must be in parentheses after quantifier
-            const body = this.parseUnary();
+            try {
+                // Parse the body - must be in parentheses after quantifier if it's complex,
+                // but standard unary handles precedence.
+                // Note: Prover9 syntax often requires parens around quantifier body if complex, e.g., all x (P(x)).
+                // But `all x P(x) & Q(x)` is `(all x P(x)) & Q(x)`.
+                const body = this.parseUnary();
 
-            return {
-                type: quantifier === 'all' ? 'forall' : 'exists',
-                variable,
-                body
-            };
+                return {
+                    type: quantifier === 'all' ? 'forall' : 'exists',
+                    variable,
+                    body
+                };
+            } finally {
+                // Restore scope
+                if (!wasBound) {
+                    this.boundVariables.delete(variable);
+                }
+            }
         }
 
         return this.parseAtom();
