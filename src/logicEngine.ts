@@ -69,7 +69,8 @@ export class LogicEngine {
 
         try {
             // Build program from premises
-            prologProgram = buildPrologProgram(premises);
+            // We pass enableEquality option to translator so it uses eq/2 instead of =/2
+            prologProgram = buildPrologProgram(premises, { enableEquality: options?.enableEquality });
 
             // Add arithmetic axioms if enabled
             if (options?.enableArithmetic) {
@@ -97,7 +98,8 @@ export class LogicEngine {
             }
 
             // Build query from conclusion
-            const query = folGoalToProlog(conclusion);
+            // Pass enableEquality to translator
+            const query = folGoalToProlog(conclusion, { enableEquality: options?.enableEquality });
 
             // Run query
             const queryResult = await runPrologQuery(this.session, query);
@@ -198,6 +200,8 @@ export class LogicEngine {
      */
     async checkSatisfiability(premises: string[]): Promise<boolean> {
         try {
+            // Note: checkSatisfiability usually assumes default options (no special equality handling)
+            // or we could add options here too. For now, we assume default (strict equality).
             const program = buildPrologProgram(premises);
             this.session = pl.create(this.inferenceLimit);
 
