@@ -6,8 +6,10 @@
  */
 
 import { Clause } from '../types/clause.js';
-import { ProveResult } from '../types/index.js';
-import { clausify, isHornFormula } from '../clausifier.js';
+import { ProveResult, ASTNode } from '../types/index.js';
+import { parse } from '../parser.js';
+import { clausifyAST, isHornFormula } from '../clausifier.js';
+import { buildProveResult } from '../utils/response.js';
 import {
     EngineCapabilities,
     EngineProveOptions,
@@ -70,7 +72,7 @@ export class EngineManager {
         premises: string[],
         conclusion: string,
         options?: ManagerProveOptions
-    ): Promise<ProveResult & { engineUsed?: string }> {
+    ): Promise<ProveResult> {
         const engine = options?.engine ?? 'auto';
 
         // Explicit engine selection
@@ -95,26 +97,89 @@ export class EngineManager {
         premises: string[],
         conclusion: string,
         options?: EngineProveOptions
-    ): Promise<ProveResult & { engineUsed?: string }> {
-        // Try to clausify to analyze structure
-        const combined = [...premises, `-${conclusion}`].join(' & ');
-        const clausifyResult = clausify(combined);
+    ): Promise<ProveResult> {
+        const startTime = Date.now();
+        // Construct AST for refutation: Premises & -Conclusion
+        try {
+            const premiseASTs = premises.map(p => parse(p));
+            const conclusionAST = parse(conclusion);
+            const negatedConclusion: ASTNode = {
+                type: 'not',
+                operand: conclusionAST
+            };
+            const allFormulas = [...premiseASTs, negatedConclusion];
 
-        // If clausification fails or formula is Horn, use Prolog
-        if (!clausifyResult.success || !clausifyResult.clauses) {
+            // Combine into a single AND tree if there are multiple formulas
+            let combinedAST: ASTNode;
+            if (allFormulas.length === 1) {
+                combinedAST = allFormulas[0];
+            } else {
+                combinedAST = allFormulas.reduce((acc, curr) => ({
+                    type: 'and',
+                    left: acc,
+                    right: curr
+                }));
+            }
+
+            // Clausify to analyze structure
+            const clausifyResult = clausifyAST(combinedAST);
+
+            // If clausification fails (e.g. timeout) or returns no clauses, fallback to Prolog (safe default)
+            if (!clausifyResult.success || !clausifyResult.clauses) {
+                const result = await this.prolog.prove(premises, conclusion, options);
+                return { ...result, engineUsed: this.prolog.name };
+            }
+
+            // Check if Horn (Prolog-compatible)
+            if (isHornFormula(clausifyResult.clauses)) {
+                const result = await this.prolog.prove(premises, conclusion, options);
+                return { ...result, engineUsed: this.prolog.name };
+            }
+
+            // Non-Horn: use SAT solver with the already computed clauses
+            const satResult = await this.sat.checkSat(clausifyResult.clauses);
+
+            // Build result (similar to SATEngine.prove but using existing clauses/satResult)
+             if (!satResult.sat) {
+                // UNSAT means the conclusion follows from premises
+                return {
+                    ...buildProveResult({
+                        success: true,
+                        result: 'proved',
+                        message: `Proved: ${conclusion} (via refutation)`,
+                        proof: [
+                            `Premises: ${premises.join('; ')}`,
+                            `Conclusion: ${conclusion}`,
+                            `Method: Refutation (premises ∧ ¬conclusion is UNSAT)`,
+                        ],
+                        timeMs: Date.now() - startTime,
+                        clauseCount: clausifyResult.clauses.length,
+                        varCount: satResult.statistics?.variables,
+                    }, options?.verbosity || 'standard'),
+                    engineUsed: this.sat.name
+                };
+            } else {
+                // SAT means we found a countermodel
+                 return {
+                    ...buildProveResult({
+                        success: false,
+                        result: 'failed',
+                        message: `Cannot prove: ${conclusion}`,
+                        error: 'Found satisfying assignment for premises ∧ ¬conclusion',
+                        timeMs: Date.now() - startTime,
+                        clauseCount: clausifyResult.clauses.length,
+                        varCount: satResult.statistics?.variables,
+                    }, options?.verbosity || 'standard'),
+                    engineUsed: this.sat.name
+                 };
+            }
+
+        } catch (e) {
+            // Fallback to Prolog if anything goes wrong during analysis (e.g. parsing error)
+            // though likely Prolog will also fail if parsing is the issue.
             const result = await this.prolog.prove(premises, conclusion, options);
             return { ...result, engineUsed: this.prolog.name };
         }
-
-        // Check if Horn (Prolog-compatible)
-        if (isHornFormula(clausifyResult.clauses)) {
-            const result = await this.prolog.prove(premises, conclusion, options);
-            return { ...result, engineUsed: this.prolog.name };
-        }
-
-        // Non-Horn: use SAT solver
-        const result = await this.sat.prove(premises, conclusion, options);
-        return { ...result, engineUsed: this.sat.name };
     }
 
     /**
