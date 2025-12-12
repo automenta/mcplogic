@@ -15,6 +15,13 @@ import { checkAllFormulas } from './utils/evaluation.js';
 export type { Model, ModelResult };
 
 /**
+ * Options for model finding
+ */
+export interface ModelOptions {
+    maxDomainSize?: number;
+}
+
+/**
  * Model Finder for finite domains
  */
 export class ModelFinder {
@@ -32,11 +39,13 @@ export class ModelFinder {
      */
     async findModel(
         premises: string[],
-        domainSize?: number
+        domainSize?: number,
+        options?: ModelOptions
     ): Promise<ModelResult> {
         this.startTime = Date.now();
         const startSize = domainSize || 2;
-        const endSize = domainSize || this.maxDomainSize;
+        // Use override option or default
+        const endSize = domainSize || options?.maxDomainSize || this.maxDomainSize;
 
         try {
             // Parse all premises
@@ -96,14 +105,16 @@ export class ModelFinder {
     async findCounterexample(
         premises: string[],
         conclusion: string,
-        domainSize?: number
+        domainSize?: number,
+        options?: ModelOptions
     ): Promise<ModelResult> {
         // A counterexample is a model of premises ∧ ¬conclusion
         const negatedConclusion = `-(${conclusion.replace(/\.$/, '')})`;
 
         const result = await this.findModel(
             [...premises, negatedConclusion],
-            domainSize
+            domainSize,
+            options
         );
 
         if (result.success) {
