@@ -27,6 +27,8 @@ export type {
 } from './errors.js';
 
 // Re-export clause types for CNF
+// Note: Consumers should import utility functions (createSkolemEnv, etc.) directly from src/utils/clause.js
+// but they are kept here for backward compatibility.
 export {
     createSkolemEnv,
     isTautology,
