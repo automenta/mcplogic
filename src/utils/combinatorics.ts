@@ -37,11 +37,16 @@ export function* allSubsets<T>(set: T[]): Generator<T[]> {
 }
 
 /**
- * Enumerate all possible constant assignments
+ * Enumerate all possible constant assignments with Symmetry Breaking
+ *
+ * Uses the Least Number Heuristic:
+ * The k-th constant can only be assigned a value v such that v <= max(assigned) + 1.
+ * This avoids generating isomorphic models that differ only by a permutation of domain elements.
  */
 export function* enumerateConstantAssignments(
     constants: string[],
-    domain: number[]
+    domain: number[],
+    maxUsed: number = -1
 ): Generator<Map<string, number>> {
     if (constants.length === 0) {
         yield new Map();
@@ -49,8 +54,20 @@ export function* enumerateConstantAssignments(
     }
 
     const [first, ...rest] = constants;
-    for (const value of domain) {
-        for (const restAssignment of enumerateConstantAssignments(rest, domain)) {
+
+    // Determine the range of values we can assign to 'first'.
+    // We can pick any value from 0 up to maxUsed + 1.
+    // However, we must ensure we don't go out of domain bounds.
+    // Also, we must check if we are allowed to pick ANY value in domain if maxUsed is "saturated"?
+    // No, standard LNH says: value <= maxUsed + 1.
+
+    const limit = Math.min(maxUsed + 1, domain.length - 1);
+
+    for (let value = 0; value <= limit; value++) {
+        // Calculate new maxUsed
+        const newMaxUsed = Math.max(maxUsed, value);
+
+        for (const restAssignment of enumerateConstantAssignments(rest, domain, newMaxUsed)) {
             const assignment = new Map(restAssignment);
             assignment.set(first, value);
             yield assignment;
