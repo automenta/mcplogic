@@ -11,6 +11,7 @@ import { extractSignature, getUsedPredicates } from './utils/ast.js';
 import { createGenericError } from './types/errors.js';
 import { allTuples, allSubsets, enumerateConstantAssignments } from './utils/combinatorics.js';
 import { checkAllFormulas } from './utils/evaluation.js';
+import { formatModel } from './utils/formatting.js';
 
 export type { Model, ModelResult };
 
@@ -83,7 +84,7 @@ export class ModelFinder {
                         success: true,
                         result: 'model_found',
                         model,
-                        interpretation: this.formatModel(model)
+                        interpretation: formatModel(model)
                     };
                 }
             }
@@ -169,7 +170,7 @@ export class ModelFinder {
             );
 
             if (model) {
-                model.interpretation = this.formatModel(model);
+                model.interpretation = formatModel(model);
                 return model;
             }
         }
@@ -253,29 +254,6 @@ export class ModelFinder {
         return null;
     }
 
-    /**
-     * Format model as human-readable string
-     */
-    private formatModel(model: Model): string {
-        const lines: string[] = [];
-        lines.push(`Domain size: ${model.domainSize}`);
-        lines.push(`Domain: {${model.domain.join(', ')}}`);
-
-        if (model.constants.size > 0) {
-            lines.push('Constants:');
-            for (const [name, value] of model.constants) {
-                lines.push(`  ${name} = ${value}`);
-            }
-        }
-
-        lines.push('Predicates:');
-        for (const [name, extension] of model.predicates) {
-            const tuples = Array.from(extension).map(s => `(${s})`).join(', ');
-            lines.push(`  ${name}: {${tuples}}`);
-        }
-
-        return lines.join('\n');
-    }
 }
 
 /**

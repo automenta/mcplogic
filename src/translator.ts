@@ -154,39 +154,43 @@ function termToProlog(node: ASTNode): string {
 }
 
 /**
- * Convert arbitrary FOL to meta-representation in Prolog
- * This allows representing complex formulas that don't fit Horn clause form.
+ * Convert arbitrary FOL goal to meta-representation in Prolog.
+ * This handles complex goals (implication, equivalence) that standard Prolog
+ * queries don't support directly, by using Prolog's control structures
+ * (e.g., (A -> B ; true) for implication).
+ *
+ * Note: This is NOT used for premises, which are fully clausified.
  */
-function astToMetaProlog(node: ASTNode, options: TranslatorOptions = {}): string | null {
+function goalToPrologTerm(node: ASTNode, options: TranslatorOptions = {}): string | null {
     switch (node.type) {
         case 'predicate':
             return predicateToProlog(node, options);
 
         case 'and':
-            return `(${astToMetaProlog(node.left!, options)}, ${astToMetaProlog(node.right!, options)})`;
+            return `(${goalToPrologTerm(node.left!, options)}, ${goalToPrologTerm(node.right!, options)})`;
 
         case 'or':
-            return `(${astToMetaProlog(node.left!, options)}; ${astToMetaProlog(node.right!, options)})`;
+            return `(${goalToPrologTerm(node.left!, options)}; ${goalToPrologTerm(node.right!, options)})`;
 
         case 'not':
-            return `\\+ ${astToMetaProlog(node.operand!, options)}`;
+            return `\\+ ${goalToPrologTerm(node.operand!, options)}`;
 
         case 'implies':
             // P -> Q is equivalent to ¬P ∨ Q
             // In Prolog (P -> Q ; true) implements material implication P -> Q
-            return `(${astToMetaProlog(node.left!, options)} -> ${astToMetaProlog(node.right!, options)}; true)`;
+            return `(${goalToPrologTerm(node.left!, options)} -> ${goalToPrologTerm(node.right!, options)}; true)`;
 
         case 'iff':
             // P <-> Q is (P -> Q) & (Q -> P)
-            const left = astToMetaProlog(node.left!, options);
-            const right = astToMetaProlog(node.right!, options);
+            const left = goalToPrologTerm(node.left!, options);
+            const right = goalToPrologTerm(node.right!, options);
             return `((${left} -> ${right} ; true), (${right} -> ${left} ; true))`;
 
         case 'equals':
              if (options.enableEquality) {
-                 return `eq(${astToMetaProlog(node.left!, options)}, ${astToMetaProlog(node.right!, options)})`;
+                 return `eq(${goalToPrologTerm(node.left!, options)}, ${goalToPrologTerm(node.right!, options)})`;
              }
-            return `${astToMetaProlog(node.left!, options)} = ${astToMetaProlog(node.right!, options)}`;
+            return `${goalToPrologTerm(node.left!, options)} = ${goalToPrologTerm(node.right!, options)}`;
 
         case 'variable':
         case 'constant':
@@ -195,11 +199,11 @@ function astToMetaProlog(node: ASTNode, options: TranslatorOptions = {}): string
 
         case 'forall':
             // Universal quantification - in Prolog, typically handled by variables being universal in rules
-            return astToMetaProlog(node.body!, options);
+            return goalToPrologTerm(node.body!, options);
 
         case 'exists':
             // Existential - Prolog handles this through unification
-            return astToMetaProlog(node.body!, options);
+            return goalToPrologTerm(node.body!, options);
 
         default:
             return null;
@@ -240,7 +244,7 @@ export function folGoalToProlog(goal: string, options: TranslatorOptions = {}): 
     }
 
     // For complex goals, use meta-representation
-    const meta = astToMetaProlog(ast, options);
+    const meta = goalToPrologTerm(ast, options);
     return meta ? meta + '.' : '';
 }
 
