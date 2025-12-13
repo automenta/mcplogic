@@ -11,7 +11,7 @@ describe('MCP Resources', () => {
     describe('listResources', () => {
         test('returns all resources', () => {
             const resources = listResources();
-            expect(resources.length).toBe(8);  // 7 axiom resources + 1 engine info
+            expect(resources.length).toBe(11);  // 10 axiom resources + 1 engine info
         });
 
         test('each resource has required fields', () => {

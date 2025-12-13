@@ -53,6 +53,9 @@ export class PrologEngine implements ReasoningEngine {
             verbosity: options?.verbosity,
             enableArithmetic: options?.enableArithmetic,
             enableEquality: options?.enableEquality,
+            strategy: options?.strategy,
+            maxInferences: options?.maxInferences,
+            maxSeconds: options?.maxSeconds,
         };
         return this.engine.prove(premises, conclusion, proveOptions);
     }
