@@ -57,8 +57,8 @@ export class Tokenizer {
                 case '.': this.addToken('DOT', '.'); this.pos++; continue;
             }
 
-            // Identifiers (predicates, variables, quantifiers, constants)
-            if (/[a-zA-Z_]/.test(char)) {
+            // Identifiers (predicates, variables, quantifiers, constants) and Numbers
+            if (/[a-zA-Z0-9_]/.test(char)) {
                 const start = this.pos;
                 while (this.pos < this.input.length && /[a-zA-Z0-9_]/.test(this.input[this.pos])) {
                     this.pos++;
@@ -70,6 +70,7 @@ export class Tokenizer {
                     this.tokens.push({ type: 'QUANTIFIER', value, position: start });
                 } else {
                     // Will be classified as PREDICATE, VARIABLE, or CONSTANT during parsing
+                    // Numbers will be treated as constants by classifyTerm logic (not bound, not length=1&lowercase)
                     this.tokens.push({ type: 'VARIABLE', value, position: start });
                 }
                 continue;

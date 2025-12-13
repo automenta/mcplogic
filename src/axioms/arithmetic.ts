@@ -12,7 +12,7 @@
  * - `X > 0` compares numeric values
  */
 
-import { ASTNode } from './parser.js';
+import { ASTNode } from '../types/index.js';
 
 /**
  * Check if an AST node contains arithmetic expressions.

@@ -35,6 +35,12 @@ export interface EngineProveOptions {
     enableEquality?: boolean;
     /** Force clausification for SAT fallback */
     enableClausify?: boolean;
+    /** Search strategy (e.g., iterative deepening) */
+    strategy?: 'auto' | 'breadth' | 'depth' | 'iterative';
+    /** Maximum inference steps */
+    maxInferences?: number;
+    /** Maximum time in seconds */
+    maxSeconds?: number;
 }
 
 /**

@@ -22,19 +22,10 @@ import {
     createEngineError,
 } from './types/index.js';
 import { buildProveResult } from './utils/response.js';
+import { ProveOptions } from './types/options.js';
 
-export type { ProveResult };
-
-/**
- * Options for prove operation
- */
-export interface ProveOptions {
-    verbosity?: Verbosity;
-    /** Enable arithmetic support (default: false) */
-    enableArithmetic?: boolean;
-    /** Enable equality axioms (default: false) */
-    enableEquality?: boolean;
-}
+// Re-export ProveOptions to ensure it's used correctly by consumers
+export type { ProveResult, ProveOptions };
 
 /**
  * Logic Engine using Tau-Prolog
@@ -60,6 +51,10 @@ export class LogicEngine {
         conclusion: string,
         options?: ProveOptions
     ): Promise<ProveResult> {
+        if (options?.strategy === 'iterative') {
+            return this.proveIterative(premises, conclusion, options);
+        }
+
         const startTime = Date.now();
         const verbosity = options?.verbosity || 'standard';
         let prologProgram = '';
@@ -80,8 +75,13 @@ export class LogicEngine {
                 prologProgram = this.setupEquality(prologProgram, premises, conclusion);
             }
 
-            // Create fresh session with configured inference limit
-            this.session = pl.create(this.inferenceLimit);
+            // Use configured limit or default to constructor limit
+            const limit = options?.maxInferences ?? this.inferenceLimit;
+            this.session = pl.create(limit);
+
+            // Add directive to make unknown predicates fail instead of error
+            // This enables closed-world assumption for tautology checking
+            prologProgram = ':- set_prolog_flag(unknown, fail).\n' + prologProgram;
 
             // Consult the program
             const consultResult = await this.consultProgram(prologProgram);
@@ -123,7 +123,7 @@ export class LogicEngine {
             } else {
                 // If we hit the limit, use structured error
                 if (hitInferenceLimit) {
-                    const error = createInferenceLimitError(this.inferenceLimit, conclusion);
+                    const error = createInferenceLimitError(limit, conclusion);
                     return buildProveResult({
                         success: false,
                         result: 'failed',
@@ -131,7 +131,7 @@ export class LogicEngine {
                         error: error.message,
                         prologProgram,
                         timeMs: Date.now() - startTime,
-                        inferenceCount: this.inferenceLimit,
+                        inferenceCount: limit,
                     }, verbosity);
                 }
 
@@ -156,6 +156,51 @@ export class LogicEngine {
                 inferenceCount,
             }, verbosity);
         }
+    }
+
+    /**
+     * Iterative deepening proof strategy
+     */
+    async proveIterative(
+        premises: string[],
+        conclusion: string,
+        options?: ProveOptions
+    ): Promise<ProveResult> {
+        const maxInf = options?.maxInferences ?? 50000;
+        const maxSec = options?.maxSeconds ?? 30;
+        const start = Date.now();
+        const limits = [100, 500, 1000, 2500, 5000, 10000, 25000, 50000].filter(l => l <= maxInf);
+
+        // Ensure at least one attempt if maxInf is small
+        if (limits.length === 0 || limits[limits.length - 1] < maxInf) {
+            limits.push(maxInf);
+        }
+
+        for (const limit of limits) {
+            if (Date.now() - start > maxSec * 1000) {
+                return buildProveResult({
+                    success: false,
+                    result: 'timeout',
+                    message: `Timeout after ${Math.round((Date.now() - start) / 1000)}s`,
+                    timeMs: Date.now() - start
+                }, options?.verbosity ?? 'standard');
+            }
+
+            const result = await this.prove(premises, conclusion, { ...options, maxInferences: limit, strategy: undefined }); // prevent recursion
+
+            if (result.result === 'proved') return result;
+
+            // If it didn't hit limit (definite failure) or error, we can stop early
+            const isLimitError = result.message?.includes('limit');
+            if (!isLimitError && result.result === 'failed') return result;
+        }
+
+        return buildProveResult({
+            success: false,
+            result: 'failed',
+            message: `No proof found within ${maxInf} inferences`,
+            timeMs: Date.now() - start
+        }, options?.verbosity ?? 'standard');
     }
 
     /**

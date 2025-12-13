@@ -5,13 +5,15 @@
  * Moved from src/types/clause.ts
  */
 
-import { Clause, Literal, SkolemEnv, DIMACSResult } from '../types/clause.js';
+import { Clause, Literal, SkolemEnv, DIMACSResult, ClausifyOptions, ClausifyResult } from '../types/clause.js';
 
 export type {
     Clause,
     Literal,
     SkolemEnv,
-    DIMACSResult
+    DIMACSResult,
+    ClausifyOptions,
+    ClausifyResult
 };
 
 /**

@@ -105,6 +105,7 @@ export interface Model {
     domain: number[];
     predicates: Map<string, Set<string>>;
     constants: Map<string, number>;
+    functions: Map<string, Map<string, number>>;
     interpretation: string;
 }
 

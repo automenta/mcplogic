@@ -1,0 +1,12 @@
+[
+  {"name": "P1", "premises": [], "conclusion": "p -> p"},
+  {"name": "P2", "premises": [], "conclusion": "--p <-> p"},
+  {"name": "P3", "premises": [], "conclusion": "-(p -> q) -> (q -> p)"},
+  {"name": "P4", "premises": [], "conclusion": "(-p -> q) <-> (-q -> p)"},
+  {"name": "P5", "premises": [], "conclusion": "((p | q) -> (p | r)) -> (p | (q -> r))"},
+  {"name": "P6", "premises": [], "conclusion": "p | -p"},
+  {"name": "P7", "premises": [], "conclusion": "p | ---p"},
+  {"name": "P8", "premises": [], "conclusion": "((p -> q) -> p) -> p"},
+  {"name": "P9", "premises": [], "conclusion": "((p | q) & (-p | q) & (p | -q)) -> -(-p | -q)"},
+  {"name": "P10", "premises": ["q -> r", "r -> (p & q)", "p -> (q | r)"], "conclusion": "p <-> q"}
+]

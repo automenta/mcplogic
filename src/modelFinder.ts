@@ -137,6 +137,7 @@ export class ModelFinder {
                     domain,
                     predicates,
                     constants,
+                    functions: new Map(), // TODO: Implement function enumeration
                     interpretation: ''
                 };
 
@@ -324,10 +325,11 @@ export class ModelFinder {
                 return assignment.get(node.name!) ?? 0;
             case 'constant':
                 return model.constants.get(node.name!) ?? 0;
-            case 'function':
-                // For now, treat functions as returning 0
-                // A full implementation would need function interpretations
-                return 0;
+            case 'function': {
+                const args = (node.args || []).map(a => this.evaluateTerm(a, model, assignment));
+                const table = model.functions.get(node.name!);
+                return table?.get(args.join(',')) ?? 0;
+            }
             default:
                 return 0;
         }

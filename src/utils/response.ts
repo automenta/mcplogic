@@ -1,4 +1,4 @@
-import { ProveResult, Verbosity } from './types/index.js';
+import { ProveResult, Verbosity } from '../types/index.js';
 
 export interface BaseResultData {
     success: boolean;
