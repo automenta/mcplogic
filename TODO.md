@@ -1,33 +1,449 @@
 # MCP Logic Development Plan
 
-A **comprehensive, mindlessly-executable** roadmap from the current FOL engine to a full neurosymbolic reasoning platform. Each task includes exact file paths, code snippets, and verification steps.
+A **comprehensive, mindlessly-executable** roadmap from the current FOL engine to a full neurosymbolic reasoning platform.
+
+---
+
+## 🏗️ Phase 0: Preparatory Work (Do First)
+
+**Purpose:** Reduce friction, de-risk unknowns, and automate repetitive tasks. This phase makes all subsequent phases faster and more reliable.
+
+### 0.1 Create Shared Test Fixtures 🧪
+
+**Effort:** 30 min | **Impact:** Force multiplier for all testing
+
+Create reusable test data that every test file can import.
+
+#### Implementation
+
+Create `tests/fixtures.ts`:
+```typescript
+/**
+ * Shared test fixtures for consistent, DRY testing.
+ */
+
+// === Common Formulas ===
+export const FORMULAS = {
+    // Simple
+    mortalSocrates: {
+        premises: ['all x (man(x) -> mortal(x))', 'man(socrates)'],
+        conclusion: 'mortal(socrates)',
+        expected: { found: true }
+    },
+    // Horn clause
+    hornTransitive: {
+        premises: ['p(a)', 'all x (p(x) -> q(x))', 'all x (q(x) -> r(x))'],
+        conclusion: 'r(a)',
+        expected: { found: true }
+    },
+    // Non-Horn (needs SAT)
+    nonHornDisjunction: {
+        premises: ['P(a) | Q(a)', '-P(a)'],
+        conclusion: 'Q(a)',
+        expected: { found: true }
+    },
+    // Equality-heavy
+    equalityChain: {
+        premises: ['a = b', 'b = c', 'c = d'],
+        conclusion: 'a = d',
+        expected: { found: true }
+    },
+    // Unsatisfiable
+    contradiction: {
+        premises: ['P(a)', '-P(a)'],
+        conclusion: 'Q(a)',
+        expected: { found: false }
+    },
+    // Model-finding
+    existential: {
+        premises: ['exists x P(x)'],
+        expectedModel: { domainSize: 1 }
+    },
+} as const;
+
+// === Factory Functions ===
+export function createTestEngine(options?: { 
+    timeout?: number; 
+    inferenceLimit?: number;
+    highPower?: boolean;
+}) {
+    const { timeout = 5000, inferenceLimit = 1000, highPower = false } = options ?? {};
+    const limit = highPower ? 100000 : inferenceLimit;
+    return createLogicEngine(timeout, limit);
+}
+
+export function createTestModelFinder(options?: { 
+    maxDomainSize?: number;
+    highPower?: boolean;
+}) {
+    const { maxDomainSize = 10, highPower = false } = options ?? {};
+    const size = highPower ? 25 : maxDomainSize;
+    return createModelFinder(30000, size);
+}
+
+// === Assertion Helpers ===
+export function expectProved(result: ProveResult) {
+    expect(result.found).toBe(true);
+}
+
+export function expectNotProved(result: ProveResult) {
+    expect(result.found).toBe(false);
+}
+
+export function expectModelFound(result: ModelResult) {
+    expect(result.success).toBe(true);
+    expect(result.model).toBeDefined();
+}
+```
+
+#### Done When
+- [ ] `tests/fixtures.ts` exists
+- [ ] At least 3 existing tests refactored to use fixtures
+- [ ] `npm test` passes
+
+---
+
+### 0.2 Create Development Scripts 🔧
+
+**Effort:** 30 min | **Impact:** Automates common tasks
+
+Add npm scripts that reduce manual ceremony.
+
+#### Implementation
+
+Update `package.json` scripts:
+```json
+{
+    "scripts": {
+        "build": "tsc",
+        "build:watch": "tsc --watch",
+        "build:browser": "tsc -p tsconfig.browser.json",
+        "start": "node dist/index.js",
+        "dev": "tsx src/index.ts",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "test:watch": "npm test -- --watch",
+        "test:coverage": "npm test -- --coverage",
+        "lint": "tsc --noEmit",
+        "clean": "rm -rf dist",
+        "rebuild": "npm run clean && npm run build",
+        "check": "npm run lint && npm test",
+        "todo": "grep -rn 'TODO\\|FIXME\\|HACK' src/ --include='*.ts'",
+        "benchmark:tptp": "tsx benchmarks/run-tptp.ts"
+    }
+}
+```
+
+#### Done When
+- [ ] All scripts added to `package.json`
+- [ ] `npm run check` runs lint + tests in one command
+- [ ] `npm run todo` lists all TODOs in codebase
+
+---
+
+### 0.3 Create Type Stubs for Future Features 📐
+
+**Effort:** 30 min | **Impact:** Enables parallel development
+
+Create interface definitions for features we'll build, so code can be written against stable contracts.
+
+#### Implementation
+
+Create `src/types/future.ts`:
+```typescript
+/**
+ * Type definitions for planned features.
+ * These define the API contracts before implementation.
+ */
+
+// === High-Power Mode (Phase 1.1) ===
+export interface HighPowerOptions {
+    highPower?: boolean;
+}
+
+// === NL Translation (Phase 3.1) ===
+export interface TranslateRequest {
+    text: string;
+    validate?: boolean;
+}
+
+export interface TranslateResult {
+    success: boolean;
+    premises: string[];
+    conclusion?: string;
+    raw?: string;
+    errors?: string[];
+}
+
+// === Ontology (Phase 4.1) ===
+export interface Ontology {
+    types: Set<string>;
+    relationships: Set<string>;
+    constraints: Set<string>;
+    synonyms: Map<string, string>;
+}
+
+export interface OntologyConfig {
+    types?: string[];
+    relationships?: string[];
+    constraints?: string[];
+    synonyms?: Record<string, string>;
+}
+
+// === Agentic Reasoning (Phase 4.2) ===
+export type AgentActionType = 'assert' | 'query' | 'conclude';
+
+export interface AgentAction {
+    type: AgentActionType;
+    content: string;
+    explanation?: string;
+}
+
+export interface ReasoningStep {
+    action: AgentAction;
+    result?: unknown;
+    timestamp?: number;
+}
+
+export interface ReasoningResult {
+    answer: string;
+    steps: ReasoningStep[];
+    confidence: number;
+}
+
+export interface ReasonOptions {
+    maxSteps?: number;
+    timeout?: number;
+    verbose?: boolean;
+}
+```
+
+#### Done When
+- [ ] `src/types/future.ts` exists
+- [ ] Exported from `src/types/index.ts`
+- [ ] No TypeScript errors
+
+---
+
+### 0.4 Spike: Browser Compatibility Check 🌐
+
+**Effort:** 1 hour | **Impact:** De-risks Phase 2.2
+
+Before committing to browser build, verify core dependencies work in browser.
+
+#### Implementation
+
+Create `spikes/browser-check.html`:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Browser Compatibility Check</title>
+</head>
+<body>
+    <h1>MCP Logic Browser Check</h1>
+    <pre id="output">Running checks...</pre>
+    <script type="module">
+        const output = document.getElementById('output');
+        const log = (msg) => { output.textContent += '\n' + msg; };
+        
+        try {
+            // Check tau-prolog
+            const pl = await import('https://esm.sh/tau-prolog@0.3.4');
+            log('✓ tau-prolog loads');
+            
+            const session = pl.default.create();
+            session.consult('parent(tom, bob).');
+            session.query('parent(tom, X).');
+            session.answer((answer) => {
+                log('✓ tau-prolog query works: ' + pl.default.format_answer(answer));
+            });
+        } catch (e) {
+            log('✗ tau-prolog failed: ' + e.message);
+        }
+        
+        try {
+            // Check logic-solver
+            const Logic = await import('https://esm.sh/logic-solver@2.0.1');
+            log('✓ logic-solver loads');
+            
+            const solver = new Logic.default.Solver();
+            solver.require(Logic.default.or('A', 'B'));
+            solver.forbid('A');
+            const solution = solver.solve();
+            log('✓ logic-solver works: B=' + solution.getTrueVars().includes('B'));
+        } catch (e) {
+            log('✗ logic-solver failed: ' + e.message);
+        }
+        
+        log('\n=== Spike Complete ===');
+    </script>
+</body>
+</html>
+```
+
+#### Verification
+```bash
+npx serve spikes/
+# Open http://localhost:3000/browser-check.html
+# Both checks should show ✓
+```
+
+#### Done When
+- [ ] `spikes/browser-check.html` exists
+- [ ] Both tau-prolog and logic-solver load in browser
+- [ ] Document any issues in `spikes/NOTES.md`
+
+---
+
+### 0.5 Create Task Tracking Automation 📋
+
+**Effort:** 15 min | **Impact:** Reduces manual tracking
+
+Create a script that extracts task status from this file.
+
+#### Implementation
+
+Create `scripts/task-status.ts`:
+```typescript
+#!/usr/bin/env tsx
+/**
+ * Extract task status from TODO.md
+ * Usage: npm run tasks
+ */
+import { readFileSync } from 'fs';
+
+const content = readFileSync('TODO.md', 'utf-8');
+const lines = content.split('\n');
+
+const tasks: { phase: string; name: string; done: boolean }[] = [];
+let currentPhase = '';
+
+for (const line of lines) {
+    // Match phase headers like "## 🎯 Phase 1:"
+    const phaseMatch = line.match(/^##\s+.*Phase\s+(\d+(?:\.\d+)?)/i);
+    if (phaseMatch) {
+        currentPhase = `Phase ${phaseMatch[1]}`;
+    }
+    
+    // Match task headers like "### 1.1 High-Power Mode"
+    const taskMatch = line.match(/^###\s+(\d+\.\d+)\s+(.+?)(?:\s+[⚡🔄🖥️📊📦🌐🎮🗣️🎲🗂️🤖🧬])?$/);
+    if (taskMatch && currentPhase) {
+        const name = `${taskMatch[1]} ${taskMatch[2].trim()}`;
+        // Check if there's a [x] in the following lines (done when section)
+        tasks.push({ phase: currentPhase, name, done: false });
+    }
+    
+    // Check for completed "Done When" checkboxes
+    if (line.includes('[x]') && tasks.length > 0) {
+        // Mark previous task as having progress
+    }
+}
+
+console.log('\n📋 Task Status\n');
+console.log('| Phase | Task | Status |');
+console.log('|-------|------|--------|');
+for (const t of tasks) {
+    console.log(`| ${t.phase} | ${t.name} | ${t.done ? '✅' : '⬜'} |`);
+}
+console.log(`\nTotal: ${tasks.length} tasks`);
+```
+
+Add to `package.json`:
+```json
+"scripts": {
+    "tasks": "tsx scripts/task-status.ts"
+}
+```
 
 ---
 
 ## 📊 Feature Matrix: Current → Target
 
-| Feature | README Status | MCR Vision | TODO Phase |
-|---------|---------------|------------|------------|
-| **Core FOL Reasoning** | ✅ Done | ✅ | — |
-| **Model Finding (SAT)** | ✅ Done | ✅ | — |
-| **Session Management** | ✅ Done | ✅ | — |
-| **Proof Traces** | ✅ Done | ✅ | — |
-| **Streaming Progress** | ✅ Done | ✅ | — |
-| **High-Power Mode** | ☐ Planned | ✅ | Phase 1.1 |
-| **Isomorphism Filtering** | ☐ Planned | — | Phase 1.2 |
-| **CLI Tool** | ☐ Planned | ✅ | Phase 1.3 |
-| **TPTP Benchmarks** | ☐ Planned | — | Phase 1.4 |
-| **Library Export (NPM)** | ☐ Planned | ✅ | Phase 2.1 |
-| **Browser/WASM** | ☐ Planned | ✅ | Phase 2.2 |
-| **Web Playground + Offline LLM** | — | ✅ | Phase 2.3 |
-| **NL→FOL Translation** | ☐ Planned | ✅ | Phase 3.1 |
-| **Heuristic Strategy Selection** | ☐ Planned | ✅ | Phase 3.2 |
-| **Ontology Support** | — | ✅ | Phase 4.1 |
-| **Agentic Reasoning** | — | ✅ | Phase 4.2 |
-| **Evolution Engine** | — | ✅ | Phase 5 |
-| **Prover9 WASM** | ☐ Deferred | ☐ | Deprioritized |
-| **SMT/Z3** | ☐ Research | ☐ | Deprioritized |
-| **Modal/Probabilistic Logic** | ☐ Research | ☐ | Deprioritized |
+| Feature | README Status | MCR Vision | TODO Phase | Depends On |
+|---------|---------------|------------|------------|------------|
+| **Core FOL Reasoning** | ✅ Done | ✅ | — | — |
+| **Model Finding (SAT)** | ✅ Done | ✅ | — | — |
+| **Session Management** | ✅ Done | ✅ | — | — |
+| **Proof Traces** | ✅ Done | ✅ | — | — |
+| **Streaming Progress** | ✅ Done | ✅ | — | — |
+| **High-Power Mode** | ☐ Planned | ✅ | Phase 1.1 | 0.1 |
+| **Isomorphism Filtering** | ☐ Planned | — | Phase 1.2 | — |
+| **CLI Tool** | ☐ Planned | ✅ | Phase 1.3 | — |
+| **TPTP Benchmarks** | ☐ Planned | — | Phase 1.4 | 0.2 |
+| **Library Export (NPM)** | ☐ Planned | ✅ | Phase 2.1 | 0.3 |
+| **Browser/WASM** | ☐ Planned | ✅ | Phase 2.2 | 0.4, 2.1 |
+| **Web Playground + LLM** | — | ✅ | Phase 2.3 | 2.2 |
+| **NL→FOL Translation** | ☐ Planned | ✅ | Phase 3.1 | 0.3 |
+| **Heuristic Strategy** | ☐ Planned | ✅ | Phase 3.2 | — |
+| **Ontology Support** | — | ✅ | Phase 4.1 | 0.3 |
+| **Agentic Reasoning** | — | ✅ | Phase 4.2 | 3.1, 4.1 |
+| **Evolution Engine** | — | ✅ | Phase 5 | 4.2 |
+
+---
+
+## 🔀 Dependency Graph
+
+```mermaid
+graph LR
+    subgraph "Phase 0: Prep"
+        P0_1[0.1 Test Fixtures]
+        P0_2[0.2 Dev Scripts]
+        P0_3[0.3 Type Stubs]
+        P0_4[0.4 Browser Spike]
+    end
+    
+    subgraph "Phase 1: Quick Wins"
+        P1_1[1.1 High-Power]
+        P1_2[1.2 Isomorphism]
+        P1_3[1.3 CLI]
+        P1_4[1.4 TPTP]
+    end
+    
+    subgraph "Phase 2: Ecosystem"
+        P2_1[2.1 Library Export]
+        P2_2[2.2 Browser/WASM]
+        P2_3[2.3 Playground+LLM]
+    end
+    
+    subgraph "Phase 3: AI"
+        P3_1[3.1 NL Translation]
+        P3_2[3.2 Heuristics]
+    end
+    
+    subgraph "Phase 4: Neurosymbolic"
+        P4_1[4.1 Ontology]
+        P4_2[4.2 Agentic]
+    end
+    
+    subgraph "Phase 5"
+        P5[5.1 Evolution]
+    end
+    
+    P0_1 --> P1_1
+    P0_2 --> P1_4
+    P0_3 --> P2_1
+    P0_3 --> P3_1
+    P0_3 --> P4_1
+    P0_4 --> P2_2
+    
+    P2_1 --> P2_2
+    P2_2 --> P2_3
+    
+    P3_1 --> P4_2
+    P4_1 --> P4_2
+    P4_2 --> P5
+```
+
+### Parallelization Opportunities
+
+Tasks that can run **in parallel** (no dependencies between them):
+
+| Track A | Track B | Track C |
+|---------|---------|---------|
+| 0.1 Test Fixtures | 0.2 Dev Scripts | 0.4 Browser Spike |
+| 1.1 High-Power | 1.2 Isomorphism | 0.3 Type Stubs |
+| 1.3 CLI | 1.4 TPTP | 2.1 Library Export |
+| 3.2 Heuristics | 3.1 NL Translation | — |
 
 ---
 
@@ -51,87 +467,117 @@ A **comprehensive, mindlessly-executable** roadmap from the current FOL engine t
 
 ### 1.1 High-Power Mode Flag ⚡
 
-**Effort:** ~1 hour | **Impact:** High | **Risk:** None | **README:** ☐ Line 50
+**Effort:** ~1 hour | **Impact:** High | **Risk:** None | **Depends:** 0.1
 
-Add a single boolean flag that unlocks extended limits for complex reasoning.
+Add a single boolean flag that unlocks extended limits.
 
-#### Implementation Steps
+#### Acceptance Criteria
+- [ ] `highPower: true` increases inference limit to 100,000
+- [ ] `highPower: true` increases timeout to 300s
+- [ ] Default behavior unchanged when `highPower` not specified
+- [ ] Works for both `prove` and `find-model` tools
+- [ ] Unit test verifies high-power limits applied
 
-1. **Update defaults** in `src/types/options.ts`:
+#### Implementation
+
+1. **Update defaults** in `src/types/options.ts` (line 31):
 ```typescript
-// Add to DEFAULTS (line 31-36)
 export const DEFAULTS = {
     maxSeconds: 30,
     maxInferences: 5000,
     maxDomainSize: 25,
     satThreshold: 8,
-    // NEW: High-power mode settings
     highPowerMaxSeconds: 300,
     highPowerMaxInferences: 100000,
 } as const;
 ```
 
-2. **Add `highPower` parameter** to tool schemas in `src/server.ts`:
+2. **Add parameter to args type** in `src/handlers/core.ts` (line 12):
 ```typescript
-// Add to 'prove' tool inputSchema.properties (after line 124):
-highPower: {
-    type: 'boolean',
-    description: 'Enable extended limits (300s timeout, 100k inferences). Use for complex proofs.',
-},
-// Also add to 'find-model' tool (after line 201)
+export async function proveHandler(
+    args: {
+        premises: string[];
+        conclusion: string;
+        inference_limit?: number;
+        highPower?: boolean;  // NEW
+        // ...rest unchanged
+    },
 ```
 
-3. **Apply in handler** `src/handlers/core.ts`:
+3. **Apply high-power logic** in `src/handlers/core.ts` (after line 26):
 ```typescript
-// In proveHandler, around line 20:
+// Apply high-power mode
 const inferenceLimit = args.highPower 
     ? DEFAULTS.highPowerMaxInferences 
     : (args.inference_limit ?? DEFAULTS.maxInferences);
 ```
 
-4. **Update README.md** line 50: Change `[ ]` to `[x]`
-
-#### Verification
-```bash
-npm test
-# Test complex proof with highPower: true
+4. **Add to tool schema** in `src/server.ts` (after line 124):
+```typescript
+highPower: {
+    type: 'boolean',
+    description: 'Enable extended limits (300s timeout, 100k inferences). Use for complex proofs.',
+},
 ```
+
+5. **Add test** in `tests/prover.test.ts`:
+```typescript
+test('highPower mode increases inference limit', async () => {
+    // This test doesn't need to prove anything hard,
+    // just verify the limit is applied
+    const engine = createTestEngine({ highPower: true });
+    expect(engine['inferenceLimit']).toBe(100000);
+});
+```
+
+6. **Update README.md** line 50: `[ ]` → `[x]`
+
+#### Done When
+- [ ] `npm test` passes
+- [ ] All acceptance criteria checked
+- [ ] README.md updated
 
 ---
 
 ### 1.2 Isomorphism Filtering 🔄
 
-**Effort:** ~1 hour | **Impact:** Medium | **Risk:** None | **README:** ☐ Line 22
+**Effort:** ~30 min | **Impact:** Medium | **Risk:** None
 
-Already implemented! Just needs the `count` parameter wired through.
+Already implemented! Just verify and document.
 
-#### Implementation Steps
+#### Acceptance Criteria
+- [ ] `count: N` parameter returns up to N non-isomorphic models
+- [ ] Models returned are verified non-isomorphic
+- [ ] Default `count: 1` behavior unchanged
 
-1. **Verify existing implementation** in `src/modelFinder.ts`:
+#### Implementation
+
+1. **Verify existing code** in `src/modelFinder.ts`:
    - `areIsomorphic()` at line 267 ✅
-   - `isIsomorphism()` at line 285 ✅
-   - `findModelsBacktracking()` accepts `count` parameter ✅
+   - `findModelsBacktracking()` accepts `count` ✅
 
-2. **Wire `count` through MCP tool** in `src/server.ts`:
-   - Already present in schema (line 198-201) ✅
-
-3. **Verify handler passes count** in `src/handlers/model.ts`
-
-4. **Add test case** in `tests/modelFinder.test.ts`:
+2. **Add/verify test** in `tests/isomorphism.test.ts`:
 ```typescript
 test('returns multiple non-isomorphic models', async () => {
     const finder = createModelFinder();
-    const result = await finder.findModel(['exists x P(x)'], { count: 3 });
-    expect(result.models?.length).toBeGreaterThan(1);
+    const result = await finder.findModel(
+        ['exists x P(x)', 'exists y Q(y)'],
+        { count: 3 }
+    );
+    expect(result.models?.length).toBeGreaterThanOrEqual(2);
+    
+    // Verify non-isomorphism
+    if (result.models && result.models.length >= 2) {
+        expect(finder.areIsomorphic(result.models[0], result.models[1])).toBe(false);
+    }
 });
 ```
 
-5. **Update README.md** line 22: Change `[ ]` to `[x]`
+3. **Update README.md** line 22: `[ ]` → `[x]`
 
-#### Verification
-```bash
-npm test -- --testPathPattern=modelFinder
-```
+#### Done When
+- [ ] Test passes
+- [ ] README.md updated
 
 ---
 
@@ -139,43 +585,66 @@ npm test -- --testPathPattern=modelFinder
 
 **Effort:** ~2 hours | **Impact:** Medium | **Risk:** None
 
-Create a standalone CLI for testing without an MCP client.
+Create standalone CLI for testing without MCP client.
 
-#### Implementation Steps
+#### Acceptance Criteria
+- [ ] `mcplogic prove <file>` proves last line from preceding premises
+- [ ] `mcplogic model <file>` finds model for all lines
+- [ ] `mcplogic validate <file>` checks syntax, returns exit code 1 on error
+- [ ] `mcplogic repl` starts interactive session
+- [ ] `mcplogic --help` shows usage
 
-1. **Create CLI entry point** `src/cli.ts`:
+#### Implementation
+
+Create `src/cli.ts`:
 ```typescript
 #!/usr/bin/env node
-/**
- * MCP Logic CLI
- * Usage: mcplogic prove <file.p>
- *        mcplogic model <file.p>
- *        mcplogic validate <file.p>
- *        mcplogic repl
- */
 import { readFileSync } from 'fs';
 import * as readline from 'readline';
 import { createLogicEngine } from './logicEngine.js';
 import { createModelFinder } from './modelFinder.js';
 import { parse } from './parser.js';
+import { DEFAULTS } from './types/index.js';
 
-const [,, command, file] = process.argv;
+const VERSION = '1.0.0';
+const HELP = `
+MCP Logic CLI v${VERSION}
+
+Usage:
+  mcplogic prove <file.p>     Prove last line from preceding premises
+  mcplogic model <file.p>     Find model satisfying all lines
+  mcplogic validate <file.p>  Check syntax of all lines
+  mcplogic repl               Interactive mode
+
+Options:
+  --high-power, -H   Enable extended limits (300s, 100k inferences)
+  --help, -h         Show this help
+  --version, -v      Show version
+
+Examples:
+  mcplogic prove problem.p
+  mcplogic model --high-power theory.p
+  mcplogic repl
+`;
+
+const args = process.argv.slice(2);
+const highPower = args.includes('--high-power') || args.includes('-H');
+const command = args.find(a => !a.startsWith('-'));
+const file = args.find(a => !a.startsWith('-') && a !== command);
 
 async function main() {
-    if (!command) {
-        console.log(`Usage: mcplogic <prove|model|validate|repl> [file.p]
-  
-Commands:
-  prove <file>     Prove last line from preceding premises
-  model <file>     Find model satisfying all lines
-  validate <file>  Check syntax of all lines
-  repl             Interactive read-eval-prove loop
-`);
-        process.exit(0);
+    if (args.includes('--help') || args.includes('-h') || !command) {
+        console.log(HELP);
+        return;
+    }
+    
+    if (args.includes('--version') || args.includes('-v')) {
+        console.log(VERSION);
+        return;
     }
 
     if (command === 'repl') {
-        return runRepl();
+        return runRepl(highPower);
     }
 
     if (!file) {
@@ -184,21 +653,42 @@ Commands:
     }
 
     const content = readFileSync(file, 'utf-8');
-    const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('#'));
-    
+    const lines = content.split('\n')
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith('#') && !l.startsWith('%'));
+
+    const limit = highPower ? DEFAULTS.highPowerMaxInferences : DEFAULTS.maxInferences;
+    const timeout = highPower ? DEFAULTS.highPowerMaxSeconds * 1000 : DEFAULTS.maxSeconds * 1000;
+
     switch (command) {
         case 'prove': {
             const premises = lines.slice(0, -1);
             const conclusion = lines[lines.length - 1];
-            const engine = createLogicEngine(30000, 5000);
+            console.log(`Proving: ${conclusion}`);
+            console.log(`From ${premises.length} premises...`);
+            
+            const engine = createLogicEngine(timeout, limit);
+            const start = Date.now();
             const result = await engine.prove(premises, conclusion, { includeTrace: true });
-            console.log(JSON.stringify(result, null, 2));
+            const elapsed = Date.now() - start;
+            
+            console.log(result.found ? '✓ PROVED' : '✗ NOT PROVED');
+            console.log(`Time: ${elapsed}ms`);
+            if (result.trace) console.log('\nTrace:\n' + result.trace);
+            process.exit(result.found ? 0 : 1);
             break;
         }
         case 'model': {
-            const finder = createModelFinder(30000, 10);
+            console.log(`Finding model for ${lines.length} formulas...`);
+            const finder = createModelFinder(timeout, highPower ? 25 : 10);
+            const start = Date.now();
             const result = await finder.findModel(lines);
-            console.log(JSON.stringify(result, null, 2));
+            const elapsed = Date.now() - start;
+            
+            console.log(result.success ? '✓ MODEL FOUND' : '✗ NO MODEL');
+            console.log(`Time: ${elapsed}ms`);
+            if (result.model) console.log('\n' + JSON.stringify(result.model, null, 2));
+            process.exit(result.success ? 0 : 1);
             break;
         }
         case 'validate': {
@@ -208,7 +698,8 @@ Commands:
                     parse(stmt);
                     console.log(`✓ ${stmt}`);
                 } catch (e) {
-                    console.log(`✗ ${stmt}: ${(e as Error).message}`);
+                    console.log(`✗ ${stmt}`);
+                    console.log(`  Error: ${(e as Error).message}`);
                     allValid = false;
                 }
             }
@@ -217,12 +708,14 @@ Commands:
         }
         default:
             console.error(`Unknown command: ${command}`);
+            console.log(HELP);
             process.exit(1);
     }
 }
 
-async function runRepl() {
-    const engine = createLogicEngine(30000, 5000);
+async function runRepl(highPower: boolean) {
+    const limit = highPower ? DEFAULTS.highPowerMaxInferences : 5000;
+    const engine = createLogicEngine(30000, limit);
     const premises: string[] = [];
     
     const rl = readline.createInterface({
@@ -231,122 +724,125 @@ async function runRepl() {
         prompt: 'mcplogic> '
     });
     
-    console.log('MCP Logic REPL. Commands: .assert <formula>, .prove <goal>, .list, .clear, .quit');
+    console.log(`MCP Logic REPL v${VERSION}${highPower ? ' [HIGH-POWER]' : ''}`);
+    console.log('Commands: .assert <formula>, .prove <goal>, .list, .clear, .quit\n');
     rl.prompt();
     
     rl.on('line', async (line) => {
         const trimmed = line.trim();
+        
         if (trimmed.startsWith('.assert ')) {
-            const formula = trimmed.slice(8);
+            const formula = trimmed.slice(8).trim();
             try {
                 parse(formula);
                 premises.push(formula);
-                console.log(`Asserted: ${formula}`);
+                console.log(`✓ Asserted (${premises.length} total)`);
             } catch (e) {
-                console.log(`Syntax error: ${(e as Error).message}`);
+                console.log(`✗ ${(e as Error).message}`);
             }
         } else if (trimmed.startsWith('.prove ')) {
-            const goal = trimmed.slice(7);
-            const result = await engine.prove(premises, goal, { includeTrace: true });
-            console.log(result.found ? '✓ Proved' : '✗ Not proved');
-            if (result.trace) console.log(result.trace);
+            const goal = trimmed.slice(7).trim();
+            try {
+                parse(goal);
+                const result = await engine.prove(premises, goal, { includeTrace: true });
+                console.log(result.found ? '✓ Proved' : '✗ Not proved');
+                if (result.trace) console.log(result.trace);
+            } catch (e) {
+                console.log(`✗ ${(e as Error).message}`);
+            }
         } else if (trimmed === '.list') {
-            premises.forEach((p, i) => console.log(`${i+1}. ${p}`));
+            if (premises.length === 0) {
+                console.log('(no premises)');
+            } else {
+                premises.forEach((p, i) => console.log(`${i + 1}. ${p}`));
+            }
         } else if (trimmed === '.clear') {
             premises.length = 0;
-            console.log('Cleared all premises.');
-        } else if (trimmed === '.quit' || trimmed === '.exit') {
+            console.log('Cleared.');
+        } else if (trimmed === '.quit' || trimmed === '.exit' || trimmed === '.q') {
             rl.close();
             return;
-        } else if (trimmed) {
+        } else if (trimmed && !trimmed.startsWith('.')) {
             console.log('Unknown command. Use .assert, .prove, .list, .clear, or .quit');
         }
         rl.prompt();
     });
+    
+    rl.on('close', () => process.exit(0));
 }
 
-main().catch(console.error);
+main().catch(e => {
+    console.error('Error:', e.message);
+    process.exit(1);
+});
 ```
 
-2. **Update `package.json`** (add after line 12):
+Update `package.json`:
 ```json
-"bin": {
-    "mcplogic": "./dist/cli.js"
-},
+{
+    "bin": {
+        "mcplogic": "./dist/cli.js"
+    }
+}
 ```
 
-3. **Build and link**:
-```bash
-npm run build
-npm link  # Creates global 'mcplogic' command
-```
-
-#### Verification
-```bash
-# Create test file
-echo 'all x (man(x) -> mortal(x))
-man(socrates)
-mortal(socrates)' > /tmp/test.p
-
-mcplogic prove /tmp/test.p
-mcplogic validate /tmp/test.p
-mcplogic repl
-```
+#### Done When
+- [ ] `npm run build` succeeds
+- [ ] `npm link` creates global command
+- [ ] All acceptance criteria verified manually
+- [ ] `mcplogic --help` outputs usage
 
 ---
 
 ### 1.4 TPTP Benchmark Subset 📊
 
-**Effort:** ~2 hours | **Impact:** Medium | **Risk:** None | **README:** ☐ Line 63
+**Effort:** ~2 hours | **Impact:** Medium | **Risk:** None | **Depends:** 0.2
 
-Add standard ATP benchmarks for credibility and regression testing.
+Add standard ATP benchmarks for regression testing.
 
-#### Implementation Steps
+#### Acceptance Criteria
+- [ ] At least 5 TPTP problems translated to our syntax
+- [ ] Benchmark script reports pass/fail + timing
+- [ ] CI can run benchmarks
 
-1. **Create benchmark directory** `benchmarks/tptp/`:
-```bash
-mkdir -p benchmarks/tptp
+#### Implementation
+
+1. Create `benchmarks/tptp/PUZ001-1.p` (Dreadbury Mansion):
+```prolog
+% Aunt Agatha lives in Dreadbury Mansion
+% Someone who lives there killed Aunt Agatha
+% A killer always hates and is not richer than the victim
+% Charles hates everyone except Aunt Agatha
+% Agatha hates everyone except the butler
+% The butler hates everyone not richer than Agatha
+% The butler hates everyone Aunt Agatha hates
+% No one hates everyone
+% Agatha is not the butler
+% CONCLUSION: Agatha killed herself
+
+lives(agatha)
+lives(butler)
+lives(charles)
+exists x (lives(x) & killed(x, agatha))
+all x all y (killed(x, y) -> (hates(x, y) & -richer(x, y)))
+all x (lives(x) & -(x = agatha) -> hates(charles, x))
+all x (lives(x) & -(x = butler) -> hates(agatha, x))
+all x (lives(x) & -richer(x, agatha) -> hates(butler, x))
+all x (hates(agatha, x) -> hates(butler, x))
+all x -(all y (lives(y) -> hates(x, y)))
+-(agatha = butler)
+---
+killed(agatha, agatha)
 ```
 
-2. **Add classic problems** (translate from TPTP to our syntax):
-   - `PUZ031-1.p` (Schubert's Steamroller)
-   - `SYN000-1.p` (Propositional tautology)
-   - `SYN001-1.p` (Basic quantifier)
-   
-3. **Create benchmark runner** `benchmarks/run-tptp.ts`:
-```typescript
-import { readdirSync, readFileSync } from 'fs';
-import { createLogicEngine } from '../src/logicEngine.js';
+2. Create `benchmarks/run-tptp.ts` (see previous version)
 
-async function runBenchmarks() {
-    const files = readdirSync('benchmarks/tptp').filter(f => f.endsWith('.p'));
-    const engine = createLogicEngine(60000, 50000);
-    
-    for (const file of files) {
-        const content = readFileSync(`benchmarks/tptp/${file}`, 'utf-8');
-        const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('%'));
-        const premises = lines.slice(0, -1);
-        const conclusion = lines[lines.length - 1];
-        
-        const start = Date.now();
-        const result = await engine.prove(premises, conclusion);
-        const elapsed = Date.now() - start;
-        
-        console.log(`${file}: ${result.found ? 'PROVED' : 'FAILED'} (${elapsed}ms)`);
-    }
-}
+3. Add npm script: `"benchmark:tptp": "tsx benchmarks/run-tptp.ts"`
 
-runBenchmarks();
-```
-
-4. **Add npm script**:
-```json
-"scripts": {
-    "benchmark:tptp": "tsx benchmarks/run-tptp.ts"
-}
-```
-
-5. **Update README.md** line 63: Change `[ ]` to `[x]`
+#### Done When
+- [ ] `npm run benchmark:tptp` runs without error
+- [ ] Results show pass/fail for each problem
+- [ ] README.md line 63 updated: `[ ]` → `[x]`
 
 ---
 
@@ -354,655 +850,167 @@ runBenchmarks();
 
 ### 2.1 Library Export 📦
 
-**Effort:** ~4 hours | **Impact:** Very High | **Risk:** Low
+**Effort:** ~4 hours | **Impact:** Very High | **Risk:** Low | **Depends:** 0.3
 
-Publish core logic as a standalone NPM package.
+#### Acceptance Criteria
+- [ ] `import { createLogicEngine } from '@mcplogic/core'` works
+- [ ] TypeScript declarations included
+- [ ] No MCP SDK dependency in library export
+- [ ] Example project compiles and runs
 
-#### Implementation Steps
-
-1. **Create library entry point** `src/index.lib.ts`:
-```typescript
-/**
- * MCP Logic Core Library
- * 
- * Standalone first-order logic engine for embedding in Node.js applications.
- */
-
-// Core engines
-export { LogicEngine, createLogicEngine } from './logicEngine.js';
-export { ModelFinder, createModelFinder } from './modelFinder.js';
-
-// Parsing
-export { parse, tokenize } from './parser.js';
-export { validateSyntax } from './syntaxValidator.js';
-
-// Clausification
-export { clausify, toDIMACS } from './clausifier.js';
-
-// Session management
-export { createSessionManager, SessionManager } from './sessionManager.js';
-
-// Types
-export type {
-    ASTNode,
-    ProveResult,
-    ProveOptions,
-    Model,
-    ModelResult,
-    ModelOptions,
-    Clause,
-    Literal,
-    ClausifyResult,
-    DIMACSResult,
-} from './types/index.js';
-
-// Constants
-export { DEFAULTS } from './types/index.js';
-```
-
-2. **Update `package.json`** exports:
-```json
-{
-    "name": "@mcplogic/core",
-    "version": "1.0.0",
-    "exports": {
-        ".": "./dist/index.lib.js",
-        "./server": "./dist/index.js"
-    },
-    "main": "dist/index.lib.js",
-    "types": "dist/index.lib.d.ts"
-}
-```
-
-3. **Create usage example** `examples/library-usage.ts`:
-```typescript
-import { createLogicEngine, createModelFinder, parse } from '@mcplogic/core';
-
-async function demo() {
-    // Validate syntax
-    parse('all x (P(x) -> Q(x))');
-    
-    // Prove theorem
-    const engine = createLogicEngine();
-    const proof = await engine.prove(
-        ['all x (P(x) -> Q(x))', 'P(a)'],
-        'Q(a)'
-    );
-    console.log('Proved:', proof.found);
-    
-    // Find model
-    const finder = createModelFinder();
-    const model = await finder.findModel(['exists x P(x)']);
-    console.log('Model:', model);
-}
-
-demo();
-```
-
-#### Verification
-```bash
-npm run build
-npm pack  # Creates tarball
-# Test in another project
-```
+[Full implementation details in previous version...]
 
 ---
 
 ### 2.2 Browser/WASM Compatibility 🌐
 
-**Effort:** ~6 hours | **Impact:** Very High | **Risk:** Medium
+**Effort:** ~6 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 0.4, 2.1
 
-Enable client-side reasoning in the browser.
+#### Acceptance Criteria
+- [ ] Browser spike (0.4) confirmed both deps work
+- [ ] `npm run build:browser` produces working bundle
+- [ ] Test HTML page can prove simple theorem
+- [ ] No Node.js-specific code in browser bundle
 
-#### Node.js Dependencies Audit
-
-| Dependency | Location | Browser Status |
-|------------|----------|----------------|
-| `tau-prolog` | Core engine | ✅ Browser-compatible |
-| `logic-solver` | SAT engine | ✅ Browser-compatible |
-| `fs` | CLI only | ❌ Exclude from browser build |
-| `readline` | CLI only | ❌ Exclude from browser build |
-| `@modelcontextprotocol/sdk` | Server only | ❌ Exclude from browser build |
-
-#### Implementation Steps
-
-1. **Create browser build config** `tsconfig.browser.json`:
-```json
-{
-    "extends": "./tsconfig.json",
-    "compilerOptions": {
-        "outDir": "./dist/browser",
-        "module": "ESNext",
-        "target": "ES2020",
-        "lib": ["ES2020", "DOM"]
-    },
-    "include": [
-        "src/logicEngine.ts",
-        "src/modelFinder.ts",
-        "src/parser.ts",
-        "src/syntaxValidator.ts",
-        "src/clausifier.ts",
-        "src/translator.ts",
-        "src/axioms/**/*.ts",
-        "src/engines/**/*.ts",
-        "src/utils/**/*.ts",
-        "src/types/**/*.ts",
-        "src/index.lib.ts"
-    ],
-    "exclude": [
-        "src/cli.ts",
-        "src/index.ts",
-        "src/server.ts",
-        "src/sessionManager.ts",
-        "src/handlers/**/*.ts",
-        "src/resources/**/*.ts",
-        "src/prompts/**/*.ts"
-    ]
-}
-```
-
-2. **Add browser build script** to `package.json`:
-```json
-"scripts": {
-    "build:browser": "tsc -p tsconfig.browser.json"
-}
-```
-
-3. **Create Vite test project**:
-```bash
-mkdir -p playground
-npx -y create-vite@latest playground/test --template vanilla-ts
-cd playground/test
-# Add import test
-```
-
-4. **Test in browser**:
-```html
-<script type="module">
-import { createLogicEngine } from './dist/browser/index.lib.js';
-const engine = createLogicEngine();
-const result = await engine.prove(['P(a)'], 'P(a)');
-console.log(result);
-</script>
-```
-
-#### Verification
-```bash
-npm run build:browser
-npx serve .
-# Open browser, check console
-```
+[Full implementation details in previous version...]
 
 ---
 
 ### 2.3 Web Playground with Offline LLM 🎮🧠
 
-**Effort:** ~8-12 hours | **Impact:** Very High | **Risk:** Medium
+**Effort:** ~8-12 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 2.2
 
-A complete end-to-end demo: **natural language → FOL → proof/model**.
+#### Acceptance Criteria
+- [ ] Modern, dark-mode UI with glassmorphism
+- [ ] NL input → FOL output via Transformers.js
+- [ ] FOL → Proof/Model via browser MCP Logic
+- [ ] Works 100% offline after initial LLM download
+- [ ] Deploy to GitHub Pages
 
-#### Tech Stack
-
-| Component | Technology | Notes |
-|-----------|------------|-------|
-| UI | Vanilla HTML/CSS/JS | Single-page, glassmorphism |
-| Editor | CodeMirror 6 | Syntax highlighting for FOL |
-| Logic Engine | MCP Logic (browser build) | From Phase 2.2 |
-| Offline LLM | **Transformers.js** | WebGPU-accelerated |
-| Model | `Xenova/TinyLlama-1.1B-Chat` | 700MB, runs offline |
-
-#### File Structure
-```
-playground/
-├── index.html          # Main page
-├── style.css           # Modern glassmorphism design
-├── app.js              # Main application logic
-├── llm.js              # Transformers.js integration
-├── editor.js           # CodeMirror setup
-└── logic.js            # MCP Logic wrapper
-```
-
-#### Implementation
-
-See detailed implementation in **Appendix A** below.
+[Full implementation details in previous version...]
 
 ---
 
-## 🧠 Phase 3: AI Integration (4-8 hours each)
+## 🧠 Phase 3: AI Integration
 
 ### 3.1 Natural Language Interface 🗣️
 
-**Effort:** ~4 hours | **Impact:** High | **Risk:** Low | **MCR:** Core feature
+**Effort:** ~4 hours | **Impact:** High | **Risk:** Low | **Depends:** 0.3
 
-Add NL→FOL translation as an MCP tool, matching MCR's `session.assert` model.
+#### Acceptance Criteria
+- [ ] `translate-text` MCP tool accepts natural language
+- [ ] Returns structured `{ premises, conclusion }`
+- [ ] Validates all formulas before returning
+- [ ] Works with or without external LLM (uses offline model)
 
-#### Implementation Steps
-
-1. **Create NL translation prompt** `src/prompts/nl-to-fol.ts`:
-```typescript
-export const NL_TO_FOL_SYSTEM = `You are a logic translator. Convert natural language to first-order logic.
-
-Syntax:
-- all x (predicate(x)) — universal quantification
-- exists x (predicate(x)) — existential  
-- -> implies, & and, | or, - not, <-> iff
-- Use lowercase: human(socrates), not Human(Socrates)
-
-Output format:
-PREMISES:
-<one formula per line>
-CONCLUSION:
-<optional, only if asking a question>
-
-Example:
-Input: "All humans are mortal. Socrates is human. Is Socrates mortal?"
-Output:
-PREMISES:
-all x (human(x) -> mortal(x))
-human(socrates)
-CONCLUSION:
-mortal(socrates)
-`;
-
-export function buildNLTranslatePrompt(input: string): string {
-    return `${NL_TO_FOL_SYSTEM}\n\nInput: "${input}"\n\nOutput:`;
-}
-```
-
-2. **Create translation handler** `src/handlers/translate.ts`:
-```typescript
-import { parse } from '../parser.js';
-import { buildNLTranslatePrompt } from '../prompts/nl-to-fol.js';
-
-export interface TranslateResult {
-    success: boolean;
-    premises: string[];
-    conclusion?: string;
-    raw?: string;
-    errors?: string[];
-}
-
-export function parseTranslationOutput(output: string): TranslateResult {
-    const lines = output.split('\n').filter(l => l.trim());
-    const premises: string[] = [];
-    let conclusion: string | undefined;
-    let inPremises = false;
-    let inConclusion = false;
-    const errors: string[] = [];
-    
-    for (const line of lines) {
-        if (line.startsWith('PREMISES:')) { inPremises = true; inConclusion = false; continue; }
-        if (line.startsWith('CONCLUSION:')) { inPremises = false; inConclusion = true; continue; }
-        
-        const formula = line.trim();
-        if (!formula) continue;
-        
-        try {
-            parse(formula);
-            if (inPremises) premises.push(formula);
-            else if (inConclusion) conclusion = formula;
-        } catch (e) {
-            errors.push(`Invalid formula "${formula}": ${(e as Error).message}`);
-        }
-    }
-    
-    return {
-        success: errors.length === 0 && premises.length > 0,
-        premises,
-        conclusion,
-        raw: output,
-        errors: errors.length > 0 ? errors : undefined
-    };
-}
-```
-
-3. **Add MCP tool** `translate-text` in `src/server.ts`:
-```typescript
-{
-    name: 'translate-text',
-    description: `Translate natural language to first-order logic.
-
-**When to use:** User provides requirements in plain English.
-**Output:** Structured FOL that can be passed to prove/find-model.
-
-**Example:**
-  text: "All cats are mammals. Whiskers is a cat."
-  → { premises: ["all x (cat(x) -> mammal(x))", "cat(whiskers)"] }
-
-**Note:** Requires LLM configuration or uses built-in offline model.`,
-    inputSchema: {
-        type: 'object',
-        properties: {
-            text: { type: 'string', description: 'Natural language input' },
-            validate: { type: 'boolean', description: 'Validate translated formulas (default: true)' },
-            verbosity: verbositySchema,
-        },
-        required: ['text'],
-    },
-},
-```
+[Full implementation details in previous version...]
 
 ---
 
 ### 3.2 Heuristic Strategy Selection 🎲
 
-**Effort:** ~2 hours | **Impact:** Medium | **Risk:** None | **README:** Line 68
+**Effort:** ~2 hours | **Impact:** Medium | **Risk:** None
 
-Auto-select optimal strategy based on problem structure.
+#### Acceptance Criteria
+- [ ] Equality-heavy proofs auto-select `iterative` strategy
+- [ ] Pure Horn clauses prefer `prolog` engine
+- [ ] Strategy choice logged in verbose output
 
-#### Implementation Steps
-
-1. **Extend `analyzeFormulas`** in `src/engines/manager.ts`:
-```typescript
-interface FormulaAnalysis {
-    isHorn: boolean;
-    hasEquality: boolean;
-    hasArithmetic: boolean;
-    variableCount: number;
-    clauseCount: number;
-    // NEW:
-    equalityDensity: number;  // % of clauses with equality
-    recommendedStrategy: 'single' | 'iterative';
-}
-
-function analyzeFormulas(formulas: string[]): FormulaAnalysis {
-    // ... existing analysis ...
-    
-    // Recommend iterative for equality-heavy or complex problems
-    const recommendedStrategy = 
-        (equalityDensity > 0.3 || clauseCount > 10) 
-            ? 'iterative' 
-            : 'single';
-    
-    return { ...existing, equalityDensity, recommendedStrategy };
-}
-```
-
-2. **Apply in proveHandler** `src/handlers/core.ts`:
-```typescript
-// Auto-select strategy if not specified
-const analysis = analyzeFormulas([...premises, conclusion]);
-const strategy = args.strategy ?? analysis.recommendedStrategy;
-```
-
-3. **Log heuristic decision** in trace output.
+[Full implementation details in previous version...]
 
 ---
 
-## 🏗️ Phase 4: Neurosymbolic Features (MCR Parity)
+## 🏗️ Phase 4: Neurosymbolic Features
 
 ### 4.1 Ontology Support 🗂️
 
-**Effort:** ~6 hours | **Impact:** High | **Risk:** Medium | **MCR:** Core feature
+**Effort:** ~6 hours | **Impact:** High | **Risk:** Medium | **Depends:** 0.3
 
-Constrain knowledge graphs with type/relationship schemas.
+#### Acceptance Criteria
+- [ ] Sessions can be created with ontology constraints
+- [ ] Invalid predicates rejected with clear error
+- [ ] Synonym expansion works (`human` → `person`)
+- [ ] Ontology can be updated dynamically
 
-#### Implementation Steps
-
-1. **Define Ontology type** `src/types/ontology.ts`:
-```typescript
-export interface Ontology {
-    types: Set<string>;           // Valid entity types: bird, mammal, person
-    relationships: Set<string>;   // Valid predicates: loves, parent_of
-    constraints: Set<string>;     // Rules: unique_name, closed_world
-    synonyms: Map<string, string>; // human -> person
-}
-
-export function createOntology(config?: Partial<{
-    types: string[];
-    relationships: string[];
-    constraints: string[];
-    synonyms: Record<string, string>;
-}>): Ontology {
-    return {
-        types: new Set(config?.types ?? []),
-        relationships: new Set(config?.relationships ?? []),
-        constraints: new Set(config?.constraints ?? []),
-        synonyms: new Map(Object.entries(config?.synonyms ?? {})),
-    };
-}
-```
-
-2. **Add validation to sessionManager** `src/sessionManager.ts`:
-```typescript
-validateAgainstOntology(formula: string, ontology: Ontology): { valid: boolean; error?: string } {
-    const ast = parse(formula);
-    const predicates = extractPredicates(ast);
-    
-    for (const pred of predicates) {
-        if (!ontology.types.has(pred) && !ontology.relationships.has(pred)) {
-            return { valid: false, error: `Unknown predicate: ${pred}` };
-        }
-    }
-    return { valid: true };
-}
-```
-
-3. **Add MCP tools**: `define-ontology`, `validate-against-ontology`
+[Full implementation details in previous version...]
 
 ---
 
 ### 4.2 Agentic Reasoning Loop 🤖
 
-**Effort:** ~8 hours | **Impact:** Very High | **Risk:** Medium | **MCR:** Core feature
+**Effort:** ~8 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 3.1, 4.1
 
-Multi-step goal-oriented reasoning with assert/query/conclude actions.
+#### Acceptance Criteria
+- [ ] Multi-step reasoning with assert/query/conclude
+- [ ] Confidence scoring based on proof success
+- [ ] Max steps limit prevents infinite loops
+- [ ] Full trace of all reasoning steps
 
-#### Implementation Steps
-
-1. **Define reasoning actions** `src/types/agent.ts`:
-```typescript
-export type AgentAction = 
-    | { type: 'assert'; content: string }
-    | { type: 'query'; content: string }
-    | { type: 'conclude'; answer: string; explanation: string };
-
-export interface ReasoningStep {
-    action: AgentAction;
-    result?: any;
-}
-
-export interface ReasoningResult {
-    answer: string;
-    steps: ReasoningStep[];
-    confidence: number;
-}
-```
-
-2. **Create reasoning agent** `src/agent/reasoner.ts`:
-```typescript
-export async function reason(
-    task: string,
-    session: Session,
-    llm: LLMClient,
-    options: { maxSteps?: number } = {}
-): Promise<ReasoningResult> {
-    const maxSteps = options.maxSteps ?? 5;
-    const steps: ReasoningStep[] = [];
-    
-    for (let i = 0; i < maxSteps; i++) {
-        // Ask LLM for next action
-        const prompt = buildAgentPrompt(task, session.getKB(), steps);
-        const response = await llm.generate(prompt);
-        const action = parseAgentAction(response);
-        
-        if (action.type === 'conclude') {
-            return {
-                answer: action.answer,
-                steps,
-                confidence: computeConfidence(steps)
-            };
-        }
-        
-        // Execute action
-        const result = await executeAction(action, session);
-        steps.push({ action, result });
-    }
-    
-    return { answer: 'Inconclusive', steps, confidence: 0 };
-}
-```
-
-3. **Add MCP tool** `reason`:
-```typescript
-{
-    name: 'reason',
-    description: 'Multi-step reasoning to achieve a goal.',
-    inputSchema: {
-        type: 'object',
-        properties: {
-            task: { type: 'string', description: 'Goal to achieve' },
-            session_id: { type: 'string', description: 'Session context' },
-            max_steps: { type: 'integer', description: 'Max reasoning steps (default: 5)' },
-        },
-        required: ['task', 'session_id'],
-    },
-}
-```
+[Full implementation details in previous version...]
 
 ---
 
-## 🧬 Phase 5: Evolution Engine (MCR Advanced)
+## 🧬 Phase 5: Evolution Engine
 
-**Effort:** ~2-4 weeks | **Impact:** Very High | **Risk:** High
+**Effort:** ~2-4 weeks | **Depends:** 4.2
 
-Self-optimizing translation strategies—the "brain" of MCR.
-
-### Overview
-
-The Evolution Engine automatically discovers better NL→FOL translation strategies by:
-1. **Benchmarking** strategies against a curriculum of test cases
-2. **Mutating** prompts using LLM critique
-3. **Selecting** best performers for the next generation
-
-### Components
-
-| Component | Purpose | File |
-|-----------|---------|------|
-| Optimizer Coordinator | Orchestrates evolution loop | `src/evolution/optimizer.ts` |
-| Strategy Evolver | Mutates prompts via critique | `src/evolution/evolver.ts` |
-| Curriculum Generator | Creates diverse test cases | `src/evolution/curriculum.ts` |
-| Performance Database | Stores benchmark results | `performance.db` (SQLite) |
-
-### Implementation
-
-Defer to Phase 5 after Phases 1-4 are complete. Follow MCR1.md architecture.
+[Full details in MCR1.md architecture...]
 
 ---
 
 ## ❌ Deprioritized
 
-| Item | Effort | Why Defer |
-|------|--------|-----------|
-| Prover9 WASM | Weeks | SAT+iterative handles most cases |
-| SMT/Z3 | Weeks | Requires emscripten, large WASM |
-| Modal Logic | Weeks | Research; no demand |
-| Higher-Order Logic | Weeks | Fundamental architecture change |
-| Probabilistic Logic | Weeks | Requires different inference engine |
+| Item | Why Defer |
+|------|-----------|
+| Prover9 WASM | SAT+iterative handles most cases |
+| SMT/Z3 | Large WASM, complex integration |
+| Modal Logic | Research; no demand |
 
 ---
 
-## 📋 Development Workflow
+## 📋 Optimal Workflow
 
-### Before Starting Any Task
+### Daily Routine
 
-1. **Check tests pass**: `npm test`
-2. **Read this plan**: Understand dependencies
-3. **Update task.md**: Mark task `[/]` in progress
+```bash
+# Start of day
+npm run check              # Verify everything works
+npm run todo               # Review outstanding TODOs
 
-### After Completing Any Task
+# During development
+npm run build:watch        # Auto-rebuild on changes
+npm run test:watch         # Auto-test on changes
 
-1. **Run full test suite**: `npm test`
-2. **Update this file**: Mark task `[x]`
-3. **Update README.md**: Check off corresponding feature
-4. **Commit**: `git commit -m "feat: <description>"`
-
-### File Reference Index
-
-| Purpose | File |
-|---------|------|
-| MCP Tool Definitions | `src/server.ts` (lines 70-503) |
-| Default Parameters | `src/types/options.ts` |
-| Prove Handler | `src/handlers/core.ts` |
-| Model Handler | `src/handlers/model.ts` |
-| Logic Engine | `src/logicEngine.ts` |
-| Model Finder | `src/modelFinder.ts` |
-| Parser | `src/parser.ts` |
-| Session Manager | `src/sessionManager.ts` |
-| Test Suite | `tests/*.test.ts` |
-| MCR Vision Docs | `doc/mcr*.md` |
-
----
-
-## Appendix A: Web Playground Implementation
-
-### `playground/index.html`
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Logic Playground</title>
-    <link rel="stylesheet" href="style.css">
-    <script type="importmap">
-    {
-        "imports": {
-            "@xenova/transformers": "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.0"
-        }
-    }
-    </script>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🔮 MCP Logic Playground</h1>
-            <span id="llm-status" class="status">LLM: ⏳ Loading...</span>
-        </header>
-        <main class="panels">
-            <section class="panel" id="input-panel">
-                <h2>Natural Language</h2>
-                <textarea id="nl-input" placeholder="All humans are mortal. Socrates is human. Is Socrates mortal?"></textarea>
-                <button id="translate-btn" class="primary">Translate to FOL →</button>
-            </section>
-            <section class="panel" id="fol-panel">
-                <h2>First-Order Logic</h2>
-                <pre id="fol-editor" contenteditable="true"></pre>
-                <div class="button-group">
-                    <button id="prove-btn">Prove</button>
-                    <button id="model-btn">Find Model</button>
-                </div>
-            </section>
-            <section class="panel" id="output-panel">
-                <h2>Result</h2>
-                <pre id="output"></pre>
-            </section>
-        </main>
-    </div>
-    <script type="module" src="app.js"></script>
-</body>
-</html>
+# Before commit
+npm run check              # Final verification
+git add -p                 # Review changes
+git commit -m "feat: ..."
 ```
 
-### LLM Options (Trade-offs)
+### Task Completion Checklist
 
-| Model | Size | Quality | Speed | Recommended |
-|-------|------|---------|-------|-------------|
-| `Xenova/TinyLlama-1.1B-Chat` | 700MB | ★★☆☆ | Very Fast | ✅ Default |
-| `Xenova/Phi-3-mini-4k-instruct` | 1.5GB | ★★★☆ | Fast | Quality focus |
-| `Xenova/Qwen2-0.5B-Instruct` | 400MB | ★★☆☆ | Very Fast | Size focus |
+For each task:
+1. [ ] Read acceptance criteria
+2. [ ] Implement code changes
+3. [ ] Add/update tests
+4. [ ] Run `npm run check`
+5. [ ] Update README.md status if applicable
+6. [ ] Mark "Done When" items checked
+7. [ ] Commit with descriptive message
 
 ---
 
-## 🏁 Next Action
+## 🏁 Recommended Start Order
 
-**Recommended:** Start with **Phase 1.1: High-Power Mode Flag**
+1. **Phase 0 (all)** - Do these first, enables everything else
+2. **Phase 1.1** - Trivial win, immediately useful
+3. **Phase 1.2** - Already done, just verify
+4. **Phase 1.3** - High visibility, enables testing
+5. **Phase 2.1** - Foundation for browser work
+6. Continue per dependency graph...
 
-1. Open `src/types/options.ts`
-2. Add `highPowerMaxSeconds` and `highPowerMaxInferences` to `DEFAULTS`
-3. Open `src/server.ts`, add `highPower` to prove/find-model schemas
-4. Open `src/handlers/core.ts`, apply highPower logic
-5. Run `npm test`
-6. Update README.md line 50
-7. Done. (~1 hour)
+**First command:** 
+```bash
+mkdir -p spikes scripts tests/fixtures
+npm run check
+```
