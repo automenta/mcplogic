@@ -113,6 +113,11 @@ export function createServer(): Server {
                         enum: ['prolog', 'sat', 'auto'],
                         description: "Reasoning engine: 'prolog' (Horn clauses), 'sat' (general FOL), 'auto' (select based on formula). Default: 'auto'.",
                     },
+                    strategy: {
+                        type: 'string',
+                        enum: ['auto', 'iterative'],
+                        description: "Search strategy: 'iterative' progressively increases inference limits (good for unknown complexity). Default: 'auto'.",
+                    },
                     verbosity: verbositySchema,
                 },
                 required: ['premises', 'conclusion'],
@@ -177,6 +182,15 @@ export function createServer(): Server {
                         type: 'integer',
                         description: 'Maximum domain size to try (default: 10). Larger values may timeout.',
                     },
+                    use_sat: {
+                        type: ['boolean', 'string'],
+                        enum: [true, false, 'auto'],
+                        description: "Use SAT solver backend (recommended for domains > 10). Default: 'auto'.",
+                    },
+                    enable_symmetry: {
+                        type: 'boolean',
+                        description: 'Enable symmetry breaking optimization (reduces isomorphic models). Default: true.',
+                    },
                     verbosity: verbositySchema,
                 },
                 required: ['premises'],
@@ -215,6 +229,15 @@ If found, proves the conclusion doesn't logically follow.`,
                     max_domain_size: {
                         type: 'integer',
                         description: 'Maximum domain size to try (default: 10)',
+                    },
+                    use_sat: {
+                        type: ['boolean', 'string'],
+                        enum: [true, false, 'auto'],
+                        description: "Use SAT solver backend. Default: 'auto'.",
+                    },
+                    enable_symmetry: {
+                        type: 'boolean',
+                        description: 'Enable symmetry breaking optimization. Default: true.',
                     },
                     verbosity: verbositySchema,
                 },

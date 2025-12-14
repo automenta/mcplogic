@@ -14,11 +14,12 @@ export async function proveHandler(
         enable_arithmetic?: boolean;
         enable_equality?: boolean;
         engine?: EngineSelection;
+        strategy?: 'auto' | 'breadth' | 'depth' | 'iterative';
     },
     engineManager: EngineManager,
     verbosity: Verbosity
 ): Promise<ProveResponse | { result: 'syntax_error'; validation: ValidationReport }> {
-    const { premises, conclusion, enable_arithmetic, enable_equality, engine: engineParam } = args;
+    const { premises, conclusion, enable_arithmetic, enable_equality, engine: engineParam, strategy, inference_limit } = args;
 
     // Validate syntax first
     const allFormulas = [...premises, conclusion];
@@ -34,6 +35,8 @@ export async function proveHandler(
         enableArithmetic: enable_arithmetic,
         enableEquality: enable_equality,
         engine: engineParam ?? 'auto',
+        strategy: strategy ?? 'auto',
+        maxInferences: inference_limit
     });
 
     // engineUsed is now handled in buildProveResponse

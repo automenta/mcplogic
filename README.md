@@ -17,8 +17,8 @@ Original: https://github.com/angrysky56/mcp-logic/
 - [x] **Syntax Validation** — Pre-validate formulas with detailed errors
 - [x] **CNF Clausification** — Transform FOL to Conjunctive Normal Form
 - [x] **DIMACS Export** — Export CNF for external SAT solvers
-- [ ] **Symmetry Breaking** — Lex-leader for model search
-- [ ] **SAT-Backed Model Finding** — Scale to domain 25+
+- [x] **Symmetry Breaking** — Lex-leader for model search
+- [x] **SAT-Backed Model Finding** — Scale to domain 25+
 - [ ] **Isomorphism Filtering** — Skip equivalent models
 - [ ] **Proof Traces** — Step-by-step derivation output
 
@@ -28,13 +28,13 @@ Original: https://github.com/angrysky56/mcp-logic/
 - [x] **SAT Engine** (MiniSat) — General FOL, non-Horn formulas
 - [x] **Engine Parameter** — Explicit engine selection via `engine` param
 - [ ] **Prover9 WASM** — Optional high-power ATP (lazy-loaded)
-- [ ] **Iterative Deepening** — Configurable search strategies
+- [x] **Iterative Deepening** — Configurable search strategies
 - [ ] **Demodulation** — Equational term rewriting
 
 ### Logic Features
 - [x] **Arithmetic Support** — Built-in: `lt`, `gt`, `plus`, `minus`, `times`, `divides`
 - [x] **Equality Reasoning** — Reflexivity, symmetry, transitivity, congruence
-- [ ] **Extended Axiom Library** — Ring, field, lattice, equivalence axioms
+- [x] **Extended Axiom Library** — Ring, field, lattice, equivalence axioms
 - [ ] **Typed/Sorted FOL** — Domain-constraining type annotations (research)
 - [ ] **Modal Logic** — Necessity, possibility operators (research)
 - [ ] **Probabilistic Logic** — Weighted facts, Bayesian inference (research)
@@ -56,7 +56,7 @@ Original: https://github.com/angrysky56/mcp-logic/
 
 ### Testing & Benchmarks
 - [x] **Unit Tests** — 254+ tests, 80%+ coverage
-- [ ] **Pelletier Problems** — P1-P75 benchmark suite
+- [x] **Pelletier Problems** — P1-P75 benchmark suite
 - [ ] **Group Theory Benchmarks** — Model finding & proving
 - [ ] **TPTP Library Subset** — Standard ATP benchmarks
 
@@ -186,6 +186,9 @@ all x all y all z ((greater(x, y) & greater(y, z)) -> greater(x, z))
 | `logic://axioms/category` | Category theory axioms |
 | `logic://axioms/monoid` | Monoid structure |
 | `logic://axioms/group` | Group axioms |
+| `logic://axioms/ring` | Ring structure |
+| `logic://axioms/lattice` | Lattice structure |
+| `logic://axioms/equivalence` | Equivalence relations |
 | `logic://axioms/peano` | Peano arithmetic |
 | `logic://axioms/set-zfc` | ZFC set theory basics |
 | `logic://axioms/propositional` | Propositional tautologies |
@@ -208,11 +211,10 @@ All tools support a `verbosity` parameter:
 
 ## Limitations (Current)
 
-1. **Model Size** — Finder limited to domains ≤10 elements
-2. **Inference Depth** — Complex proofs may exceed default limit (increase via `inference_limit`)
+1. **Model Size** — Finder limited to domains ≤25 elements (using SAT)
+2. **Inference Depth** — Complex proofs may exceed default limit (increase via `inference_limit` or use `iterative` strategy)
 3. **SAT Arithmetic** — Arithmetic not supported in SAT engine path
 4. **Higher-Order** — Only first-order logic supported
-5. **Functions in Models** — Function symbols not fully evaluated in model finder
 
 See [TODO2.md](TODO2.md) for the complete development roadmap addressing these limitations.
 
