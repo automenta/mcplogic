@@ -83,3 +83,17 @@ export type {
     ProveOptions,
     ModelOptions
 } from './options.js';
+
+// Re-export future types (Phase 1-4)
+export type {
+    HighPowerOptions,
+    TranslateRequest,
+    TranslateResult,
+    Ontology,
+    OntologyConfig,
+    AgentActionType,
+    AgentAction,
+    ReasoningStep,
+    ReasoningResult,
+    ReasonOptions
+} from './future.js';
