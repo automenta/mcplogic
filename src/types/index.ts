@@ -72,3 +72,14 @@ export type {
     DetailedModelResponse,
     ModelResponse,
 } from './responses.js';
+
+// Re-export options
+export {
+    DEFAULTS
+} from './options.js';
+
+export type {
+    ReasoningOptions,
+    ProveOptions,
+    ModelOptions
+} from './options.js';
