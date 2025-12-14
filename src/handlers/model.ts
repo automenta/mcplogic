@@ -12,11 +12,12 @@ export async function findModelHandler(
         max_domain_size?: number;
         use_sat?: boolean | 'auto';
         enable_symmetry?: boolean;
+        count?: number;
     },
     defaultFinder: ModelFinder,
     verbosity: Verbosity
 ): Promise<ModelResponse> {
-    const { premises, domain_size, max_domain_size, use_sat, enable_symmetry } = args;
+    const { premises, domain_size, max_domain_size, use_sat, enable_symmetry, count } = args;
 
     // Create finder with custom max domain size if specified
     const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;
@@ -31,7 +32,8 @@ export async function findModelHandler(
     const options = {
         useSAT: use_sat,
         enableSymmetry: enable_symmetry,
-        maxDomainSize: domain_size ?? max_domain_size
+        maxDomainSize: domain_size ?? max_domain_size,
+        count
     };
 
     const modelResult = await finder.findModel(premises, options);

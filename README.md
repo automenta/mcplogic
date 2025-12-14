@@ -20,7 +20,7 @@ Original: https://github.com/angrysky56/mcp-logic/
 - [x] **Symmetry Breaking** — Lex-leader for model search (reduces search space exponentially)
 - [x] **SAT-Backed Model Finding** — Scale to domain 25+ with automatic SAT threshold
 - [ ] **Isomorphism Filtering** — Skip equivalent models (deferred until "findAllModels" use case)
-- [ ] **Proof Traces** — Step-by-step derivation output (deferred; basic proved/failed covers 90% of cases)
+- [x] **Proof Traces** — Step-by-step derivation output (via `include_trace`)
 
 ### Engine Federation
 - [x] **Multi-Engine Architecture** — Automatic engine selection
@@ -46,7 +46,7 @@ Original: https://github.com/angrysky56/mcp-logic/
 - [x] **Reasoning Prompts** — Templates for proof patterns
 - [x] **Verbosity Control** — `minimal`/`standard`/`detailed` responses
 - [x] **Structured Errors** — Machine-readable error codes and suggestions
-- [ ] **Streaming Progress** — Real-time progress notifications
+- [x] **Streaming Progress** — Real-time progress notifications (via MCP notifications)
 - [ ] **High-Power Mode** — Extended limits with warning
 
 ### Advanced Engines (Research)
@@ -141,10 +141,13 @@ The `prove` tool supports automatic or explicit engine selection:
   "arguments": {
     "premises": ["foo | bar", "-foo"],
     "conclusion": "bar",
-    "engine": "auto"
+    "engine": "auto",
+    "include_trace": true
   }
 }
 ```
+
+The `include_trace` option (boolean) enables step-by-step derivation output in the response, useful for debugging or understanding the proof path.
 
 | Engine | Best For | Capabilities |
 |--------|----------|--------------|
@@ -244,9 +247,9 @@ MIT
 Potential enhancements will be driven by real-world usage:
 
 - **Isomorphism Filtering** — Skip equivalent models in exhaustive model enumeration
-- **Proof Traces** — Step-by-step derivation output for educational/debugging use cases
+- [x] **Proof Traces** — Step-by-step derivation output for educational/debugging use cases
 - **Prover9 WASM** — Optional high-power ATP for problems beyond SAT+iterative capabilities
 - **Demodulation** — Equational term rewriting optimization for equality-heavy workloads
-- **Streaming Progress** — Real-time progress notifications for long-running operations
+- [x] **Streaming Progress** — Real-time progress notifications for long-running operations
 - **Extended Benchmarks** — TPTP library subset and group theory problem suites
 - **Advanced Engines** — SMT (Z3), ASP (Clingo), or neural-guided proof search (research)

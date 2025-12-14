@@ -71,6 +71,9 @@ export interface MinimalModelResponse {
     model?: {
         predicates: Record<string, string[]>;
     };
+    models?: {
+        predicates: Record<string, string[]>;
+    }[];
 }
 
 /**
@@ -116,6 +119,7 @@ export interface ModelResult {
     success: boolean;
     result: 'model_found' | 'no_model' | 'timeout' | 'error';
     model?: Model;
+    models?: Model[];
     interpretation?: string;
     error?: string;
     message?: string;

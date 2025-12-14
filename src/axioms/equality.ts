@@ -35,27 +35,32 @@ export function generateEqualityAxioms(
     signature: FormulaSignature,
     options: EqualityAxiomsOptions = {}
 ): string[] {
-    const maxIter = options.maxIterations ?? 100;
+    const maxIter = options.maxIterations ?? 5; // Default depth 5 to prevent stack overflow
     const includeCongruence = options.includeCongruence !== false;
     const includeSubstitution = options.includeSubstitution !== false;
 
     const axioms: string[] = [];
 
-    // Reflexivity: eq(X, X).
-    axioms.push('eq(X, X).');
+    // Main equality interface
+    axioms.push(`eq(X, Y) :- eq_d(X, Y, ${maxIter}).`);
 
-    // Symmetry with iteration guard: eq(X, Y) :- eq(Y, X), X \\== Y.
-    // Using \\== to prevent infinite loop on reflexive case
-    axioms.push('eq(X, Y) :- eq(Y, X), X \\\\== Y.');
+    // Depth-limited equality (Transitive Closure)
+    // Base case: Reflexivity
+    axioms.push('eq_d(X, X, _).');
 
-    // Transitivity with iteration guard
-    // eq(X, Z) :- eq(X, Y), eq(Y, Z), X \\== Z.
-    axioms.push('eq(X, Z) :- eq(X, Y), eq(Y, Z), X \\\\== Z, Y \\\\== X, Y \\\\== Z.');
+    // Recursive step: Transitivity via eq_step
+    // eq_d(X, Y, D) :- D > 0, D1 is D - 1, eq_step(X, Z, D1), Z \== X, eq_d(Z, Y, D1).
+    axioms.push('eq_d(X, Y, D) :- D > 0, D1 is D - 1, eq_step(X, Z, D1), Z \\\\== X, eq_d(Z, Y, D1).');
 
-    // Alternative: Use a depth-limited version for safety
-    axioms.push(`% Depth-limited equality for complex cases`);
-    axioms.push(`eq_depth(X, X, _).`);
-    axioms.push(`eq_depth(X, Y, D) :- D > 0, D1 is D - 1, eq(X, Z), eq_depth(Z, Y, D1), X \\\\== Y.`);
+    // eq_step: Single step of equality
+    // 1. Unification (Bridge) - Removed to prevent trivial loops, handled by eq_d reflexivity
+    // axioms.push('eq_step(X, Y, _) :- X = Y.');
+
+    // 2. User facts (eq_fact)
+    axioms.push('eq_step(X, Y, _) :- eq_fact(X, Y).');
+
+    // 3. Symmetry of user facts
+    axioms.push('eq_step(X, Y, _) :- eq_fact(Y, X).');
 
     // Congruence axioms for functions
     if (includeCongruence) {
@@ -70,8 +75,8 @@ export function generateEqualityAxioms(
     // Substitution axioms for predicates
     if (includeSubstitution) {
         for (const [pred, arity] of signature.predicates) {
-            if (pred !== 'eq' && arity > 0) {
-                const axiom = generatePredicateSubstitution(pred, arity);
+            if (pred !== 'eq' && pred !== 'eq_fact' && pred !== 'eq_d' && pred !== 'eq_step' && arity > 0) {
+                const axiom = generatePredicateSubstitution(pred, arity, maxIter);
                 axioms.push(axiom);
             }
         }
@@ -83,30 +88,27 @@ export function generateEqualityAxioms(
 /**
  * Generate congruence axiom for a function.
  * 
- * For f with arity n:
- * eq(f(X1,...,Xn), f(Y1,...,Yn)) :- eq(X1,Y1), ..., eq(Xn,Yn).
+ * eq_step(f(X...), f(Y...), D) :- eq_d(X, Y, D)...
  */
 function generateFunctionCongruence(fn: string, arity: number): string {
     const xs = Array.from({ length: arity }, (_, i) => `X${i + 1}`);
     const ys = Array.from({ length: arity }, (_, i) => `Y${i + 1}`);
-    const equalities = xs.map((x, i) => `eq(${x}, ${ys[i]})`).join(', ');
+    const equalities = xs.map((x, i) => `eq_d(${x}, ${ys[i]}, D)`).join(', ');
     const leftTerm = `${fn}(${xs.join(', ')})`;
     const rightTerm = `${fn}(${ys.join(', ')})`;
-    return `eq(${leftTerm}, ${rightTerm}) :- ${equalities}.`;
+    return `eq_step(${leftTerm}, ${rightTerm}, D) :- ${equalities}.`;
 }
 
 /**
  * Generate substitution axiom for a predicate.
  * 
- * For P with arity n:
- * P(Y1,...,Yn) :- eq(X1,Y1), ..., eq(Xn,Yn), P(X1,...,Xn).
- * 
- * This allows substituting equals in predicate arguments.
+ * P(Y...) :- eq_d(X, Y, MaxDepth), P(X...).
  */
-function generatePredicateSubstitution(pred: string, arity: number): string {
+function generatePredicateSubstitution(pred: string, arity: number, maxDepth: number): string {
     const xs = Array.from({ length: arity }, (_, i) => `X${i + 1}`);
     const ys = Array.from({ length: arity }, (_, i) => `Y${i + 1}`);
-    const equalities = xs.map((x, i) => `eq(${x}, ${ys[i]})`).join(', ');
+    // We use full depth for substitution to allow reasoning
+    const equalities = xs.map((x, i) => `eq_d(${x}, ${ys[i]}, ${maxDepth})`).join(', ');
     const original = `${pred}(${xs.join(', ')})`;
     const substituted = `${pred}(${ys.join(', ')})`;
     return `${substituted} :- ${equalities}, ${original}.`;
@@ -115,32 +117,20 @@ function generatePredicateSubstitution(pred: string, arity: number): string {
 export { containsEquality } from '../utils/ast.js';
 import { containsEquality } from '../utils/ast.js';
 
-/**
- * Generate a minimal set of equality axioms for a specific use case.
- * Only generates axioms for the functions/predicates actually used.
- */
 export function generateMinimalEqualityAxioms(
     formulas: ASTNode[],
     options: EqualityAxiomsOptions = {}
 ): string[] {
-    // Check if any formula uses equality
     if (!formulas.some(containsEquality)) {
-        return []; // No equality axioms needed
+        return [];
     }
-
     const signature = extractSignature(formulas);
     return generateEqualityAxioms(signature, options);
 }
 
-/**
- * Wrap Prolog equality (=) with our eq predicate for proper reasoning.
- * This allows using Prolog's built-in unification alongside our axioms.
- */
 export function getEqualityBridge(): string[] {
     return [
-        '% Bridge between Prolog unification and logic equality',
-        'eq(X, Y) :- X = Y.',  // Use Prolog unification
-        '% Inequality',
-        'neq(X, Y) :- X \\\\== Y.',  // Inequality using not-identical
+        '% Bridge handled by eq_step',
+        'neq(X, Y) :- X \\\\== Y.',
     ];
 }

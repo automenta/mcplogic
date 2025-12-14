@@ -118,6 +118,10 @@ export function createServer(): Server {
                         enum: ['auto', 'iterative'],
                         description: "Search strategy: 'iterative' progressively increases inference limits (good for unknown complexity). Default: 'auto'.",
                     },
+                    include_trace: {
+                        type: 'boolean',
+                        description: 'Include step-by-step inference trace in the output. Default: false.',
+                    },
                     verbosity: verbositySchema,
                 },
                 required: ['premises', 'conclusion'],
@@ -190,6 +194,10 @@ export function createServer(): Server {
                     enable_symmetry: {
                         type: 'boolean',
                         description: 'Enable symmetry breaking optimization (reduces isomorphic models). Default: true.',
+                    },
+                    count: {
+                        type: 'integer',
+                        description: 'Number of non-isomorphic models to find (default: 1).',
                     },
                     verbosity: verbositySchema,
                 },
@@ -573,7 +581,22 @@ If found, proves the conclusion doesn't logically follow.`,
             switch (name) {
                 // ==================== CORE REASONING TOOLS ====================
                 case 'prove':
-                    result = await Handlers.proveHandler(args as any, engineManager, verbosity);
+                    const progressToken = (request.params as any)._meta?.progressToken;
+                    const onProgress = progressToken ? (progress: number | undefined, message: string) => {
+                        server.notification({
+                            method: 'notifications/progress',
+                            params: {
+                                progressToken,
+                                data: {
+                                    progress,
+                                    total: 1.0,
+                                    message
+                                }
+                            }
+                        });
+                    } : undefined;
+
+                    result = await Handlers.proveHandler(args as any, engineManager, verbosity, onProgress);
                     break;
 
                 case 'check-well-formed':

@@ -83,6 +83,8 @@ export function extractSignature(asts: ASTNode[]): FormulaSignature {
         traverse(ast, visitor);
     }
 
+    // console.log('Signature:', { predicates: [...predicates], functions: [...functions] });
+
     return { predicates, constants, variables, functions };
 }
 
