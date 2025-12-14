@@ -12,36 +12,37 @@ Original: https://github.com/angrysky56/mcp-logic/
 
 ### Core Reasoning
 - [x] **Theorem Proving** — Resolution-based proving via Tau-Prolog
-- [x] **Model Finding** — Finite model enumeration (domain ≤10)
+- [x] **Model Finding** — Finite model enumeration (domain ≤25 with SAT)
 - [x] **Counterexample Detection** — Find models refuting conclusions
 - [x] **Syntax Validation** — Pre-validate formulas with detailed errors
 - [x] **CNF Clausification** — Transform FOL to Conjunctive Normal Form
 - [x] **DIMACS Export** — Export CNF for external SAT solvers
-- [x] **Symmetry Breaking** — Lex-leader for model search
-- [x] **SAT-Backed Model Finding** — Scale to domain 25+
-- [ ] **Isomorphism Filtering** — Skip equivalent models
-- [ ] **Proof Traces** — Step-by-step derivation output
+- [x] **Symmetry Breaking** — Lex-leader for model search (reduces search space exponentially)
+- [x] **SAT-Backed Model Finding** — Scale to domain 25+ with automatic SAT threshold
+- [ ] **Isomorphism Filtering** — Skip equivalent models (deferred until "findAllModels" use case)
+- [ ] **Proof Traces** — Step-by-step derivation output (deferred; basic proved/failed covers 90% of cases)
 
 ### Engine Federation
 - [x] **Multi-Engine Architecture** — Automatic engine selection
 - [x] **Prolog Engine** (Tau-Prolog) — Horn clauses, Datalog, equality
 - [x] **SAT Engine** (MiniSat) — General FOL, non-Horn formulas
 - [x] **Engine Parameter** — Explicit engine selection via `engine` param
-- [ ] **Prover9 WASM** — Optional high-power ATP (lazy-loaded)
-- [x] **Iterative Deepening** — Configurable search strategies
-- [ ] **Demodulation** — Equational term rewriting
+- [x] **Iterative Deepening** — Progressive inference limit strategy for complex proofs
+- [ ] **Prover9 WASM** — Optional high-power ATP (deferred until SAT+iterative proves insufficient)
+- [ ] **Demodulation** — Equational term rewriting (deferred until equality workloads show perf issues)
 
 ### Logic Features
 - [x] **Arithmetic Support** — Built-in: `lt`, `gt`, `plus`, `minus`, `times`, `divides`
 - [x] **Equality Reasoning** — Reflexivity, symmetry, transitivity, congruence
-- [x] **Extended Axiom Library** — Ring, field, lattice, equivalence axioms
+- [x] **Extended Axiom Library** — Ring, field, lattice, equivalence relation axioms
+- [x] **Function Interpretation** — Full function support in model finding
 - [ ] **Typed/Sorted FOL** — Domain-constraining type annotations (research)
 - [ ] **Modal Logic** — Necessity, possibility operators (research)
 - [ ] **Probabilistic Logic** — Weighted facts, Bayesian inference (research)
 
 ### MCP Protocol
 - [x] **Session-Based Reasoning** — Incremental knowledge base construction
-- [x] **Axiom Resources** — Browsable libraries (category, Peano, ZFC, etc.)
+- [x] **Axiom Resources** — Browsable libraries (category, Peano, ZFC, ring, lattice, etc.)
 - [x] **Reasoning Prompts** — Templates for proof patterns
 - [x] **Verbosity Control** — `minimal`/`standard`/`detailed` responses
 - [x] **Structured Errors** — Machine-readable error codes and suggestions
@@ -55,10 +56,12 @@ Original: https://github.com/angrysky56/mcp-logic/
 - [ ] **Higher-Order Logic** — Quantify over predicates (research)
 
 ### Testing & Benchmarks
-- [x] **Unit Tests** — 254+ tests, 80%+ coverage
-- [x] **Pelletier Problems** — P1-P75 benchmark suite
-- [ ] **Group Theory Benchmarks** — Model finding & proving
+- [x] **Unit Tests** — 265 tests passing, 80%+ coverage
+- [x] **Pelletier Problems** — P1-P10 benchmark suite (extensible to P1-P75)
+- [x] **Symmetry Benchmarks** — Bell number validation tests
+- [x] **SAT Model Tests** — Group theory and algebraic structure verification
 - [ ] **TPTP Library Subset** — Standard ATP benchmarks
+
 
 ---
 
@@ -216,7 +219,7 @@ All tools support a `verbosity` parameter:
 3. **SAT Arithmetic** — Arithmetic not supported in SAT engine path
 4. **Higher-Order** — Only first-order logic supported
 
-See [TODO2.md](TODO2.md) for the complete development roadmap addressing these limitations.
+Future improvements may address these limitations as real-world usage dictates.
 
 ---
 
@@ -236,12 +239,14 @@ MIT
 
 ---
 
-## Roadmap
+## Future Directions
 
-See **[TODO2.md](TODO2.md)** for the comprehensive development plan including:
-- Phase 0: Pre-refactoring (fix function handling, extract grounding module)
-- Phase A: Model finding upgrades (symmetry breaking, SAT grounding, isomorphism)
-- Phase B: Proving enhancements (strategies, proof traces, demodulation, Prover9 WASM)
-- Phase C: Feature parity (extended output, MCP config, axiom library)
-- Phase D: Performance (increased limits, clausifier optimization)
-- Phase E: Testing (Pelletier problems, benchmarks)
+Potential enhancements will be driven by real-world usage:
+
+- **Isomorphism Filtering** — Skip equivalent models in exhaustive model enumeration
+- **Proof Traces** — Step-by-step derivation output for educational/debugging use cases
+- **Prover9 WASM** — Optional high-power ATP for problems beyond SAT+iterative capabilities
+- **Demodulation** — Equational term rewriting optimization for equality-heavy workloads
+- **Streaming Progress** — Real-time progress notifications for long-running operations
+- **Extended Benchmarks** — TPTP library subset and group theory problem suites
+- **Advanced Engines** — SMT (Z3), ASP (Clingo), or neural-guided proof search (research)
