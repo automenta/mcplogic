@@ -6,10 +6,21 @@
     "main": "dist/index.js",
     "scripts": {
         "build": "tsc",
+        "build:watch": "tsc --watch",
+        "build:browser": "tsc -p tsconfig.browser.json",
         "start": "node dist/index.js",
         "dev": "tsx src/index.ts",
         "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-        "test:prover": "npm test -- --testPathPattern=prover"
+        "test:watch": "npm test -- --watch",
+        "test:coverage": "npm test -- --coverage",
+        "test:browser": "npx playwright test tests/integration/browser-check.spec.ts",
+        "lint": "tsc --noEmit",
+        "clean": "rm -rf dist",
+        "rebuild": "npm run clean && npm run build",
+        "check": "npm run lint && npm test",
+        "todo": "grep -rn 'TODO\\|FIXME\\|HACK' src/ --include='*.ts'",
+        "benchmark:tptp": "tsx benchmarks/run-tptp.ts",
+        "tasks": "tsx scripts/task-status.ts"
     },
     "keywords": [
         "mcp",
@@ -26,6 +37,7 @@
         "tau-prolog": "^0.3.4"
     },
     "devDependencies": {
+        "@playwright/test": "^1.57.0",
         "@types/jest": "^29.5.11",
         "@types/node": "^20.10.0",
         "jest": "^29.7.0",
