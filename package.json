@@ -4,6 +4,9 @@
     "description": "MCP server for first-order logic reasoning with Tau-Prolog",
     "type": "module",
     "main": "dist/index.js",
+    "bin": {
+        "mcplogic": "./dist/cli.js"
+    },
     "scripts": {
         "build": "tsc",
         "build:watch": "tsc --watch",

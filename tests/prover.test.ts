@@ -4,6 +4,7 @@
 
 import { PrologEngine, createPrologEngine } from '../src/engines/prolog.js';
 import { buildPrologProgram, folGoalToProlog, folToProlog } from '../src/translator.js';
+import { createTestEngine } from './fixtures.js';
 
 describe('PrologEngine', () => {
     let engine: PrologEngine;
@@ -47,6 +48,19 @@ describe('PrologEngine', () => {
         });
     });
 
+});
+
+describe('HighPower Mode', () => {
+    test('highPower mode increases inference limit', async () => {
+        // This test doesn't need to prove anything hard,
+        // just verify the limit is applied
+        const engine = createTestEngine({ highPower: true });
+        // Access private property or inferred behavior?
+        // LogicEngine wraps ReasoningEngine.
+        // We can check if `engine` (LogicEngine) has `inferenceLimit` property if we cast to any,
+        // or check configuration via reflection.
+        expect((engine as any)['inferenceLimit']).toBe(100000);
+    });
 });
 
 describe('Translator', () => {

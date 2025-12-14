@@ -108,6 +108,10 @@ export function createServer(): Server {
                         type: 'boolean',
                         description: 'Auto-inject equality axioms (reflexivity, symmetry, transitivity, congruence). Default: false.',
                     },
+                    highPower: {
+                        type: 'boolean',
+                        description: 'Enable extended limits (300s timeout, 100k inferences). Use for complex proofs.',
+                    },
                     engine: {
                         type: 'string',
                         enum: ['prolog', 'sat', 'auto'],

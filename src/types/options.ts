@@ -33,4 +33,6 @@ export const DEFAULTS = {
     maxInferences: 5000,
     maxDomainSize: 25,
     satThreshold: 8,
+    highPowerMaxSeconds: 300,
+    highPowerMaxInferences: 100000,
 } as const;

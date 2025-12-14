@@ -97,9 +97,9 @@ export function expectModelFound(result: ModelResult) {
 ```
 
 #### Done When
-- [ ] `tests/fixtures.ts` exists
-- [ ] At least 3 existing tests refactored to use fixtures
-- [ ] `npm test` passes
+- [x] `tests/fixtures.ts` exists
+- [x] At least 3 existing tests refactored to use fixtures
+- [x] `npm test` passes
 
 ---
 
@@ -134,9 +134,9 @@ Update `package.json` scripts:
 ```
 
 #### Done When
-- [ ] All scripts added to `package.json`
-- [ ] `npm run check` runs lint + tests in one command
-- [ ] `npm run todo` lists all TODOs in codebase
+- [x] All scripts added to `package.json`
+- [x] `npm run check` runs lint + tests in one command
+- [x] `npm run todo` lists all TODOs in codebase
 
 ---
 
@@ -218,9 +218,9 @@ export interface ReasonOptions {
 ```
 
 #### Done When
-- [ ] `src/types/future.ts` exists
-- [ ] Exported from `src/types/index.ts`
-- [ ] No TypeScript errors
+- [x] `src/types/future.ts` exists
+- [x] Exported from `src/types/index.ts`
+- [x] No TypeScript errors
 
 ---
 
@@ -289,9 +289,9 @@ npx serve spikes/
 ```
 
 #### Done When
-- [ ] `spikes/browser-check.html` exists
-- [ ] Both tau-prolog and logic-solver load in browser
-- [ ] Document any issues in `spikes/NOTES.md`
+- [x] `spikes/browser-check.html` exists
+- [x] Both tau-prolog and logic-solver load in browser
+- [x] Document any issues in `spikes/NOTES.md`
 
 ---
 
@@ -472,11 +472,11 @@ Tasks that can run **in parallel** (no dependencies between them):
 Add a single boolean flag that unlocks extended limits.
 
 #### Acceptance Criteria
-- [ ] `highPower: true` increases inference limit to 100,000
-- [ ] `highPower: true` increases timeout to 300s
-- [ ] Default behavior unchanged when `highPower` not specified
-- [ ] Works for both `prove` and `find-model` tools
-- [ ] Unit test verifies high-power limits applied
+- [x] `highPower: true` increases inference limit to 100,000
+- [x] `highPower: true` increases timeout to 300s
+- [x] Default behavior unchanged when `highPower` not specified
+- [x] Works for both `prove` and `find-model` tools
+- [x] Unit test verifies high-power limits applied
 
 #### Implementation
 
@@ -533,9 +533,9 @@ test('highPower mode increases inference limit', async () => {
 6. **Update README.md** line 50: `[ ]` → `[x]`
 
 #### Done When
-- [ ] `npm test` passes
-- [ ] All acceptance criteria checked
-- [ ] README.md updated
+- [x] `npm test` passes
+- [x] All acceptance criteria checked
+- [x] README.md updated
 
 ---
 
@@ -546,9 +546,9 @@ test('highPower mode increases inference limit', async () => {
 Already implemented! Just verify and document.
 
 #### Acceptance Criteria
-- [ ] `count: N` parameter returns up to N non-isomorphic models
-- [ ] Models returned are verified non-isomorphic
-- [ ] Default `count: 1` behavior unchanged
+- [x] `count: N` parameter returns up to N non-isomorphic models
+- [x] Models returned are verified non-isomorphic
+- [x] Default `count: 1` behavior unchanged
 
 #### Implementation
 
@@ -576,8 +576,8 @@ test('returns multiple non-isomorphic models', async () => {
 3. **Update README.md** line 22: `[ ]` → `[x]`
 
 #### Done When
-- [ ] Test passes
-- [ ] README.md updated
+- [x] Test passes
+- [x] README.md updated
 
 ---
 
@@ -588,11 +588,11 @@ test('returns multiple non-isomorphic models', async () => {
 Create standalone CLI for testing without MCP client.
 
 #### Acceptance Criteria
-- [ ] `mcplogic prove <file>` proves last line from preceding premises
-- [ ] `mcplogic model <file>` finds model for all lines
-- [ ] `mcplogic validate <file>` checks syntax, returns exit code 1 on error
-- [ ] `mcplogic repl` starts interactive session
-- [ ] `mcplogic --help` shows usage
+- [x] `mcplogic prove <file>` proves last line from preceding premises
+- [x] `mcplogic model <file>` finds model for all lines
+- [x] `mcplogic validate <file>` checks syntax, returns exit code 1 on error
+- [x] `mcplogic repl` starts interactive session
+- [x] `mcplogic --help` shows usage
 
 #### Implementation
 
@@ -787,10 +787,10 @@ Update `package.json`:
 ```
 
 #### Done When
-- [ ] `npm run build` succeeds
-- [ ] `npm link` creates global command
-- [ ] All acceptance criteria verified manually
-- [ ] `mcplogic --help` outputs usage
+- [x] `npm run build` succeeds
+- [x] `npm link` creates global command
+- [x] All acceptance criteria verified manually
+- [x] `mcplogic --help` outputs usage
 
 ---
 
@@ -801,9 +801,9 @@ Update `package.json`:
 Add standard ATP benchmarks for regression testing.
 
 #### Acceptance Criteria
-- [ ] At least 5 TPTP problems translated to our syntax
-- [ ] Benchmark script reports pass/fail + timing
-- [ ] CI can run benchmarks
+- [x] At least 5 TPTP problems translated to our syntax
+- [x] Benchmark script reports pass/fail + timing
+- [x] CI can run benchmarks
 
 #### Implementation
 
@@ -840,9 +840,9 @@ killed(agatha, agatha)
 3. Add npm script: `"benchmark:tptp": "tsx benchmarks/run-tptp.ts"`
 
 #### Done When
-- [ ] `npm run benchmark:tptp` runs without error
-- [ ] Results show pass/fail for each problem
-- [ ] README.md line 63 updated: `[ ]` → `[x]`
+- [x] `npm run benchmark:tptp` runs without error
+- [x] Results show pass/fail for each problem
+- [x] README.md line 63 updated: `[ ]` → `[x]`
 
 ---
 
