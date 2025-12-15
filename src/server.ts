@@ -33,6 +33,7 @@ import {
 import { createEngineManager, EngineSelection } from './engines/manager.js';
 import * as Handlers from './handlers/index.js';
 import * as LLMHandlers from './handlers/llm.js';
+import * as AgentHandlers from './handlers/agent.js';
 
 /**
  * Verbosity parameter schema for tools
@@ -358,6 +359,42 @@ If found, proves the conclusion doesn't logically follow.`,
             },
         },
 
+        // ==================== AGENT TOOLS ====================
+        {
+            name: 'agent-reason',
+            description: `Neurosymbolic reasoning loop that combines proving and model finding.
+
+**When to use:** You want the system to autonomously attempt to prove OR disprove a goal.
+**How it works:**
+1. Asserts premises
+2. Attempts to prove goal
+3. If proof fails, attempts to find counter-example
+4. Returns result with confidence and step-by-step trace`,
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    goal: {
+                        type: 'string',
+                        description: 'Goal to prove or disprove',
+                    },
+                    premises: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Optional premises',
+                    },
+                    max_steps: {
+                        type: 'integer',
+                        description: 'Max steps (default: 10)',
+                    },
+                    timeout: {
+                        type: 'integer',
+                        description: 'Timeout in ms (default: 30000)',
+                    },
+                },
+                required: ['goal'],
+            },
+        },
+
         // ==================== SESSION MANAGEMENT TOOLS ====================
         {
             name: 'create-session',
@@ -380,6 +417,32 @@ If found, proves the conclusion doesn't logically follow.`,
                     ttl_minutes: {
                         type: 'integer',
                         description: 'Session time-to-live in minutes (default: 30, max: 1440)',
+                    },
+                    ontology: {
+                        type: 'object',
+                        description: 'Optional ontology configuration',
+                        properties: {
+                            types: {
+                                type: 'array',
+                                items: { type: 'string' },
+                                description: 'Allowed entity types (unary predicates)',
+                            },
+                            relationships: {
+                                type: 'array',
+                                items: { type: 'string' },
+                                description: 'Allowed relationships (predicates)',
+                            },
+                            constraints: {
+                                type: 'array',
+                                items: { type: 'string' },
+                                description: 'Constraints (not yet enforced)',
+                            },
+                            synonyms: {
+                                type: 'object',
+                                additionalProperties: { type: 'string' },
+                                description: 'Map of synonyms to canonical forms',
+                            },
+                        },
                     },
                     verbosity: verbositySchema,
                 },
@@ -652,6 +715,10 @@ If found, proves the conclusion doesn't logically follow.`,
 
                 case 'translate-text':
                     result = await LLMHandlers.translateTextHandler(args as any);
+                    break;
+
+                case 'agent-reason':
+                    result = await AgentHandlers.reasonHandler(args as any);
                     break;
 
                 // ==================== SESSION MANAGEMENT TOOLS ====================

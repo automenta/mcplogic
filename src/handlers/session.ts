@@ -7,15 +7,23 @@ import { EngineManager } from '../engines/manager.js';
 import { buildProveResponse } from './utils.js';
 
 export function createSessionHandler(
-    args: { ttl_minutes?: number },
+    args: {
+        ttl_minutes?: number;
+        ontology?: {
+            types?: string[];
+            relationships?: string[];
+            constraints?: string[];
+            synonyms?: Record<string, string>;
+        };
+    },
     sessionManager: SessionManager
 ): object {
-    const { ttl_minutes } = args;
+    const { ttl_minutes, ontology } = args;
     const ttlMs = ttl_minutes
         ? Math.min(ttl_minutes, 1440) * 60 * 1000  // Max 24 hours
         : undefined;
 
-    const session = sessionManager.create({ ttlMs });
+    const session = sessionManager.create({ ttlMs, ontology });
     const info = sessionManager.getInfo(session.id);
 
     return {
@@ -24,6 +32,7 @@ export function createSessionHandler(
         expires_at: new Date(info.expiresAt).toISOString(),
         ttl_minutes: Math.round(info.ttlMs / 60000),
         active_sessions: sessionManager.count,
+        has_ontology: !!session.ontology,
     };
 }
 

@@ -8,7 +8,6 @@ import {
 } from '../types/agent.js';
 import { EngineManager, createEngineManager } from '../engines/manager.js';
 import { ModelFinder, createModelFinder } from '../modelFinder.js';
-import { createGenericError } from '../types/errors.js';
 import { parse } from '../parser.js';
 
 /**
