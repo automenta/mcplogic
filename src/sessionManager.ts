@@ -6,6 +6,8 @@
  */
 
 import { buildPrologProgram } from './translator.js';
+import { OntologyManager } from './ontology/manager.js';
+import { OntologyConfig } from './types/ontology.js';
 import {
     createSessionNotFoundError,
     createSessionLimitError,
@@ -30,6 +32,7 @@ export interface Session {
     id: string;
     premises: string[];          // Original FOL formulas
     prologProgram: string;       // Compiled Prolog program
+    ontology?: OntologyManager;  // Optional ontology manager
     createdAt: number;
     lastAccessedAt: number;
     ttlMs: number;               // Time-to-live in milliseconds
@@ -40,6 +43,7 @@ export interface Session {
  */
 export interface CreateSessionOptions {
     ttlMs?: number;              // Custom TTL (default: 30 minutes)
+    ontology?: OntologyConfig;   // Optional ontology configuration
 }
 
 /**
@@ -80,6 +84,7 @@ export class SessionManager {
             createdAt: now,
             lastAccessedAt: now,
             ttlMs: options?.ttlMs ?? this.defaultTtlMs,
+            ontology: options?.ontology ? new OntologyManager(options.ontology) : undefined,
         };
 
         this.sessions.set(session.id, session);
@@ -120,7 +125,14 @@ export class SessionManager {
      */
     assertPremise(id: string, formula: string): Session {
         const session = this.get(id);
-        session.premises.push(formula);
+
+        let processedFormula = formula;
+        if (session.ontology) {
+            processedFormula = session.ontology.expandSynonyms(formula);
+            session.ontology.validate(processedFormula);
+        }
+
+        session.premises.push(processedFormula);
         session.prologProgram = buildPrologProgram(session.premises);
         return session;
     }

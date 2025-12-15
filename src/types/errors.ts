@@ -18,7 +18,8 @@ export type LogicErrorCode =
   | 'SESSION_LIMIT'         // Max sessions reached
   | 'ENGINE_ERROR'          // Internal Prolog error
   | 'CLAUSIFICATION_ERROR'  // Error during CNF conversion
-  | 'CLAUSIFICATION_BLOWUP'; // CNF blowup exceeded limits
+  | 'CLAUSIFICATION_BLOWUP' // CNF blowup exceeded limits
+  | 'INVALID_PREDICATE';    // Predicate not allowed by ontology
 
 /**
  * Source location span for error reporting

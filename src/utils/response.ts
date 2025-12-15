@@ -24,6 +24,7 @@ export function buildProveResult(
     verbosity: Verbosity
 ): ProveResult {
     const base: ProveResult = {
+        found: data.result === 'proved',
         success: data.success,
         result: data.result,
     };

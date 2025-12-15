@@ -19,10 +19,7 @@ describe('PrologEngine', () => {
                 ['all x (man(x) -> mortal(x))', 'man(socrates)'],
                 'mortal(socrates)'
             );
-            // Note: Tau-Prolog may not handle all FOL constructs perfectly
-            // The test validates the engine doesn't crash
-            expect(result).toBeDefined();
-            expect(result.result).toBeDefined();
+            expect(result.result).toBe('proved');
         });
 
         test('handles simple facts', async () => {

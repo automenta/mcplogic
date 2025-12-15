@@ -47,6 +47,7 @@ export type ProveResponse = MinimalProveResponse | StandardProveResponse | Detai
  * Result of a proof operation (legacy format, extended for verbosity)
  */
 export interface ProveResult {
+    found: boolean; // Backwards compatibility helper
     success: boolean;
     result: 'proved' | 'failed' | 'timeout' | 'error';
     message?: string;
