@@ -80,3 +80,36 @@ export function* allFunctionTables(
         yield table;
     }
 }
+
+/**
+ * Generate all permutations of a domain.
+ * Note: Factorial complexity. Use with caution for sizes > 8.
+ */
+export function* generatePermutations(domain: number[]): Generator<Map<number, number>> {
+    if (domain.length === 0) { yield new Map(); return; }
+
+    const permute = (arr: number[]): number[][] => {
+        if (arr.length === 0) return [[]];
+        const first = arr[0];
+        const rest = arr.slice(1);
+        const restPerms = permute(rest);
+        const all: number[][] = [];
+
+        for (const p of restPerms) {
+            for (let i = 0; i <= p.length; i++) {
+                const newP = [...p.slice(0, i), first, ...p.slice(i)];
+                all.push(newP);
+            }
+        }
+        return all;
+    };
+
+    const perms = permute(domain);
+    for (const p of perms) {
+        const map = new Map<number, number>();
+        for (let i = 0; i < domain.length; i++) {
+            map.set(domain[i], p[i]);
+        }
+        yield map;
+    }
+}
