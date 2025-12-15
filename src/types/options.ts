@@ -1,6 +1,10 @@
 import type { Verbosity } from './responses.js';
 
-export interface ReasoningOptions {
+export interface HighPowerOptions {
+    highPower?: boolean;
+}
+
+export interface ReasoningOptions extends HighPowerOptions {
     verbosity?: Verbosity;
     maxSeconds?: number;
     maxInferences?: number;
