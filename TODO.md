@@ -853,10 +853,10 @@ killed(agatha, agatha)
 **Effort:** ~4 hours | **Impact:** Very High | **Risk:** Low | **Depends:** 0.3
 
 #### Acceptance Criteria
-- [ ] `import { createLogicEngine } from '@mcplogic/core'` works
-- [ ] TypeScript declarations included
-- [ ] No MCP SDK dependency in library export
-- [ ] Example project compiles and runs
+- [x] `import { createLogicEngine } from '@mcplogic/core'` works
+- [x] TypeScript declarations included
+- [x] No MCP SDK dependency in library export
+- [x] Example project compiles and runs
 
 [Full implementation details in previous version...]
 
@@ -867,10 +867,10 @@ killed(agatha, agatha)
 **Effort:** ~6 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 0.4, 2.1
 
 #### Acceptance Criteria
-- [ ] Browser spike (0.4) confirmed both deps work
-- [ ] `npm run build:browser` produces working bundle
-- [ ] Test HTML page can prove simple theorem
-- [ ] No Node.js-specific code in browser bundle
+- [x] Browser spike (0.4) confirmed both deps work
+- [x] `npm run build:browser` produces working bundle
+- [x] Test HTML page can prove simple theorem
+- [x] No Node.js-specific code in browser bundle
 
 [Full implementation details in previous version...]
 
@@ -881,10 +881,10 @@ killed(agatha, agatha)
 **Effort:** ~8-12 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 2.2
 
 #### Acceptance Criteria
-- [ ] Modern, dark-mode UI with glassmorphism
-- [ ] NL input → FOL output via Transformers.js
-- [ ] FOL → Proof/Model via browser MCP Logic
-- [ ] Works 100% offline after initial LLM download
+- [x] Modern, dark-mode UI with glassmorphism
+- [x] NL input → FOL output via Transformers.js
+- [x] FOL → Proof/Model via browser MCP Logic
+- [x] Works 100% offline after initial LLM download
 - [ ] Deploy to GitHub Pages
 
 [Full implementation details in previous version...]

@@ -1,0 +1,24 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "lib": [
+            "ES2020",
+            "DOM"
+        ],
+        "outDir": "./dist-browser",
+        "noEmit": false
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "tests",
+        "src/server.ts",
+        "src/cli.ts",
+        "src/index.ts"
+    ]
+}

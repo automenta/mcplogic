@@ -5,13 +5,23 @@
  * Sessions auto-expire after TTL and are garbage collected periodically.
  */
 
-import { randomUUID } from 'crypto';
 import { buildPrologProgram } from './translator.js';
 import {
     createSessionNotFoundError,
     createSessionLimitError,
-    LogicException
 } from './types/errors.js';
+
+// Browser-safe UUID generation
+function generateUUID(): string {
+    if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.randomUUID) {
+        return globalThis.crypto.randomUUID();
+    }
+    // Fallback for older environments or minimal JS contexts
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
 
 /**
  * A reasoning session with accumulated premises
@@ -64,7 +74,7 @@ export class SessionManager {
 
         const now = Date.now();
         const session: Session = {
-            id: randomUUID(),
+            id: generateUUID(),
             premises: [],
             prologProgram: '',
             createdAt: now,
