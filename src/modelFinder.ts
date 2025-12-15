@@ -203,7 +203,6 @@ export class ModelFinder {
         options: ModelOptions,
         count: number
     ): Model[] {
-        console.log(`Searching models of size ${size}`);
         const domain = Array.from({ length: size }, (_, i) => i);
         const useSymmetry = options.enableSymmetry !== false; // Default to true if not specified
         const foundModels: Model[] = [];

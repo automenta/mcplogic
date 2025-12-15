@@ -238,10 +238,6 @@ export class LogicEngine {
             }
 
             const result = await this.prove(premises, conclusion, { ...options, maxInferences: limit, strategy: undefined }); // prevent recursion
-            console.log(`Limit ${limit} result: ${result.result}, error: ${result.error}`);
-            if (result.result === 'error') {
-                console.log('Program:', result.prologProgram);
-            }
 
             if (result.result === 'proved') {
                 if (options?.onProgress) {
