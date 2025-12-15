@@ -42,6 +42,11 @@ describe('HeuristicTranslator', () => {
         expect(result.premises).toEqual(['raining -> wet']);
     });
 
+    test('translates If-Then with comma', async () => {
+        const result = await translator.translate('If raining, then wet');
+        expect(result.premises).toEqual(['raining -> wet']);
+    });
+
     test('extracts conclusion', async () => {
         const result = await translator.translate('Socrates is a man.\nTherefore Socrates is mortal');
         expect(result.premises).toEqual(['man(socrates)']);

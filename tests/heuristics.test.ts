@@ -1,6 +1,6 @@
 
 import { jest } from '@jest/globals';
-import { EngineManager } from '../src/engines/manager.js';
+import { EngineManager, createEngineManager } from '../src/engines/manager.js';
 import { proveHandler } from '../src/handlers/core.js';
 import { Verbosity } from '../src/types/index.js';
 
@@ -46,9 +46,32 @@ describe('Heuristic Strategy Selection', () => {
     });
 
     test('selects prolog engine for Horn clauses in auto mode', async () => {
-        // This logic is inside EngineManager.autoProve, so we need to test EngineManager directly or mock the helper
-        // Since we are mocking EngineManager here, we can't test internal logic of EngineManager easily.
-        // Instead, let's integration test the actual EngineManager logic in a separate test block or file.
-        // Or better, let's rely on the handler passing 'auto' correctly and trust EngineManager (which we will modify)
+        // Handled by EngineManager integration tests
+    });
+});
+
+describe('EngineManager Heuristics', () => {
+    let manager: EngineManager;
+
+    beforeEach(() => {
+        manager = createEngineManager();
+    });
+
+    test('auto-selects Prolog for Horn clauses', async () => {
+        const result = await manager.prove(
+            ['all x (man(x) -> mortal(x))', 'man(socrates)'],
+            'mortal(socrates)',
+            { engine: 'auto' }
+        );
+        expect(result.engineUsed).toBe('prolog/tau-prolog');
+    });
+
+    test('auto-selects SAT for non-Horn clauses', async () => {
+        const result = await manager.prove(
+            ['P(a) | Q(a)', '-P(a)'],
+            'Q(a)',
+            { engine: 'auto' }
+        );
+        expect(result.engineUsed).toBe('sat/minisat');
     });
 });

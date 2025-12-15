@@ -84,11 +84,20 @@ export type {
     ModelOptions
 } from './options.js';
 
+// Re-export LLM types
+export type {
+    TranslateRequest,
+    TranslateResult,
+    LLMMessage,
+    LLMResponse,
+    LLMProvider,
+    TranslationStrategy,
+    TranslationResult,
+} from './llm.js';
+
 // Re-export future types (Phase 1-4)
 export type {
     HighPowerOptions,
-    TranslateRequest,
-    TranslateResult,
     Ontology,
     OntologyConfig,
     AgentActionType,

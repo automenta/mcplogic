@@ -898,10 +898,10 @@ killed(agatha, agatha)
 **Effort:** ~4 hours | **Impact:** High | **Risk:** Low | **Depends:** 0.3
 
 #### Acceptance Criteria
-- [ ] `translate-text` MCP tool accepts natural language
-- [ ] Returns structured `{ premises, conclusion }`
-- [ ] Validates all formulas before returning
-- [ ] Works with or without external LLM (uses offline model)
+- [x] `translate-text` MCP tool accepts natural language
+- [x] Returns structured `{ premises, conclusion }`
+- [x] Validates all formulas before returning
+- [x] Works with or without external LLM (uses offline model)
 
 [Full implementation details in previous version...]
 
@@ -912,9 +912,9 @@ killed(agatha, agatha)
 **Effort:** ~2 hours | **Impact:** Medium | **Risk:** None
 
 #### Acceptance Criteria
-- [ ] Equality-heavy proofs auto-select `iterative` strategy
-- [ ] Pure Horn clauses prefer `prolog` engine
-- [ ] Strategy choice logged in verbose output
+- [x] Equality-heavy proofs auto-select `iterative` strategy
+- [x] Pure Horn clauses prefer `prolog` engine
+- [x] Strategy choice logged in verbose output
 
 [Full implementation details in previous version...]
 

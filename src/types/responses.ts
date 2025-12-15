@@ -22,6 +22,7 @@ export interface StandardProveResponse extends MinimalProveResponse {
     message: string;
     bindings?: Record<string, string>[];
     engineUsed?: string;
+    strategyUsed?: string;
 }
 
 /**
@@ -53,6 +54,7 @@ export interface ProveResult {
     bindings?: Record<string, string>[];
     error?: string;
     engineUsed?: string;
+    strategyUsed?: string;
     // Detailed mode fields
     prologProgram?: string;
     inferenceSteps?: string[];

@@ -74,6 +74,11 @@ export async function proveHandler(
         onProgress
     });
 
+    // Inject strategy used into result if not present
+    if (!proveResult.strategyUsed) {
+        proveResult.strategyUsed = selectedStrategy;
+    }
+
     return buildProveResponse(proveResult, verbosity);
 }
 

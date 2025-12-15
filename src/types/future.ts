@@ -8,20 +8,6 @@ export interface HighPowerOptions {
     highPower?: boolean;
 }
 
-// === NL Translation (Phase 3.1) ===
-export interface TranslateRequest {
-    text: string;
-    validate?: boolean;
-}
-
-export interface TranslateResult {
-    success: boolean;
-    premises: string[];
-    conclusion?: string;
-    raw?: string;
-    errors?: string[];
-}
-
 // === Ontology (Phase 4.1) ===
 export interface Ontology {
     types: Set<string>;

@@ -9,8 +9,9 @@ export async function translateTextHandler(args: TranslateRequest): Promise<Tran
 
     // Validation
     const errors: string[] = result.errors || [];
+    const shouldValidate = args.validate ?? true;
 
-    if (args.validate) {
+    if (shouldValidate) {
         for (const p of result.premises) {
             try {
                 parse(p);

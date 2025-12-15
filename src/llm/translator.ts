@@ -80,7 +80,8 @@ export class HeuristicTranslator implements TranslationStrategy {
         // 5. "If X then Y" (propositional/simple)
         // Handling variables is hard with regex, assuming propositional or 0-arity
         // "If raining then wet" -> raining -> wet
-        const ifThen = s.match(/^if (.+) then (.+)$/);
+        // Also handles "If raining, then wet" via regex flexibility on 'then'
+        const ifThen = s.match(/^if (.+?)(?:,)? then (.+)$/);
         if (ifThen) {
             // Recursive? Too complex for regex.
             // Let's just handle simple atoms
