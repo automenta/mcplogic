@@ -32,6 +32,7 @@ import {
 } from './types/index.js';
 import { createEngineManager, EngineSelection } from './engines/manager.js';
 import * as Handlers from './handlers/index.js';
+import * as LLMHandlers from './handlers/llm.js';
 
 /**
  * Verbosity parameter schema for tools
@@ -331,6 +332,32 @@ If found, proves the conclusion doesn't logically follow.`,
             },
         },
 
+        // ==================== LLM TOOLS ====================
+        {
+            name: 'translate-text',
+            description: `Translate natural language to First-Order Logic (FOL).
+
+**When to use:** Converting user input into logical formulas.
+**Features:**
+- Handles basic standard English forms ("All X are Y", "A is B", "If P then Q")
+- Works offline (heuristic-based)
+- Validates generated formulas`,
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    text: {
+                        type: 'string',
+                        description: 'Natural language text to translate',
+                    },
+                    validate: {
+                        type: 'boolean',
+                        description: 'Validate generated formulas (default: true)',
+                    },
+                },
+                required: ['text'],
+            },
+        },
+
         // ==================== SESSION MANAGEMENT TOOLS ====================
         {
             name: 'create-session',
@@ -621,6 +648,10 @@ If found, proves the conclusion doesn't logically follow.`,
 
                 case 'get-category-axioms':
                     result = Handlers.getCategoryAxiomsHandler(args as any, categoricalHelpers);
+                    break;
+
+                case 'translate-text':
+                    result = await LLMHandlers.translateTextHandler(args as any);
                     break;
 
                 // ==================== SESSION MANAGEMENT TOOLS ====================

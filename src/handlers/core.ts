@@ -50,13 +50,24 @@ export async function proveHandler(
         ? DEFAULTS.highPowerMaxSeconds
         : DEFAULTS.maxSeconds;
 
+    // Apply heuristic strategy selection if strategy is 'auto'
+    let selectedStrategy = strategy ?? 'auto';
+    if (selectedStrategy === 'auto') {
+        const equalityCount = (premises.join('') + conclusion).split('=').length - 1;
+        // If equality is used heavily (heuristic: > 2 occurrences), prefer iterative strategy
+        // to avoid depth-first rabbit holes in equality substitution
+        if (equalityCount > 2) {
+            selectedStrategy = 'iterative';
+        }
+    }
+
     // Use engineManager for engine-federated proving
     const proveResult = await engineManager.prove(premises, conclusion, {
         verbosity,
         enableArithmetic: enable_arithmetic,
         enableEquality: enable_equality,
         engine: engineParam ?? 'auto',
-        strategy: strategy ?? 'auto',
+        strategy: selectedStrategy,
         maxInferences: effectiveInferenceLimit,
         maxSeconds: effectiveTimeout,
         includeTrace: include_trace,
