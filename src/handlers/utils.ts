@@ -31,6 +31,7 @@ export function buildProveResponse(result: ProveResult, verbosity: Verbosity = '
             message: result.message || (result.success ? 'Proof found' : result.error || 'No proof found'),
             ...(result.bindings && { bindings: result.bindings }),
             ...(result.engineUsed && { engineUsed: result.engineUsed }),
+            ...(result.strategyUsed && { strategyUsed: result.strategyUsed }),
         };
         return response;
     }
@@ -42,6 +43,7 @@ export function buildProveResponse(result: ProveResult, verbosity: Verbosity = '
         message: result.message || (result.success ? 'Proof found' : result.error || 'No proof found'),
         ...(result.bindings && { bindings: result.bindings }),
         ...(result.engineUsed && { engineUsed: result.engineUsed }),
+        ...(result.strategyUsed && { strategyUsed: result.strategyUsed }),
         prologProgram: result.prologProgram || '',
         ...(result.inferenceSteps && { inferenceSteps: result.inferenceSteps }),
         statistics: result.statistics || { timeMs: 0 },

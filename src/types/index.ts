@@ -79,21 +79,34 @@ export {
 } from './options.js';
 
 export type {
+    HighPowerOptions,
     ReasoningOptions,
     ProveOptions,
     ModelOptions
 } from './options.js';
 
-// Re-export future types (Phase 1-4)
+// Re-export LLM types
 export type {
-    HighPowerOptions,
     TranslateRequest,
     TranslateResult,
+    LLMMessage,
+    LLMResponse,
+    LLMProvider,
+    TranslationStrategy,
+    TranslationResult,
+} from './llm.js';
+
+// Re-export Ontology types
+export type {
     Ontology,
     OntologyConfig,
+} from './ontology.js';
+
+// Re-export Agent types
+export type {
     AgentActionType,
     AgentAction,
     ReasoningStep,
     ReasoningResult,
     ReasonOptions
-} from './future.js';
+} from './agent.js';
