@@ -927,10 +927,10 @@ killed(agatha, agatha)
 **Effort:** ~6 hours | **Impact:** High | **Risk:** Medium | **Depends:** 0.3
 
 #### Acceptance Criteria
-- [ ] Sessions can be created with ontology constraints
-- [ ] Invalid predicates rejected with clear error
-- [ ] Synonym expansion works (`human` → `person`)
-- [ ] Ontology can be updated dynamically
+- [x] Sessions can be created with ontology constraints
+- [x] Invalid predicates rejected with clear error
+- [x] Synonym expansion works (`human` → `person`)
+- [x] Ontology can be updated dynamically
 
 [Full implementation details in previous version...]
 
@@ -941,10 +941,10 @@ killed(agatha, agatha)
 **Effort:** ~8 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 3.1, 4.1
 
 #### Acceptance Criteria
-- [ ] Multi-step reasoning with assert/query/conclude
-- [ ] Confidence scoring based on proof success
-- [ ] Max steps limit prevents infinite loops
-- [ ] Full trace of all reasoning steps
+- [x] Multi-step reasoning with assert/query/conclude
+- [x] Confidence scoring based on proof success
+- [x] Max steps limit prevents infinite loops
+- [x] Full trace of all reasoning steps
 
 [Full implementation details in previous version...]
 
