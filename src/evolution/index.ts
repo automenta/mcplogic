@@ -1,2 +1,5 @@
-// Placeholder for Phase 5: Evolution Engine
-export {};
+export * from './optimizer.js';
+export * from './evaluator.js';
+export * from './strategyEvolver.js';
+export * from './curriculumGenerator.js';
+export * from './storage.js';
