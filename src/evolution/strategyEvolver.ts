@@ -1,4 +1,4 @@
-import type { TranslationStrategy, EvaluationResult } from '../types/evolution.js';
+import type { EvolutionStrategy, EvaluationResult } from '../types/evolution.js';
 import type { LLMProvider } from '../types/llm.js';
 import type { IPerformanceDatabase } from './storage.js';
 import { randomUUID } from 'crypto';
@@ -18,7 +18,7 @@ export class StrategyEvolver {
     /**
      * Mutates a strategy by critiquing its prompt based on failing examples.
      */
-    async mutateStrategy(strategy: TranslationStrategy): Promise<TranslationStrategy> {
+    async mutateStrategy(strategy: EvolutionStrategy): Promise<EvolutionStrategy> {
         // 1. Fetch failing results for this strategy
         const results = await this.db.getResults(strategy.id);
         const failures = results.filter(r => !r.success);
@@ -52,7 +52,7 @@ export class StrategyEvolver {
         const newPromptTemplate = this.extractPrompt(response.content);
 
         // 5. Create new strategy object
-        const newStrategy: TranslationStrategy = {
+        const newStrategy: EvolutionStrategy = {
             id: randomUUID(),
             description: `Evolved from ${strategy.id} based on ${failures.length} failures.`,
             promptTemplate: newPromptTemplate,

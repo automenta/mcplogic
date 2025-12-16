@@ -4,7 +4,7 @@
  * Represents a strategy for translating Natural Language to FOL.
  * This is the "genome" that the evolution engine optimizes.
  */
-export interface TranslationStrategy {
+export interface EvolutionStrategy {
     id: string;
     description: string;
     // Template for the prompt sent to the LLM

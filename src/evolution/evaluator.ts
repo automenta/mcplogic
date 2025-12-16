@@ -1,4 +1,4 @@
-import type { EvaluationCase, EvaluationResult, TranslationStrategy } from '../types/evolution.js';
+import type { EvaluationCase, EvaluationResult, EvolutionStrategy } from '../types/evolution.js';
 import type { IPerformanceDatabase } from './storage.js';
 import type { LLMProvider } from '../types/llm.js';
 import { randomUUID } from 'crypto';
@@ -16,7 +16,7 @@ export class Evaluator {
         this.llm = llm;
     }
 
-    async evaluate(strategy: TranslationStrategy, testCase: EvaluationCase): Promise<EvaluationResult> {
+    async evaluate(strategy: EvolutionStrategy, testCase: EvaluationCase): Promise<EvaluationResult> {
         const startTime = Date.now();
 
         // 1. Construct prompt from strategy template and test case input
@@ -74,7 +74,7 @@ export class Evaluator {
         return result;
     }
 
-    private createFailureResult(strategy: TranslationStrategy, testCase: EvaluationCase, startTime: number, errorMsg: string): EvaluationResult {
+    private createFailureResult(strategy: EvolutionStrategy, testCase: EvaluationCase, startTime: number, errorMsg: string): EvaluationResult {
         return {
             id: randomUUID(),
             strategyId: strategy.id,

@@ -113,7 +113,7 @@ export type {
 
 // Re-export Evolution types
 export type {
-    TranslationStrategy,
+    EvolutionStrategy,
     EvaluationResult,
     EvaluationCase,
     EvolutionConfig

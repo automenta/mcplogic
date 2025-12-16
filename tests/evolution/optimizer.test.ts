@@ -2,7 +2,7 @@ import { Optimizer } from '../../src/evolution/optimizer.js';
 import { StrategyEvolver } from '../../src/evolution/strategyEvolver.js';
 import { Evaluator } from '../../src/evolution/evaluator.js';
 import { JsonPerformanceDatabase } from '../../src/evolution/storage.js';
-import type { TranslationStrategy, EvolutionConfig } from '../../src/types/evolution.js';
+import type { EvolutionStrategy, EvolutionConfig } from '../../src/types/evolution.js';
 import type { LLMProvider, LLMMessage } from '../../src/types/llm.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -68,7 +68,7 @@ describe('Optimizer', () => {
     });
 
     test('should run one generation', async () => {
-        const initialStrategies: TranslationStrategy[] = [{
+        const initialStrategies: EvolutionStrategy[] = [{
             id: 'strat-1',
             description: 'base',
             promptTemplate: 'Translate {{INPUT}}',

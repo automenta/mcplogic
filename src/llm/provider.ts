@@ -56,7 +56,7 @@ export class StandardLLMProvider implements LLMProvider {
                 throw new Error(`LLM API error (${response.status}): ${text}`);
             }
 
-            const data = await response.json();
+            const data = await response.json() as any;
 
             // Standardize response extraction
             const content = data.choices?.[0]?.message?.content || data.message?.content || '';
@@ -74,7 +74,9 @@ export class StandardLLMProvider implements LLMProvider {
             if (process.env.NODE_ENV === 'test') {
                  return { content: 'MOCK LLM RESPONSE', usage: { promptTokens: 0, completionTokens: 0 }};
             }
-            throw createGenericError('ENGINE_ERROR', `LLM Provider failed: ${(error as Error).message}`);
+            const errMsg = error instanceof Error ? error.message : String(error);
+            console.error(`LLM Provider Error: ${errMsg}`, { model: this.model });
+            throw createGenericError('ENGINE_ERROR', `LLM Provider failed: ${errMsg}`);
         }
     }
 }

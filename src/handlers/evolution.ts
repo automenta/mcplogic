@@ -1,12 +1,12 @@
 import type { Optimizer, IPerformanceDatabase, CurriculumGenerator } from '../evolution/index.js';
-import type { TranslationStrategy } from '../types/evolution.js';
+import type { EvolutionStrategy } from '../types/evolution.js';
 import { createGenericError } from '../types/errors.js';
 
 // Global state for evolution (in a real app, this would be injected)
 let optimizerInstance: Optimizer | null = null;
 let dbInstance: IPerformanceDatabase | null = null;
 let curriculumGeneratorInstance: CurriculumGenerator | null = null;
-let strategies: TranslationStrategy[] = [];
+let strategies: EvolutionStrategy[] = [];
 
 /**
  * Initialize evolution components (called by server setup if needed, or lazily)
@@ -15,7 +15,7 @@ export function initializeEvolution(
     optimizer: Optimizer,
     db: IPerformanceDatabase,
     generator: CurriculumGenerator,
-    initialStrategies: TranslationStrategy[]
+    initialStrategies: EvolutionStrategy[]
 ) {
     optimizerInstance = optimizer;
     dbInstance = db;

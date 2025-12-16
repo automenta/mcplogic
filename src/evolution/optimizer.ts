@@ -1,4 +1,4 @@
-import type { TranslationStrategy, EvolutionConfig } from '../types/evolution.js';
+import type { EvolutionStrategy, EvolutionConfig } from '../types/evolution.js';
 import type { IPerformanceDatabase } from './storage.js';
 import { StrategyEvolver } from './strategyEvolver.js';
 import { Evaluator } from './evaluator.js';
@@ -56,7 +56,7 @@ export class Optimizer {
     /**
      * Runs the evolution loop.
      */
-    async run(initialStrategies: TranslationStrategy[]) {
+    async run(initialStrategies: EvolutionStrategy[]) {
         let population = [...initialStrategies];
         const evalCases = this.loadEvaluationCases();
 

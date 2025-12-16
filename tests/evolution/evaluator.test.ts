@@ -1,6 +1,6 @@
 import { Evaluator } from '../../src/evolution/evaluator.js';
 import { JsonPerformanceDatabase } from '../../src/evolution/storage.js';
-import type { TranslationStrategy, EvaluationCase } from '../../src/types/evolution.js';
+import type { EvolutionStrategy, EvaluationCase } from '../../src/types/evolution.js';
 import type { LLMProvider, LLMMessage } from '../../src/types/llm.js';
 import * as fs from 'fs';
 
@@ -35,7 +35,7 @@ describe('Evaluator', () => {
     });
 
     test('should evaluate a strategy successfully', async () => {
-        const strategy: TranslationStrategy = {
+        const strategy: EvolutionStrategy = {
             id: 'test-strat',
             description: 'test',
             promptTemplate: 'Translate {{INPUT}}',
@@ -58,7 +58,7 @@ describe('Evaluator', () => {
     });
 
     test('should handle failure', async () => {
-        const strategy: TranslationStrategy = {
+        const strategy: EvolutionStrategy = {
             id: 'test-strat',
             description: 'test',
             promptTemplate: 'Translate {{INPUT}}',
