@@ -34,7 +34,7 @@ export {
     clauseToString,
     cnfToString,
     literalToString,
-} from './clause.js';
+} from '../utils/clause.js';
 
 export type {
     Literal,

@@ -4,7 +4,7 @@
 
 import { parse, astToString } from '../src/parser.js';
 import { validateFormulas } from '../src/syntaxValidator.js';
-import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../src/categoricalHelpers.js';
+import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../src/axioms/categorical.js';
 import { ModelFinder } from '../src/modelFinder.js';
 
 describe('Parser', () => {

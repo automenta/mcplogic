@@ -9,8 +9,8 @@
  * - Substitution: For each predicate P, ∀x∀y. x = y ∧ P(x) → P(y)
  */
 
-import type { ASTNode } from './types/index.js';
-import { extractSignature, FormulaSignature } from './astUtils.js';
+import type { ASTNode } from '../types/index.js';
+import { extractSignature, FormulaSignature } from '../utils/ast.js';
 
 /**
  * Options for equality axiom generation.
@@ -112,8 +112,8 @@ function generatePredicateSubstitution(pred: string, arity: number): string {
     return `${substituted} :- ${equalities}, ${original}.`;
 }
 
-export { containsEquality } from './astUtils.js';
-import { containsEquality } from './astUtils.js';
+export { containsEquality } from '../utils/ast.js';
+import { containsEquality } from '../utils/ast.js';
 
 /**
  * Generate a minimal set of equality axioms for a specific use case.

@@ -1,4 +1,4 @@
-import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../categoricalHelpers.js';
+import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../axioms/categorical.js';
 
 export function verifyCommutativityHandler(
     args: {

@@ -11,7 +11,7 @@ import {
     getArithmeticSetup,
     isNumericConstant,
     parseNumber,
-} from '../src/arithmetic';
+} from '../src/axioms/arithmetic';
 import { parse } from '../src/parser';
 import { LogicEngine } from '../src/logicEngine';
 

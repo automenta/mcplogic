@@ -5,7 +5,7 @@
  * via the MCP resources protocol.
  */
 
-import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../categoricalHelpers.js';
+import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../axioms/categorical.js';
 
 /**
  * Resource definition
