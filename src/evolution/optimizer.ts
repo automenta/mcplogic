@@ -69,9 +69,6 @@ export class Optimizer {
 
             // 1. Evaluate current population
             for (const strategy of population) {
-                // Skip if already evaluated enough (optimization)
-                // For now, re-evaluate everyone or check DB cache
-
                 let successCount = 0;
                 for (const testCase of evalCases) {
                    const result = await this.evaluator.evaluate(strategy, testCase);

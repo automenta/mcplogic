@@ -61,6 +61,10 @@ export class CurriculumGenerator {
 
             const rawCases = JSON.parse(jsonMatch[0]);
 
+            if (!Array.isArray(rawCases)) {
+                return [];
+            }
+
             return rawCases.map((c: any) => ({
                 id: randomUUID(),
                 input: c.input,
@@ -74,10 +78,14 @@ export class CurriculumGenerator {
     }
 
     private saveCases(cases: EvaluationCase[], domain: string) {
-        if (!fs.existsSync(this.outputDir)) {
-            fs.mkdirSync(this.outputDir, { recursive: true });
+        try {
+            if (!fs.existsSync(this.outputDir)) {
+                fs.mkdirSync(this.outputDir, { recursive: true });
+            }
+            const filename = path.join(this.outputDir, `${domain}_generated_${Date.now()}.json`);
+            fs.writeFileSync(filename, JSON.stringify(cases, null, 2));
+        } catch (e) {
+            console.error(`Failed to save generated cases to ${this.outputDir}:`, e);
         }
-        const filename = path.join(this.outputDir, `${domain}_generated_${Date.now()}.json`);
-        fs.writeFileSync(filename, JSON.stringify(cases, null, 2));
     }
 }

@@ -83,7 +83,10 @@ Here are some examples where this prompt failed:
 `;
 
         failures.forEach((f, i) => {
-            prompt += `Failure #${i + 1}:
+            // TODO: In the future, we should fetch the original input from the database or EvaluationCase
+            // so we can show the model WHAT it was trying to translate.
+            // Currently EvaluationResult doesn't store the input text, only the caseId.
+            prompt += `Failure #${i + 1} (Case ID: ${f.caseId}):
 Output: ${f.rawOutput}
 (Note: This output was incorrect or invalid.)
 `;
