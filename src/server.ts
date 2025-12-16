@@ -34,6 +34,9 @@ import { createEngineManager, EngineSelection } from './engines/manager.js';
 import * as Handlers from './handlers/index.js';
 import * as LLMHandlers from './handlers/llm.js';
 import * as AgentHandlers from './handlers/agent.js';
+import * as EvolutionHandlers from './handlers/evolution.js';
+import { Optimizer, Evaluator, StrategyEvolver, CurriculumGenerator, JsonPerformanceDatabase } from './evolution/index.js';
+import { StandardLLMProvider } from './llm/provider.js';
 
 /**
  * Verbosity parameter schema for tools
@@ -67,6 +70,32 @@ export function createServer(): Server {
     const categoricalHelpers = new CategoricalHelpers();
     const sessionManager = createSessionManager();
     const engineManager = createEngineManager();
+
+    // Initialize Evolution Engine components
+    const llmProvider = new StandardLLMProvider();
+    const perfDb = new JsonPerformanceDatabase();
+    const evaluator = new Evaluator(perfDb, llmProvider);
+    const evolver = new StrategyEvolver(llmProvider, perfDb);
+    const curriculumGenerator = new CurriculumGenerator(llmProvider, perfDb, 'src/evalCases/generated');
+
+    // Initial Strategy (Heuristic/Placeholder)
+    const initialStrategies = [{
+        id: 'heuristic-v1',
+        description: 'Standard heuristic strategy',
+        promptTemplate: 'Translate the following to FOL:\n{{INPUT}}',
+        parameters: {},
+        metadata: { successRate: 0, inferenceCount: 0, generation: 0 }
+    }];
+
+    const optimizer = new Optimizer(perfDb, evolver, evaluator, {
+        populationSize: 5,
+        generations: 3,
+        mutationRate: 0.3,
+        elitismCount: 1,
+        evalCasesPath: 'src/evalCases'
+    });
+
+    EvolutionHandlers.initializeEvolution(optimizer, perfDb, curriculumGenerator, initialStrategies);
 
     // Define available tools
     const tools: Tool[] = [
@@ -395,6 +424,39 @@ If found, proves the conclusion doesn't logically follow.`,
             },
         },
 
+        // ==================== EVOLUTION TOOLS ====================
+        {
+            name: 'evolution-start',
+            description: `Start the evolution optimization loop to improve translation strategies.
+
+**When to use:** You want to optimize the NL->FOL translation strategies using collected data.
+**Effect:** Runs genetic algorithm to evolve prompt templates.`,
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    generations: { type: 'integer', description: 'Number of generations (default: 1)' },
+                    population_size: { type: 'integer', description: 'Population size (default: 5)' }
+                }
+            }
+        },
+        {
+            name: 'evolution-list-strategies',
+            description: `List available translation strategies.`,
+            inputSchema: { type: 'object', properties: {} }
+        },
+        {
+            name: 'evolution-generate-cases',
+            description: `Generate new evaluation test cases using LLM.`,
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    domain: { type: 'string', description: 'Domain topic (e.g. "physics")' },
+                    count: { type: 'integer', description: 'Number of cases to generate' }
+                },
+                required: ['domain']
+            }
+        },
+
         // ==================== SESSION MANAGEMENT TOOLS ====================
         {
             name: 'create-session',
@@ -719,6 +781,17 @@ If found, proves the conclusion doesn't logically follow.`,
 
                 case 'agent-reason':
                     result = await AgentHandlers.reasonHandler(args as any);
+                    break;
+
+                // ==================== EVOLUTION TOOLS ====================
+                case 'evolution-start':
+                    result = await EvolutionHandlers.startEvolutionHandler(args as any);
+                    break;
+                case 'evolution-list-strategies':
+                    result = await EvolutionHandlers.listStrategiesHandler(args as any);
+                    break;
+                case 'evolution-generate-cases':
+                    result = await EvolutionHandlers.generateCasesHandler(args as any);
                     break;
 
                 // ==================== SESSION MANAGEMENT TOOLS ====================
