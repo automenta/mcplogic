@@ -17,7 +17,7 @@ export async function proveHandler(
     },
     engineManager: EngineManager,
     verbosity: Verbosity
-): Promise<ProveResponse | { result: 'syntax_error'; validation: ValidationReport }> {
+): Promise<ProveResponse> {
     const { premises, conclusion, enable_arithmetic, enable_equality, engine: engineParam } = args;
 
     // Validate syntax first
@@ -25,7 +25,12 @@ export async function proveHandler(
     const validation = validateFormulas(allFormulas);
 
     if (!validation.valid) {
-        return { result: 'syntax_error', validation };
+        return {
+            success: false,
+            result: 'syntax_error',
+            message: 'Syntax error in premises or conclusion',
+            validation
+        };
     }
 
     // Use engineManager for engine-federated proving

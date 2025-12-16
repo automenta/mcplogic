@@ -7,8 +7,10 @@
 
 import { Clause } from '../types/clause.js';
 import { ProveResult, Verbosity } from '../types/index.js';
+import { ASTNode } from '../types/index.js';
+import { parse } from '../parser.js';
 import { buildProveResult } from '../utils/response.js';
-import { clausify } from '../clausifier.js';
+import { clausifyAST } from '../clausifier.js';
 import { solveSat } from './satUtils.js';
 import {
     ReasoningEngine,
@@ -78,14 +80,27 @@ export class SATEngine implements ReasoningEngine {
         const verbosity = options?.verbosity || 'standard';
 
         try {
-            // Build the refutation formula: premises & -conclusion
-            // Wrap each part in parentheses to ensure correct precedence
-            const wrappedPremises = premises.map(p => `(${p})`);
-            const wrappedNegConclusion = `(-(${conclusion}))`;
-            const refutationFormula = [...wrappedPremises, wrappedNegConclusion].join(' & ');
+            // Build the refutation formula AST manually to avoid string concatenation and re-parsing
+            // AST = And(And(P1, P2, ...), Not(Conclusion))
 
-            // Clausify 
-            const clausifyResult = clausify(refutationFormula);
+            const premiseASTs = premises.map(p => parse(p));
+            const conclusionAST = parse(conclusion);
+            const negatedConclusion: ASTNode = {
+                type: 'not',
+                operand: conclusionAST
+            };
+
+            const allFormulas = [...premiseASTs, negatedConclusion];
+
+            // Combine into a single AND tree
+            const combinedAST = allFormulas.reduce((acc, curr) => ({
+                type: 'and',
+                left: acc,
+                right: curr
+            }));
+
+            // Clausify AST
+            const clausifyResult = clausifyAST(combinedAST);
 
             if (!clausifyResult.success || !clausifyResult.clauses) {
                 return buildProveResult({

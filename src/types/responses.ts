@@ -12,7 +12,7 @@ export type Verbosity = 'minimal' | 'standard' | 'detailed';
  */
 export interface MinimalProveResponse {
     success: boolean;
-    result: 'proved' | 'failed' | 'timeout' | 'error';
+    result: 'proved' | 'failed' | 'timeout' | 'error' | 'syntax_error';
 }
 
 /**
@@ -22,15 +22,16 @@ export interface StandardProveResponse extends MinimalProveResponse {
     message: string;
     bindings?: Record<string, string>[];
     engineUsed?: string;
+    validation?: any; // For syntax errors
 }
 
 /**
  * Detailed response - includes debug info
  */
 export interface DetailedProveResponse extends StandardProveResponse {
-    prologProgram: string;
+    prologProgram?: string;
     inferenceSteps?: string[];
-    statistics: {
+    statistics?: {
         inferences?: number;
         timeMs: number;
     };
@@ -124,4 +125,51 @@ export interface ModelResult {
         searchedSizes?: number[];
         timeMs: number;
     };
+}
+
+// Session Responses
+
+export interface SessionInfo {
+    session_id: string;
+    created_at: string;
+    expires_at: string;
+    ttl_minutes: number;
+    active_sessions: number;
+}
+
+export interface PremiseAssertResponse {
+    success: boolean;
+    session_id: string;
+    premise_count: number;
+    formula_added: string;
+    result?: 'syntax_error';
+    validation?: any;
+}
+
+export interface PremiseRetractResponse {
+    success: boolean;
+    session_id: string;
+    premise_count: number;
+    message: string;
+}
+
+export interface SessionListResponse {
+    session_id: string;
+    premise_count: number;
+    premises: string[];
+    created_at?: string;
+    expires_at?: string;
+}
+
+export interface SessionClearResponse {
+    success: boolean;
+    session_id: string;
+    message: string;
+    premise_count: number;
+}
+
+export interface SessionDeleteResponse {
+    success: boolean;
+    message: string;
+    active_sessions: number;
 }

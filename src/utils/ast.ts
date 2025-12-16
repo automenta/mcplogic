@@ -87,6 +87,19 @@ export function extractSignature(asts: ASTNode[]): FormulaSignature {
 }
 
 /**
+ * Get set of predicates used in an AST node
+ */
+export function getUsedPredicates(node: ASTNode): Set<string> {
+    const predicates = new Set<string>();
+    traverse(node, (n) => {
+        if (n.type === 'predicate' && n.name) {
+            predicates.add(n.name);
+        }
+    });
+    return predicates;
+}
+
+/**
  * Count nodes in an AST (for complexity estimation)
  */
 export function countNodes(ast: ASTNode): number {

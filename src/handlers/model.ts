@@ -2,7 +2,7 @@ import {
     Verbosity,
     ModelResponse,
 } from '../types/index.js';
-import { ModelFinder, createModelFinder } from '../modelFinder.js';
+import { ModelFinder } from '../modelFinder.js';
 import { buildModelResponse } from './utils.js';
 
 export async function findModelHandler(
@@ -15,10 +15,8 @@ export async function findModelHandler(
     verbosity: Verbosity
 ): Promise<ModelResponse> {
     const { premises, domain_size, max_domain_size } = args;
-    // Create finder with custom max domain size if specified
-    const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;
-    // findModel expects domainSize (camelCase), but args has domain_size (snake_case)
-    const modelResult = await finder.findModel(premises, domain_size);
+    // Pass max_domain_size as option to findModel
+    const modelResult = await defaultFinder.findModel(premises, domain_size, { maxDomainSize: max_domain_size });
     return buildModelResponse(modelResult, verbosity);
 }
 
@@ -33,8 +31,7 @@ export async function findCounterexampleHandler(
     verbosity: Verbosity
 ): Promise<ModelResponse> {
     const { premises, conclusion, domain_size, max_domain_size } = args;
-    // Create finder with custom max domain size if specified
-    const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;
-    const modelResult = await finder.findCounterexample(premises, conclusion, domain_size);
+    // Pass max_domain_size as option to findCounterexample
+    const modelResult = await defaultFinder.findCounterexample(premises, conclusion, domain_size, { maxDomainSize: max_domain_size });
     return buildModelResponse(modelResult, verbosity);
 }
