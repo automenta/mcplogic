@@ -37,7 +37,13 @@ export async function startEvolutionHandler(args: {
     // Let's assume it runs for a short burst.
 
     try {
-        const newPopulation = await optimizerInstance.run(strategies);
+        // Pass a no-op progress handler or one that logs to server logs/stderr if needed.
+        // For MCP handler, maybe we want to log to stderr so it shows up in server logs but not stdout (which is JSON-RPC)
+        const progressHandler = (msg: string) => {
+             // console.error(msg); // Optional: enable for server-side logging
+        };
+
+        const newPopulation = await optimizerInstance.run(strategies, progressHandler);
 
         // Update global strategies with the evolved population
         strategies = newPopulation;

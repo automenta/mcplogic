@@ -10,18 +10,17 @@ import * as path from 'path';
  * Orchestrates the evolution loop.
  */
 export class Optimizer {
-    private db: IPerformanceDatabase;
     private evolver: StrategyEvolver;
     private evaluator: Evaluator;
     private config: EvolutionConfig;
 
     constructor(
-        db: IPerformanceDatabase,
+        _db: IPerformanceDatabase,
         evolver: StrategyEvolver,
         evaluator: Evaluator,
         config: EvolutionConfig
     ) {
-        this.db = db;
+        // db currently unused but kept in signature for future persistence
         this.evolver = evolver;
         this.evaluator = evaluator;
         this.config = config;
@@ -56,17 +55,17 @@ export class Optimizer {
     /**
      * Runs the evolution loop.
      */
-    async run(initialStrategies: EvolutionStrategy[]) {
+    async run(initialStrategies: EvolutionStrategy[], onProgress?: (msg: string) => void) {
         let population = [...initialStrategies];
         const evalCases = this.loadEvaluationCases();
 
         if (evalCases.length === 0) {
-            console.warn("No evaluation cases found. Evolution cannot proceed.");
+            if (onProgress) onProgress("No evaluation cases found. Evolution cannot proceed.");
             return population;
         }
 
         for (let gen = 0; gen < this.config.generations; gen++) {
-            console.log(`=== Generation ${gen + 1} / ${this.config.generations} ===`);
+            if (onProgress) onProgress(`=== Generation ${gen + 1} / ${this.config.generations} ===`);
 
             // 1. Evaluate current population
             for (const strategy of population) {
@@ -81,7 +80,7 @@ export class Optimizer {
 
                 // Update in-memory metadata
                 strategy.metadata.successRate = successCount / evalCases.length;
-                console.log(`Strategy ${strategy.id}: ${(strategy.metadata.successRate * 100).toFixed(1)}% success`);
+                if (onProgress) onProgress(`Strategy ${strategy.id}: ${(strategy.metadata.successRate * 100).toFixed(1)}% success`);
             }
 
             // 2. Selection (Elitism)
@@ -103,8 +102,10 @@ export class Optimizer {
             population = newPopulation;
         }
 
-        console.log("Evolution complete.");
-        console.log("Best Strategy:", population[0].id);
+        if (onProgress) {
+            onProgress("Evolution complete.");
+            onProgress("Best Strategy: " + population[0].id);
+        }
 
         return population;
     }
