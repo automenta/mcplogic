@@ -62,7 +62,7 @@ export class Optimizer {
 
         if (evalCases.length === 0) {
             console.warn("No evaluation cases found. Evolution cannot proceed.");
-            return;
+            return population;
         }
 
         for (let gen = 0; gen < this.config.generations; gen++) {
@@ -105,5 +105,7 @@ export class Optimizer {
 
         console.log("Evolution complete.");
         console.log("Best Strategy:", population[0].id);
+
+        return population;
     }
 }

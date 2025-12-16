@@ -34,7 +34,7 @@ import * as Handlers from './handlers/index.js';
 import * as LLMHandlers from './handlers/llm.js';
 import * as AgentHandlers from './handlers/agent.js';
 import * as EvolutionHandlers from './handlers/evolution.js';
-import { Optimizer, Evaluator, StrategyEvolver, CurriculumGenerator, JsonPerformanceDatabase } from './evolution/index.js';
+import { Optimizer, Evaluator, StrategyEvolver, CurriculumGenerator, JsonPerformanceDatabase, InputRouter } from './evolution/index.js';
 import { StandardLLMProvider } from './llm/provider.js';
 import { TOOLS } from './tools/definitions.js';
 
@@ -85,6 +85,10 @@ export function createServer(): Server {
         elitismCount: 1,
         evalCasesPath: 'src/evalCases'
     });
+
+    // Initialize Router
+    const router = new InputRouter(perfDb, initialStrategies[0], llmProvider);
+    LLMHandlers.setInputRouter(router);
 
     EvolutionHandlers.initializeEvolution(optimizer, perfDb, curriculumGenerator, initialStrategies);
 

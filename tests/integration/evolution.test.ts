@@ -75,9 +75,17 @@ describe('Evolution Integration', () => {
         expect(result.strategies[0].id).toBe('strat-1');
     });
 
-    test('startEvolutionHandler should run without error', async () => {
+    test('startEvolutionHandler should run without error and update strategies', async () => {
         const result = await startEvolutionHandler({ generations: 1 });
         expect(result.message).toContain('complete');
+
+        // Verify strategies updated (we check listStrategiesHandler)
+        const listResult = await listStrategiesHandler({});
+        // In this integration test with 2 population size, we expect 2 strategies
+        expect(listResult.strategies.length).toBe(2);
+        // We expect at least one new strategy (ID != strat-1) to be present
+        const hasNewStrategy = listResult.strategies.some(s => s.id !== 'strat-1');
+        expect(hasNewStrategy).toBe(true);
     });
 
     test('generateCasesHandler should return mocked cases', async () => {

@@ -37,10 +37,16 @@ export async function startEvolutionHandler(args: {
     // Let's assume it runs for a short burst.
 
     try {
-        await optimizerInstance.run(strategies);
+        const newPopulation = await optimizerInstance.run(strategies);
+
+        // Update global strategies with the evolved population
+        strategies = newPopulation;
+
         return {
             message: 'Evolution cycle complete',
-            generations: args.generations || 1
+            generations: args.generations || 1,
+            strategies_count: strategies.length,
+            best_strategy_id: strategies[0]?.id
         };
     } catch (e) {
         throw createGenericError('ENGINE_ERROR', `Evolution failed: ${(e as Error).message}`);
