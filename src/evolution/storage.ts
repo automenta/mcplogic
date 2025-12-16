@@ -1,6 +1,5 @@
 import type { EvaluationResult } from '../types/evolution.js';
 import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * Interface for the Performance Database.
@@ -56,16 +55,13 @@ export class JsonPerformanceDatabase implements IPerformanceDatabase {
         return this.data.filter(r => r.strategyId === strategyId);
     }
 
-    async getBestStrategy(inputClass: string): Promise<string | null> {
+    async getBestStrategy(_inputClass: string): Promise<string | null> {
         // Basic implementation: Find strategy with highest success rate
-        // In reality, 'inputClass' matching would be more complex (e.g., matching domain or keywords)
+        // Note: 'inputClass' is currently ignored but will be used for granular routing in future iterations.
 
         const strategyStats = new Map<string, { successes: number, total: number }>();
 
         for (const res of this.data) {
-             // For now, we ignore inputClass filtering and just find the global best
-             // In Phase 5 refinement, we would use the Input Router logic here
-
              const stats = strategyStats.get(res.strategyId) || { successes: 0, total: 0 };
              stats.total++;
              if (res.success) {

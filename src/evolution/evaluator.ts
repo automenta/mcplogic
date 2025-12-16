@@ -2,10 +2,6 @@ import type { EvaluationCase, EvaluationResult, EvolutionStrategy } from '../typ
 import type { IPerformanceDatabase } from './storage.js';
 import type { LLMProvider } from '../types/llm.js';
 import { randomUUID } from 'crypto';
-// We will need to import the actual translator logic.
-// For now, assuming we have a way to invoke a strategy.
-// In the future, this should probably use `mcrService` or `HeuristicTranslator` directly if possible,
-// but since the strategy defines the prompt, we might need a `StrategyRunner`.
 
 export class Evaluator {
     private db: IPerformanceDatabase;
@@ -99,6 +95,7 @@ export class Evaluator {
         // Very basic comparison: check if all expected formulas appear in the raw output
         // In reality, we need to parse the raw output into FOL AST and compare with expected ASTs
         // modulo variable renaming and ordering.
+        // TODO: Implement AST-based comparison using parser.
 
         // Normalization helper
         const normalize = (s: string) => s.replace(/\s+/g, '').toLowerCase();
