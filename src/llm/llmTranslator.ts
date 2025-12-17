@@ -23,8 +23,6 @@ export class LLMTranslator implements TranslationStrategy {
             const prompt = this.strategy.promptTemplate.replace('{{INPUT}}', text);
 
             // 2. Call LLM
-            // We use a simple user message for now.
-            // EvolutionStrategy parameters (temp, etc) would be used here if the Provider interface supported them per-call.
             const response = await this.provider.complete([
                 { role: 'user', content: prompt }
             ]);
@@ -32,39 +30,49 @@ export class LLMTranslator implements TranslationStrategy {
             const rawOutput = response.content;
 
             // 3. Parse output
-            // This assumes the LLM outputs raw FOL lines or a specific format.
-            // We might need a more robust parser depending on the strategy's expected output format.
-            // For now, reuse HeuristicTranslator's parsing logic or simple line splitting?
-            // Let's try to extract formulas.
+            // Strategy:
+            // a. Try to extract code blocks first.
+            // b. If no blocks, process the whole text.
+            // c. Filter lines that look like conversational filler.
 
-            // If the strategy output is expected to be pure code/FOL, we can try to parse it.
-            // A common pattern is to wrap output in ```prolog blocks.
-            const codeBlockMatch = rawOutput.match(/```(?:prolog)?\s*([\s\S]*?)```/);
+            const codeBlockMatch = rawOutput.match(/```(?:prolog|logic|text)?\s*([\s\S]*?)```/);
             const contentToParse = codeBlockMatch ? codeBlockMatch[1] : rawOutput;
 
-            // Basic cleanup
             const lines = contentToParse
                 .split('\n')
                 .map(l => l.trim())
-                .filter(l => l && !l.startsWith('%') && !l.startsWith('#')); // comments
-
-            // Validation?
-            // If we have a robust parser, we should use it.
-            // For now, let's just return the lines as premises.
-
-            // Limitation: We don't distinguish conclusion vs premises easily without markers.
-            // We will assume everything is a premise unless marked "conclusion:" (similar to Heuristic)
+                .filter(l => l && !l.startsWith('%') && !l.startsWith('#') && !l.startsWith('//')); // comments
 
             const premises: string[] = [];
             let conclusion: string | undefined;
             const errors: string[] = [];
 
             for (const line of lines) {
-                if (line.toLowerCase().startsWith('conclusion:') || line.toLowerCase().startsWith('prove:')) {
-                    conclusion = line.replace(/^(conclusion:|prove:)\s*/i, '');
-                } else {
-                    premises.push(line);
+                // Check for conclusion markers
+                if (/^(conclusion:|prove:|goal:)\s*/i.test(line)) {
+                    conclusion = line.replace(/^(conclusion:|prove:|goal:)\s*/i, '');
+                    continue;
                 }
+
+                // Heuristic filtering for conversational lines if we didn't find a code block
+                // If we found a code block, we assume the LLM put valid stuff in it.
+                // If we are parsing raw text, we need to be careful.
+                if (!codeBlockMatch) {
+                    // Skip lines that end with ':' (often headers like "Here is the logic:")
+                    if (line.endsWith(':')) continue;
+
+                    // Skip lines that look like sentences but don't have logic symbols or parens
+                    // (Very rough heuristic: must have '(', ')', '=', '->', '<->', '&', '|', 'all ', 'exists ', or be very short assignment)
+                    const hasLogicChars = /[()=&|<>]|all\s|exists\s/.test(line);
+
+                    // If it doesn't have logic chars, and has spaces (implies sentence), skip it.
+                    // Allows "P(a)" but skips "Sure thing."
+                    if (!hasLogicChars && line.includes(' ')) {
+                         continue;
+                    }
+                }
+
+                premises.push(line);
             }
 
             return {
@@ -74,8 +82,6 @@ export class LLMTranslator implements TranslationStrategy {
             };
 
         } catch (error) {
-            // Fallback to heuristic if LLM fails? Or just report error?
-            // Reporting error is safer for debugging evolution.
             return {
                 premises: [],
                 errors: [`LLM Translation failed: ${(error as Error).message}`]
