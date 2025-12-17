@@ -14,6 +14,7 @@ import { symmetricMappings, allMappings, allFunctionTables, allTuples } from './
 import { SATEngine } from './engines/sat.js';
 import { groundFormula } from './utils/grounding.js';
 import { clausify } from './clausifier.js';
+import type { Literal } from './types/index.js';
 
 export type { Model, ModelResult };
 
@@ -74,10 +75,8 @@ export class ModelFinder {
                 const foundModels: Model[] = [];
 
                 if (shouldUseSAT) {
-                    // SAT currently only finds one model per size. 
-                    // TODO: Implement multiple model finding for SAT (requires blocking clauses)
-                    const model = await this.findModelSAT(premises, size, opts);
-                    if (model) foundModels.push(model);
+                    const models = await this.findModelsSAT(premises, size, opts);
+                    foundModels.push(...models);
                 } else {
                     // Backtracking search
                     const models = this.findModelsBacktracking(asts, signature, size, opts, count);
@@ -110,13 +109,13 @@ export class ModelFinder {
     }
 
     /**
-     * Find a model using SAT solver
+     * Find models using SAT solver
      */
-    private async findModelSAT(
+    private async findModelsSAT(
         premises: string[],
         size: number,
         opts: ModelOptions
-    ): Promise<Model | null> {
+    ): Promise<Model[]> {
         // 1. Ground all premises
         const grounded = premises.map(p => {
             const ast = parse(p);
@@ -125,14 +124,33 @@ export class ModelFinder {
 
         // 2. Clausify
         const result = clausify(grounded);
-        if (!result.success || !result.clauses) return null;
+        if (!result.success || !result.clauses) return [];
 
-        // 3. SAT solve
-        const satResult = await this.satEngine.checkSat(result.clauses);
-        if (!satResult.sat) return null;
+        const clauses = [...result.clauses];
+        const models: Model[] = [];
+        const count = opts.count ?? 1;
 
-        // 4. Decode
-        return this.decodeSATModel(satResult.model!, size);
+        // 3. Loop: Solve, Record, Block
+        while (models.length < count) {
+            const satResult = await this.satEngine.checkSat(clauses);
+            if (!satResult.sat) break;
+
+            const model = this.decodeSATModel(satResult.model!, size);
+            models.push(model);
+
+            // Add blocking clause (negation of current model)
+            const literals: Literal[] = [];
+            for (const [key, val] of satResult.model!) {
+                literals.push({
+                    predicate: key,
+                    args: [],
+                    negated: val // If val=true, NOT key. If val=false, key.
+                });
+            }
+            clauses.push({ literals });
+        }
+
+        return models;
     }
 
     /**
