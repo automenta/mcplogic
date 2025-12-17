@@ -6,7 +6,6 @@ import {
     Optimizer, Evaluator, StrategyEvolver, CurriculumGenerator,
     JsonPerformanceDatabase, InputRouter, IPerformanceDatabase
 } from './evolution/index.js';
-import * as LLMHandlers from './handlers/llm.js';
 import { StandardLLMProvider } from './llm/provider.js';
 import { EvolutionStrategy } from './types/evolution.js';
 
@@ -95,7 +94,6 @@ Input:
 
     // Initialize Router
     const router = new InputRouter(perfDb, defaultStrategy, llmProvider);
-    LLMHandlers.setInputRouter(router);
 
     return {
         modelFinder,

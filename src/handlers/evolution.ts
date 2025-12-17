@@ -24,7 +24,15 @@ export async function startEvolutionHandler(
              // console.error(msg); // Optional: enable for server-side logging
         };
 
-        const newPopulation = await optimizer.run(state.strategies, progressHandler);
+        const overrides = {
+            generations: args.generations,
+            populationSize: args.population_size
+        };
+
+        // Clean undefined
+        const cleanOverrides = Object.fromEntries(Object.entries(overrides).filter(([_, v]) => v !== undefined));
+
+        const newPopulation = await optimizer.run(state.strategies, progressHandler, cleanOverrides);
 
         // Update state
         state.strategies = newPopulation;
