@@ -51,7 +51,8 @@ describe('SyntaxValidator', () => {
     test('detects unbalanced parentheses', () => {
         const result = validateFormulas(['all x (P(x) -> Q(x)']);
         expect(result.valid).toBe(false);
-        expect(result.formulaResults[0].errors.some(e => e.includes('parenthesis'))).toBe(true);
+        const messages = [...result.formulaResults[0].errors, ...result.formulaResults[0].warnings];
+        expect(messages.some(e => e.includes('parenthesis'))).toBe(true);
     });
 
     test('warns about uppercase predicates', () => {

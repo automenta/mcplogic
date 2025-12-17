@@ -1,8 +1,10 @@
 /**
  * Syntax Validator for FOL formulas
  * 
- * Port of syntax_validator.py - validates formulas before processing.
+ * Validates formulas using the parser and provides linting/heuristics.
  */
+
+import { parse } from './parser.js';
 
 export interface ValidationResult {
     valid: boolean;
@@ -40,9 +42,25 @@ export class SyntaxValidator {
         // Remove trailing period for analysis
         const formulaClean = formula.replace(/\.$/, '').trim();
 
-        this.checkBalancedParens(formulaClean);
-        this.checkQuantifiers(formulaClean);
-        this.checkOperators(formulaClean);
+        // 1. Try actual parsing
+        try {
+            parse(formulaClean);
+        } catch (e) {
+            // Parser failed
+            this.errors.push((e as Error).message);
+
+            // Run heuristics to provide helpful hints as warnings
+            this.runDiagnostics(formulaClean);
+
+            return {
+                valid: false,
+                errors: [...this.errors],
+                warnings: [...this.warnings]
+            };
+        }
+
+        // 2. If valid, check style/conventions (linting)
+        // Some lint checks might produce errors (e.g. reserved words)
         this.checkNaming(formulaClean);
         this.checkCommonMistakes(formulaClean);
 
@@ -51,6 +69,15 @@ export class SyntaxValidator {
             errors: [...this.errors],
             warnings: [...this.warnings]
         };
+    }
+
+    /**
+     * Run heuristic checks to explain errors
+     */
+    private runDiagnostics(formula: string): void {
+        this.checkBalancedParens(formula);
+        this.checkQuantifiers(formula);
+        this.checkOperators(formula);
     }
 
     /**
@@ -65,7 +92,7 @@ export class SyntaxValidator {
                 stack.push(i);
             } else if (char === ')') {
                 if (stack.length === 0) {
-                    this.errors.push(`Unmatched closing parenthesis at position ${i}`);
+                    this.warnings.push(`Unmatched closing parenthesis at position ${i}`);
                 } else {
                     stack.pop();
                 }
@@ -73,7 +100,7 @@ export class SyntaxValidator {
         }
 
         if (stack.length > 0) {
-            this.errors.push(`Unmatched opening parenthesis at position ${stack[0]}`);
+            this.warnings.push(`Unmatched opening parenthesis at position ${stack[0]}`);
         }
     }
 
@@ -82,7 +109,6 @@ export class SyntaxValidator {
      */
     private checkQuantifiers(formula: string): void {
         for (const quantifier of QUANTIFIERS) {
-            // Find all occurrences of this quantifier
             const pattern = new RegExp(`\\b${quantifier}\\s+(\\w+)`, 'g');
             let match;
 
@@ -90,15 +116,13 @@ export class SyntaxValidator {
                 const varName = match[1];
                 const endPos = match.index + match[0].length;
 
-                // Check if variable follows lowercase convention
                 if (!/^[a-z]/.test(varName)) {
                     this.warnings.push(`Quantifier variable '${varName}' should start with lowercase`);
                 }
 
-                // Check if there's a formula after the quantifier
                 const remaining = formula.slice(endPos).trim();
                 if (!remaining || remaining[0] !== '(') {
-                    this.errors.push(
+                    this.warnings.push(
                         `Quantifier '${quantifier} ${varName}' must be followed by a formula in parentheses`
                     );
                 }
@@ -110,14 +134,12 @@ export class SyntaxValidator {
      * Check operator usage
      */
     private checkOperators(formula: string): void {
-        // Check for double operators (likely mistakes)
         for (const op of ['&', '|']) {
             if (formula.includes(op + op)) {
                 this.warnings.push(`Double operator '${op}${op}' found - did you mean to use it twice?`);
             }
         }
 
-        // Check for implication chains without parentheses
         const implCount = (formula.match(/->/g) || []).length;
         const parenCount = (formula.match(/\(/g) || []).length;
         if (implCount > 1 && parenCount === 0) {
@@ -131,26 +153,20 @@ export class SyntaxValidator {
      * Check predicate/function naming conventions
      */
     private checkNaming(formula: string): void {
-        // Extract potential predicate/function names (word followed by opening paren)
         const pattern = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
         let match;
 
         while ((match = pattern.exec(formula)) !== null) {
             const name = match[1];
 
-            // Skip quantifiers
-            if (QUANTIFIERS.has(name)) {
-                continue;
-            }
+            if (QUANTIFIERS.has(name)) continue;
 
-            // Predicates should start with lowercase
             if (/^[A-Z]/.test(name)) {
                 this.warnings.push(
                     `Predicate/function '${name}' starts with uppercase - consider using lowercase for consistency`
                 );
             }
 
-            // Check for reserved words
             if (RESERVED.has(name)) {
                 this.errors.push(
                     `'${name}' is a reserved keyword and cannot be used as a predicate/function`
@@ -163,7 +179,6 @@ export class SyntaxValidator {
      * Check for common syntax mistakes
      */
     private checkCommonMistakes(formula: string): void {
-        // Missing spaces around operators
         for (const op of ['->', '<->']) {
             const pattern = new RegExp(`\\w${op.replace(/[-<>]/g, '\\$&')}\\w`);
             if (pattern.test(formula)) {
@@ -171,14 +186,12 @@ export class SyntaxValidator {
             }
         }
 
-        // Unquoted strings
         if (formula.includes('"') || formula.includes("'")) {
             this.warnings.push(
                 'Strings in quotes are not standard in first-order logic - use predicates or constants instead'
             );
         }
 
-        // Empty parentheses
         if (formula.includes('()')) {
             this.errors.push('Empty parentheses found - predicates and functions must have arguments');
         }
