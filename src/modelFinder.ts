@@ -54,15 +54,17 @@ export class ModelFinder {
             // This allows users to write P(x) and find a model where P holds for some element named x
             // without explicit quantification, following Mace4 convention.
             const freeVars = new Set<string>();
-            asts.forEach(ast => {
+            for (const ast of asts) {
                 const free = getFreeVariables(ast);
-                free.forEach(v => freeVars.add(v));
-            });
+                for (const v of free) {
+                    freeVars.add(v);
+                }
+            }
 
-            freeVars.forEach(v => {
+            for (const v of freeVars) {
                 signature.constants.add(v);
                 signature.variables.delete(v);
-            });
+            }
 
             // Try increasing domain sizes
             for (let size = startSize; size <= endSize; size++) {

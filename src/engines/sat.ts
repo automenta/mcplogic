@@ -7,6 +7,7 @@
 
 import Logic from 'logic-solver';
 import { Clause, Literal } from '../types/clause.js';
+import { allMappings } from '../utils/enumerate.js';
 import { ProveResult, Verbosity } from '../types/index.js';
 import { buildProveResult } from '../utils/response.js';
 import { clausify, isHornFormula } from '../clausifier.js';
@@ -185,7 +186,7 @@ export class SATEngine implements ReasoningEngine {
             }
 
             const vars = Array.from(clauseVars);
-            const assignments = this.generateAssignments(vars, constantList);
+            const assignments = allMappings(vars, constantList);
 
             for (const assign of assignments) {
                 const newLiterals = clause.literals.map(lit => ({
@@ -198,22 +199,6 @@ export class SATEngine implements ReasoningEngine {
         }
 
         return instantiatedClauses;
-    }
-
-    private generateAssignments(vars: string[], constants: string[]): Map<string, string>[] {
-        if (vars.length === 0) return [new Map()];
-        const [first, ...rest] = vars;
-        const restAssignments = this.generateAssignments(rest, constants);
-        const result: Map<string, string>[] = [];
-
-        for (const c of constants) {
-            for (const assign of restAssignments) {
-                const newAssign = new Map(assign);
-                newAssign.set(first, c);
-                result.push(newAssign);
-            }
-        }
-        return result;
     }
 
     /**
