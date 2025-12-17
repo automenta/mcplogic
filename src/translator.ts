@@ -14,6 +14,13 @@ import { clausify } from './clausifier.js';
 import { Clause, Literal } from './types/clause.js';
 
 /**
+ * Options for translation
+ */
+export interface TranslatorOptions {
+    enableEquality?: boolean;
+}
+
+/**
  * Convert a Prover9-style formula to Prolog
  * 
  * Prover9: all x (man(x) -> mortal(x))
@@ -24,7 +31,7 @@ import { Clause, Literal } from './types/clause.js';
  * (which may produce meta-logical terms like (A;B) that are valid Prolog syntax
  * but not executable clauses).
  */
-export function folToProlog(formula: string): string[] {
+export function folToProlog(formula: string, options?: TranslatorOptions): string[] {
     // Use clausifier to handle Skolemization, NNF, and variable standardization
     const result = clausify(formula);
 
@@ -34,7 +41,7 @@ export function folToProlog(formula: string): string[] {
     }
 
     try {
-        return clausesToProlog(result.clauses);
+        return clausesToProlog(result.clauses, options);
     } catch (e) {
         // Not Horn clauses (e.g. A | B).
         // The Prolog engine cannot natively reason with non-Horn clauses as premises.
@@ -50,7 +57,7 @@ export function folToProlog(formula: string): string[] {
  * Convert clauses to Prolog-compatible format.
  * Only works for Horn clauses.
  */
-export function clausesToProlog(clauses: Clause[]): string[] {
+export function clausesToProlog(clauses: Clause[], options?: TranslatorOptions): string[] {
     const prologClauses: string[] = [];
 
     for (const clause of clauses) {
@@ -60,16 +67,16 @@ export function clausesToProlog(clauses: Clause[]): string[] {
         if (positive.length === 0) {
             // Goal clause (all negative) - represents a query
             // :- p, q. means "prove p and q"
-            const body = negative.map(l => literalToProlog(l, false)).join(', ');
+            const body = negative.map(l => literalToProlog(l, false, options)).join(', ');
             prologClauses.push(`:- ${body}.`);
         } else if (positive.length === 1) {
-            const head = literalToProlog(positive[0], false);
+            const head = literalToProlog(positive[0], false, options);
             if (negative.length === 0) {
                 // Fact
                 prologClauses.push(`${head}.`);
             } else {
                 // Rule
-                const body = negative.map(l => literalToProlog(l, false)).join(', ');
+                const body = negative.map(l => literalToProlog(l, false, options)).join(', ');
                 prologClauses.push(`${head} :- ${body}.`);
             }
         } else {
@@ -84,13 +91,15 @@ export function clausesToProlog(clauses: Clause[]): string[] {
 /**
  * Convert a literal to Prolog format.
  */
-function literalToProlog(lit: Literal, useNegation: boolean): string {
+function literalToProlog(lit: Literal, useNegation: boolean, options?: TranslatorOptions): string {
     const formatArg = (arg: string): string => {
         return formatPrologTerm(arg);
     };
 
     let predicate = lit.predicate;
     if (predicate === '=') {
+        // Facts about equality are always stored as eq_fact
+        // LogicEngine sets up axioms where eq_step uses eq_fact.
         predicate = 'eq_fact';
     }
 
@@ -104,15 +113,6 @@ function literalToProlog(lit: Literal, useNegation: boolean): string {
     return atom;
 }
 
-/**
- * Formats a term string (variable or constant) for Prolog.
- *
- * Rules:
- * - Variables (start with _ or uppercase) -> Uppercase
- * - Skolem constants (start with sk) -> Lowercase
- * - Free variables (single lowercase letter) -> Uppercase (implicit universal)
- * - Constants (lowercase or uppercase) -> Lowercase
- */
 /**
  * Formats a term string (variable or constant) for Prolog.
  * Handles complex terms like f(x, g(y)) by parsing them first.
@@ -175,7 +175,7 @@ function astToPrologTermRecursive(node: ASTNode): string {
     }
 }
 
-function predicateToProlog(node: ASTNode): string {
+function predicateToProlog(node: ASTNode, options?: TranslatorOptions): string {
     if (node.type !== 'predicate') {
         throw createEngineError(`Expected predicate, got ${node.type} during translation`);
     }
@@ -210,33 +210,36 @@ function termToProlog(node: ASTNode): string {
  * Convert arbitrary FOL to meta-representation in Prolog
  * This allows representing complex formulas that don't fit Horn clause form.
  */
-function astToMetaProlog(node: ASTNode): string | null {
+function astToMetaProlog(node: ASTNode, options?: TranslatorOptions): string | null {
     switch (node.type) {
         case 'predicate':
-            return predicateToProlog(node);
+            return predicateToProlog(node, options);
 
         case 'and':
-            return `(${astToMetaProlog(node.left!)}, ${astToMetaProlog(node.right!)})`;
+            return `(${astToMetaProlog(node.left!, options)}, ${astToMetaProlog(node.right!, options)})`;
 
         case 'or':
-            return `(${astToMetaProlog(node.left!)}; ${astToMetaProlog(node.right!)})`;
+            return `(${astToMetaProlog(node.left!, options)}; ${astToMetaProlog(node.right!, options)})`;
 
         case 'not':
-            return `\\+ ${astToMetaProlog(node.operand!)}`;
+            return `\\+ ${astToMetaProlog(node.operand!, options)}`;
 
         case 'implies':
             // P -> Q is equivalent to ¬P ∨ Q
             // In Prolog (P -> Q ; true) implements material implication P -> Q
-            return `(${astToMetaProlog(node.left!)} -> ${astToMetaProlog(node.right!)}; true)`;
+            return `(${astToMetaProlog(node.left!, options)} -> ${astToMetaProlog(node.right!, options)}; true)`;
 
         case 'iff':
             // P <-> Q is (P -> Q) & (Q -> P)
-            const left = astToMetaProlog(node.left!);
-            const right = astToMetaProlog(node.right!);
+            const left = astToMetaProlog(node.left!, options);
+            const right = astToMetaProlog(node.right!, options);
             return `((${left} -> ${right} ; true), (${right} -> ${left} ; true))`;
 
         case 'equals':
-            return `${astToMetaProlog(node.left!)} = ${astToMetaProlog(node.right!)}`;
+            if (options?.enableEquality) {
+                 return `eq(${astToMetaProlog(node.left!, options)}, ${astToMetaProlog(node.right!, options)})`;
+            }
+            return `${astToMetaProlog(node.left!, options)} = ${astToMetaProlog(node.right!, options)}`;
 
         case 'variable':
         case 'constant':
@@ -245,11 +248,11 @@ function astToMetaProlog(node: ASTNode): string | null {
 
         case 'forall':
             // Universal quantification - in Prolog, typically handled by variables being universal in rules
-            return astToMetaProlog(node.body!);
+            return astToMetaProlog(node.body!, options);
 
         case 'exists':
             // Existential - Prolog handles this through unification
-            return astToMetaProlog(node.body!);
+            return astToMetaProlog(node.body!, options);
 
         default:
             return null;
@@ -273,7 +276,7 @@ export function prologResultToFol(result: Record<string, string>): Record<string
 /**
  * Create a Prolog query from a FOL goal
  */
-export function folGoalToProlog(goal: string): string {
+export function folGoalToProlog(goal: string, options?: TranslatorOptions): string {
     const ast = parse(goal);
 
     // Check for universal quantifiers which Prolog cannot directly prove via goal query
@@ -284,12 +287,14 @@ export function folGoalToProlog(goal: string): string {
         );
     }
 
+    // Special handling for top-level predicate to avoid meta-call overhead if possible,
+    // but only if it's not equality with enableEquality (which converts to eq)
     if (ast.type === 'predicate') {
-        return predicateToProlog(ast) + '.';
+        return predicateToProlog(ast, options) + '.';
     }
 
-    // For complex goals, use meta-representation
-    const meta = astToMetaProlog(ast);
+    // For complex goals (including equality if enabled), use meta-representation
+    const meta = astToMetaProlog(ast, options);
     return meta ? meta + '.' : '';
 }
 
@@ -313,11 +318,11 @@ function containsUniversal(node: ASTNode): boolean {
 /**
  * Build a complete Prolog program from premises
  */
-export function buildPrologProgram(premises: string[]): string {
+export function buildPrologProgram(premises: string[], options?: TranslatorOptions): string {
     const allClauses: string[] = [];
 
     for (const premise of premises) {
-        const clauses = folToProlog(premise);
+        const clauses = folToProlog(premise, options);
         allClauses.push(...clauses);
     }
 
