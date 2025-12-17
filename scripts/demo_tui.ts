@@ -1,100 +1,27 @@
 import { spawn } from 'child_process';
-import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import * as readline from 'readline';
 
-// Configuration
-const MOCK_PORT = 3001;
-const USE_MOCK = process.argv.includes('--mock');
-
-// Mock Data
-const MOCK_SCENARIOS = [
-    {
-        pattern: /all humans are mortal/i,
-        response: `all x (Human(x) -> Mortal(x))`
-    },
-    {
-        pattern: /socrates is human/i,
-        response: `Human(Socrates)`
-    },
-    {
-        pattern: /is socrates mortal/i,
-        response: `conclusion: Mortal(Socrates)`
-    }
-];
-
-let mockServer: any = null;
-
-// Helper to start mock server
-function startMockServer(): Promise<void> {
-    return new Promise((resolve) => {
-        mockServer = createServer((req: IncomingMessage, res: ServerResponse) => {
-            let body = '';
-            req.on('data', chunk => { body += chunk.toString(); });
-            req.on('end', () => {
-                if (req.url?.includes('/chat/completions') && req.method === 'POST') {
-                    const parsed = JSON.parse(body);
-                    const content = parsed.messages[parsed.messages.length - 1].content;
-
-                    // Find matching scenario
-                    const scenario = MOCK_SCENARIOS.find(s => s.pattern.test(content));
-                    const responseText = scenario ? scenario.response : `Predicate(${content.replace(/\s/g, '_')})`;
-
-                    const response = {
-                        id: 'chatcmpl-mock',
-                        object: 'chat.completion',
-                        created: Date.now(),
-                        model: 'mock-model',
-                        choices: [{
-                            message: {
-                                role: 'assistant',
-                                content: responseText
-                            }
-                        }]
-                    };
-
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(response));
-                } else {
-                    res.writeHead(404);
-                    res.end('Not Found');
-                }
-            });
-        });
-        mockServer.listen(MOCK_PORT, () => {
-            // console.log(`[Demo] Mock LLM running on port ${MOCK_PORT}`);
-            resolve();
-        });
-    });
-}
-
 async function runInteractiveMode() {
-    // 1. Start Mock LLM Server if needed
-    if (USE_MOCK) {
-        await startMockServer();
-        console.log('[Demo] Mock Server Started.');
-    }
-
-    // 2. Setup Environment
+    // 1. Setup Environment
     const env = { ...process.env };
 
-    if (USE_MOCK) {
-        env.OPENAI_BASE_URL = `http://localhost:${MOCK_PORT}/v1`;
-        env.OPENAI_API_KEY = 'test-key';
-        env.OLLAMA_URL = undefined;
-        console.log('[Demo] Running in MOCK mode.');
+    // Check for LLM configuration
+    const hasLLM = env.OPENAI_BASE_URL || env.OPENAI_API_KEY || env.OLLAMA_URL;
+
+    if (!hasLLM) {
+        console.warn('\n[Demo] ⚠️  WARNING: No LLM environment variables found.');
+        console.warn('[Demo] The "translate-text" tool requires a configured LLM.');
+        console.warn('[Demo] Please set OPENAI_BASE_URL (for local), OPENAI_API_KEY, or OLLAMA_URL.');
+        console.warn('[Demo] See AGENTS.md for setup instructions.\n');
+        // We continue, as the user might only want to use 'prove' with manual premises.
     } else {
-        if (!env.OPENAI_BASE_URL && !env.OPENAI_API_KEY && !env.OLLAMA_URL) {
-            console.warn('[Demo] WARNING: No LLM environment variables found.');
-            console.warn('[Demo] Please set OPENAI_BASE_URL, OPENAI_API_KEY, or OLLAMA_URL.');
-            console.warn('[Demo] Or run with --mock to use internal mock server.');
-            process.exit(1);
-        }
-        console.log('[Demo] Running in REAL mode (connecting to configured LLM).');
+        console.log('[Demo] LLM Configuration detected. Ready for Natural Language inputs.');
     }
 
-    // 3. Connect MCP Client
+    // 2. Connect MCP Client
+    // We spawn the server process directly.
     const transport = new StdioClientTransport({
         command: 'npx',
         args: ['tsx', '-e', 'import { runServer } from "./src/server.ts"; runServer();'],
@@ -108,11 +35,10 @@ async function runInteractiveMode() {
         console.log('[Demo] Connected to MCP Logic Server.');
     } catch (e) {
         console.error('[Demo] Failed to connect to MCP server:', e);
-        if (mockServer) mockServer.close();
         process.exit(1);
     }
 
-    // 4. Interactive Loop
+    // 3. Interactive Loop
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -181,6 +107,7 @@ async function runInteractiveMode() {
 
                 if (!goalFormula) {
                     console.error('Failed to extract goal formula from LLM output.');
+                    if (transContent.errors) console.error('Details:', transContent.errors);
                 } else {
                     console.log(`Goal Formula: ${goalFormula}`);
 
@@ -233,9 +160,6 @@ async function runInteractiveMode() {
 
     rl.on('close', () => {
         console.log('\nGoodbye.');
-        if (mockServer) {
-             mockServer.close();
-        }
         // Force exit to kill MCP subprocess if it hangs
         setTimeout(() => process.exit(0), 100);
     });
