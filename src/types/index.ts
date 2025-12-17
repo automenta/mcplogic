@@ -27,15 +27,6 @@ export type {
 } from './errors.js';
 
 // Re-export clause types for CNF
-export {
-    createSkolemEnv,
-    isTautology,
-    atomToKey,
-    clauseToString,
-    cnfToString,
-    literalToString,
-} from '../utils/clause.js';
-
 export type {
     Literal,
     Clause,
