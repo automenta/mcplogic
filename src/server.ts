@@ -64,14 +64,14 @@ const toolHandlers: Record<string, ToolHandler> = {
         AgentHandlers.reasonHandler(args),
 
     // ==================== EVOLUTION TOOLS ====================
-    'evolution-start': (args) =>
-        EvolutionHandlers.startEvolutionHandler(args),
+    'evolution-start': (args, c) =>
+        EvolutionHandlers.startEvolutionHandler(args, c.optimizer, c),
 
-    'evolution-list-strategies': (args) =>
-        EvolutionHandlers.listStrategiesHandler(args),
+    'evolution-list-strategies': (args, c) =>
+        EvolutionHandlers.listStrategiesHandler(args, c.strategies),
 
-    'evolution-generate-cases': (args) =>
-        EvolutionHandlers.generateCasesHandler(args),
+    'evolution-generate-cases': (args, c) =>
+        EvolutionHandlers.generateCasesHandler(args, c.curriculumGenerator),
 
     // ==================== SESSION MANAGEMENT TOOLS ====================
     'create-session': (args, c) =>

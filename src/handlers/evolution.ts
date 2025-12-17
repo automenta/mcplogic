@@ -2,82 +2,63 @@ import type { Optimizer, IPerformanceDatabase, CurriculumGenerator } from '../ev
 import type { EvolutionStrategy } from '../types/evolution.js';
 import { createGenericError } from '../types/errors.js';
 
-// Global state for evolution (in a real app, this would be injected)
-let optimizerInstance: Optimizer | null = null;
-let dbInstance: IPerformanceDatabase | null = null;
-let curriculumGeneratorInstance: CurriculumGenerator | null = null;
-let strategies: EvolutionStrategy[] = [];
-
-/**
- * Initialize evolution components (called by server setup if needed, or lazily)
- */
-export function initializeEvolution(
-    optimizer: Optimizer,
-    db: IPerformanceDatabase,
-    generator: CurriculumGenerator,
-    initialStrategies: EvolutionStrategy[]
-) {
-    optimizerInstance = optimizer;
-    dbInstance = db;
-    curriculumGeneratorInstance = generator;
-    strategies = initialStrategies;
+export interface EvolutionState {
+    strategies: EvolutionStrategy[];
 }
 
-export async function startEvolutionHandler(args: {
-    generations?: number;
-    population_size?: number;
-}) {
-    if (!optimizerInstance) {
+export async function startEvolutionHandler(
+    args: {
+        generations?: number;
+        population_size?: number;
+    },
+    optimizer: Optimizer,
+    state: EvolutionState
+) {
+    if (!optimizer) {
         throw createGenericError('ENGINE_ERROR', 'Evolution engine not initialized');
     }
 
-    // This is a long-running process. In a real MCP server, we might need async progress reporting.
-    // For now, we will run it and return the result, assuming small generations or accept timeout.
-    // Better: Run in background? But MCP doesn't support async background tasks well without notifications.
-    // Let's assume it runs for a short burst.
-
     try {
         // Pass a no-op progress handler or one that logs to server logs/stderr if needed.
-        // For MCP handler, maybe we want to log to stderr so it shows up in server logs but not stdout (which is JSON-RPC)
         const progressHandler = (msg: string) => {
              // console.error(msg); // Optional: enable for server-side logging
         };
 
-        const newPopulation = await optimizerInstance.run(strategies, progressHandler);
+        const newPopulation = await optimizer.run(state.strategies, progressHandler);
 
-        // Update global strategies with the evolved population
-        strategies = newPopulation;
+        // Update state
+        state.strategies = newPopulation;
 
         return {
             message: 'Evolution cycle complete',
             generations: args.generations || 1,
-            strategies_count: strategies.length,
-            best_strategy_id: strategies[0]?.id
+            strategies_count: state.strategies.length,
+            best_strategy_id: state.strategies[0]?.id
         };
     } catch (e) {
         throw createGenericError('ENGINE_ERROR', `Evolution failed: ${(e as Error).message}`);
     }
 }
 
-export async function listStrategiesHandler(args: {}) {
-    if (!dbInstance) {
-        // Return in-memory strategies if DB not ready
-        return { strategies };
-    }
-
-    // Merge active strategies with historical bests?
-    // For now, just return the current population
+export async function listStrategiesHandler(
+    args: {},
+    strategies: EvolutionStrategy[]
+) {
     return { strategies };
 }
 
-export async function getBestStrategyHandler(args: { input?: string }) {
-    if (!dbInstance) {
+export async function getBestStrategyHandler(
+    args: { input?: string },
+    db: IPerformanceDatabase,
+    strategies: EvolutionStrategy[]
+) {
+    if (!db) {
         throw createGenericError('ENGINE_ERROR', 'Performance DB not initialized');
     }
 
     // Logic to pick best strategy based on input classification
     // For now, global best
-    const bestId = await dbInstance.getBestStrategy('default');
+    const bestId = await db.getBestStrategy('default');
     const strategy = strategies.find(s => s.id === bestId);
 
     if (!strategy) {
@@ -87,13 +68,16 @@ export async function getBestStrategyHandler(args: { input?: string }) {
     return { strategy };
 }
 
-export async function generateCasesHandler(args: { domain: string; count?: number }) {
-    if (!curriculumGeneratorInstance) {
+export async function generateCasesHandler(
+    args: { domain: string; count?: number },
+    generator: CurriculumGenerator
+) {
+    if (!generator) {
         throw createGenericError('ENGINE_ERROR', 'Curriculum Generator not initialized');
     }
 
     try {
-        const cases = await curriculumGeneratorInstance.generateNewCases(args.domain, args.count || 5);
+        const cases = await generator.generateNewCases(args.domain, args.count || 5);
         return {
             success: true,
             count: cases.length,
