@@ -9,6 +9,7 @@ import { Model, ModelResult, ModelOptions, DEFAULTS } from './types/index.js';
 import type { ASTNode } from './types/index.js';
 import { extractSignature, astToString, getFreeVariables } from './utils/ast.js';
 import { createGenericError } from './types/errors.js';
+import { checkAllFormulas } from './utils/evaluation.js';
 import { symmetricMappings, allMappings, allFunctionTables, allTuples } from './utils/enumerate.js';
 import { SATEngine } from './engines/sat.js';
 import { groundFormula } from './utils/grounding.js';
@@ -238,7 +239,7 @@ export class ModelFinder {
                         interpretation: ''
                     };
 
-                    if (this.checkAllFormulas(asts, model)) {
+                    if (checkAllFormulas(asts, model)) {
                         // Check isomorphism against already found models
                         let isIso = false;
                         for (const existing of foundModels) {
@@ -268,6 +269,10 @@ export class ModelFinder {
      */
     private areIsomorphic(m1: Model, m2: Model): boolean {
         if (m1.domainSize !== m2.domainSize) return false;
+
+        // Safety check: Don't attempt isomorphism check for large domains
+        // n=9 -> 362,880 permutations, which is too slow for interactive use
+        if (m1.domainSize > 8) return false;
 
         // Generate all permutations of the domain
         const permutations = this.generatePermutations(m1.domain);
@@ -425,111 +430,6 @@ export class ModelFinder {
         }
     }
 
-    /**
-     * Check if all formulas are satisfied in the model
-     */
-    private checkAllFormulas(
-        asts: ASTNode[],
-        model: Model
-    ): boolean {
-        for (const ast of asts) {
-            if (!this.evaluate(ast, model, new Map())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Evaluate a formula in a model under an assignment
-     */
-    private evaluate(
-        node: ASTNode,
-        model: Model,
-        assignment: Map<string, number>
-    ): boolean {
-        switch (node.type) {
-            case 'predicate': {
-                const args = (node.args || []).map(a => this.evaluateTerm(a, model, assignment));
-                const key = args.join(',');
-                const extension = model.predicates.get(node.name!);
-                return extension?.has(key) ?? false;
-            }
-
-            case 'and':
-                return this.evaluate(node.left!, model, assignment) &&
-                    this.evaluate(node.right!, model, assignment);
-
-            case 'or':
-                return this.evaluate(node.left!, model, assignment) ||
-                    this.evaluate(node.right!, model, assignment);
-
-            case 'not':
-                return !this.evaluate(node.operand!, model, assignment);
-
-            case 'implies':
-                return !this.evaluate(node.left!, model, assignment) ||
-                    this.evaluate(node.right!, model, assignment);
-
-            case 'iff':
-                return this.evaluate(node.left!, model, assignment) ===
-                    this.evaluate(node.right!, model, assignment);
-
-            case 'forall':
-                return model.domain.every(d => {
-                    const newAssign = new Map(assignment);
-                    newAssign.set(node.variable!, d);
-                    return this.evaluate(node.body!, model, newAssign);
-                });
-
-            case 'exists':
-                return model.domain.some(d => {
-                    const newAssign = new Map(assignment);
-                    newAssign.set(node.variable!, d);
-                    return this.evaluate(node.body!, model, newAssign);
-                });
-
-            case 'equals': {
-                const left = this.evaluateTerm(node.left!, model, assignment);
-                const right = this.evaluateTerm(node.right!, model, assignment);
-                return left === right;
-            }
-
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Evaluate a term to a domain element
-     */
-    private evaluateTerm(
-        node: ASTNode,
-        model: Model,
-        assignment: Map<string, number>
-    ): number {
-        switch (node.type) {
-            case 'variable':
-                // Check assignment first (bound variables)
-                if (assignment.has(node.name!)) {
-                    return assignment.get(node.name!)!;
-                }
-                // Then check model constants (free variables treated as constants)
-                if (model.constants.has(node.name!)) {
-                    return model.constants.get(node.name!)!;
-                }
-                return 0;
-            case 'constant':
-                return model.constants.get(node.name!) ?? 0;
-            case 'function': {
-                const args = (node.args || []).map(a => this.evaluateTerm(a, model, assignment));
-                const table = model.functions.get(node.name!);
-                return table?.get(args.join(',')) ?? 0;
-            }
-            default:
-                return 0;
-        }
-    }
 
     /**
      * Format model as human-readable string
