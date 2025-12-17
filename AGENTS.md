@@ -50,14 +50,36 @@ You can configure the server using environment variables.
     ```
     *(Note: If `OPENAI_BASE_URL` is set, it takes precedence. For Ollama, you can also use its OpenAI-compatible endpoint at `http://localhost:11434/v1` and set `OPENAI_BASE_URL` instead.)*
 
-## Verification
+## Testing and Verification
 
-To verify that the system is using your local LLM:
+We provide tools to test the integration with your local LLM and verify its reasoning capabilities.
 
-1.  Set the environment variables.
-2.  Run the MCP server.
-3.  Use the `translate-text` tool with a simple query like "All men are mortal."
-4.  Check your local LLM server logs to see the request coming in.
+### Interactive Demo
+
+Run the interactive CLI to chat with the Logic Server, select pre-defined scenarios, and configure connection settings on the fly:
+
+```bash
+npm run demo
+```
+
+Features:
+- **Scenarios**: Choose from classic logic problems (e.g., Socrates, Knights & Knaves).
+- **Visualization**: See the step-by-step process (Translation → Proof → Model Finding).
+- **Configuration**: Easily switch LLM endpoints within the tool.
+
+### Automated Testing
+
+To verify your LLM's performance against a suite of logic problems:
+
+```bash
+npm run test:llm -- --url="http://localhost:8080/v1"
+```
+
+Arguments:
+- `--url=<url>`: Override `OPENAI_BASE_URL`.
+- `--key=<key>`: Override `OPENAI_API_KEY`.
+
+This script will run through diverse scenarios and report a Pass/Fail summary, which is useful for validating if a "compact" model (like Qwen 0.5B) is capable enough for the tasks.
 
 ## Troubleshooting
 
