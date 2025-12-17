@@ -2,6 +2,10 @@ import type { EvaluationCase, EvaluationResult, EvolutionStrategy } from '../typ
 import type { IPerformanceDatabase } from './storage.js';
 import type { LLMProvider } from '../types/llm.js';
 import { randomUUID } from 'crypto';
+import { parse } from '../parser.js';
+import { toNNF, standardizeVariables } from '../utils/transform.js';
+import { astToString } from '../utils/ast.js';
+import { parseLLMOutput } from '../llm/outputParser.js';
 
 export class Evaluator {
     private db: IPerformanceDatabase;
@@ -34,12 +38,11 @@ export class Evaluator {
         const rawOutput = response.content;
 
         // 3. Parse and Validate
-        // This logic needs to be robust. For now, we'll assume the output is directly the FOL
-        // or a JSON that needs parsing.
-        // We need a canonical way to compare FOL.
+        const { premises, conclusion } = parseLLMOutput(rawOutput);
+        const actualFormulas = [...premises];
+        if (conclusion) actualFormulas.push(conclusion);
 
-        // Use a heuristic comparison for now (e.g., string equality or set equality after normalization)
-        const isSuccess = this.compareOutput(rawOutput, testCase.expected);
+        const isSuccess = this.compareOutput(actualFormulas, testCase.expected);
 
         const result: EvaluationResult = {
             id: randomUUID(),
@@ -91,16 +94,26 @@ export class Evaluator {
         };
     }
 
-    private compareOutput(raw: string, expected: string[]): boolean {
-        // Very basic comparison: check if all expected formulas appear in the raw output
-        // In reality, we need to parse the raw output into FOL AST and compare with expected ASTs
-        // modulo variable renaming and ordering.
-        // TODO: Implement AST-based comparison using parser.
+    private compareOutput(actual: string[], expected: string[]): boolean {
+        // Check if every expected formula has an equivalent in the actual output
+        return expected.every(exp =>
+            actual.some(act => this.areEquivalent(exp, act))
+        );
+    }
 
-        // Normalization helper
-        const normalize = (s: string) => s.replace(/\s+/g, '').toLowerCase();
+    private areEquivalent(f1: string, f2: string): boolean {
+        try {
+            const ast1 = parse(f1);
+            const ast2 = parse(f2);
 
-        const rawNormalized = normalize(raw);
-        return expected.every(e => rawNormalized.includes(normalize(e)));
+            // Normalize: NNF + Standardized Variables
+            const norm1 = standardizeVariables(toNNF(ast1));
+            const norm2 = standardizeVariables(toNNF(ast2));
+
+            return astToString(norm1) === astToString(norm2);
+        } catch {
+            // If parsing fails, fall back to normalized string equality
+            return f1.replace(/\s+/g, '') === f2.replace(/\s+/g, '');
+        }
     }
 }
