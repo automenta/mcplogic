@@ -69,14 +69,50 @@ export function createServer(): Server {
     const evolver = new StrategyEvolver(llmProvider, perfDb);
     const curriculumGenerator = new CurriculumGenerator(llmProvider, perfDb, 'src/evalCases/generated');
 
-    // Initial Strategy (Heuristic/Placeholder)
-    const initialStrategies = [{
+    // Define strategies
+    const heuristicStrategy = {
         id: 'heuristic-v1',
-        description: 'Standard heuristic strategy',
-        promptTemplate: 'Translate the following to FOL:\n{{INPUT}}',
+        description: 'Standard heuristic strategy (Regex-based)',
+        promptTemplate: 'Translate the following to FOL:\n{{INPUT}}', // Unused for heuristic but required by type
         parameters: {},
         metadata: { successRate: 0, inferenceCount: 0, generation: 0 }
-    }];
+    };
+
+    const llmStrategy = {
+        id: 'llm-default',
+        description: 'LLM-based translation strategy',
+        promptTemplate: `You are an expert in First-Order Logic (FOL).
+Translate the following natural language text into First-Order Logic formulas using Prover9 syntax.
+
+Syntax Rules:
+- Quantifiers: 'all x', 'exists x'
+- Operators: '&' (and), '|' (or), '->' (implies), '<->' (iff), '-' (not)
+- Predicates: Lowercase start, e.g., 'man(x)', 'mortal(x)'
+- Constants: Lowercase start, e.g., 'socrates'
+- Variables: Single lowercase letters (x, y, z...) are free variables (implicitly universal) unless bound.
+- Equality: '='
+
+Output Format:
+- Provide ONLY the list of formulas.
+- Do not wrap in code blocks if possible, or use \`\`\`prolog or \`\`\`text.
+- Separate formulas by newlines.
+- If there is a clear conclusion/goal to prove, prefix it with "conclusion:".
+
+Input:
+{{INPUT}}
+`,
+        parameters: {},
+        metadata: { successRate: 0, inferenceCount: 0, generation: 0 }
+    };
+
+    // Determine default strategy based on environment
+    const hasLLMConfig = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_BASE_URL || process.env.OLLAMA_URL);
+
+    // We start with the Heuristic strategy in the list, but we might set the default to LLM
+    const initialStrategies = [heuristicStrategy, llmStrategy];
+
+    // If LLM is configured, use it as default. Otherwise fallback to heuristic.
+    const defaultStrategy = hasLLMConfig ? llmStrategy : heuristicStrategy;
 
     const optimizer = new Optimizer(perfDb, evolver, evaluator, {
         populationSize: 5,
@@ -87,7 +123,7 @@ export function createServer(): Server {
     });
 
     // Initialize Router
-    const router = new InputRouter(perfDb, initialStrategies[0], llmProvider);
+    const router = new InputRouter(perfDb, defaultStrategy, llmProvider);
     LLMHandlers.setInputRouter(router);
 
     EvolutionHandlers.initializeEvolution(optimizer, perfDb, curriculumGenerator, initialStrategies);

@@ -12,14 +12,33 @@ export class StandardLLMProvider implements LLMProvider {
     private type: 'openai' | 'ollama';
 
     constructor() {
-        // Defaults to Ollama (localhost) if no API key
         this.apiKey = process.env.OPENAI_API_KEY || '';
-        this.type = this.apiKey ? 'openai' : 'ollama';
+        const baseUrl = process.env.OPENAI_BASE_URL;
 
-        if (this.type === 'openai') {
+        if (baseUrl) {
+            // Custom OpenAI-compatible endpoint (e.g., local llama.cpp, vLLM)
+            this.type = 'openai';
+            // Ensure we handle the path correctly. We assume the user provides the base URL
+            // (e.g. http://localhost:8080/v1) and we append /chat/completions,
+            // OR they provide the full URL if they know what they are doing.
+            // For safety with standard tools, we'll try to detect if it looks like a base or full URL.
+            // But simpler is to assume it is the BASE URL for the API (like OpenAI SDK).
+            this.apiUrl = baseUrl.replace(/\/$/, '') + '/chat/completions';
+
+            // If the user provided a specific URL that already ends in chat/completions, fix it.
+            if (baseUrl.endsWith('/chat/completions')) {
+                this.apiUrl = baseUrl;
+            }
+
+            this.model = process.env.OPENAI_MODEL || 'model'; // Local servers often ignore model name, but 'model' is safe
+        } else if (this.apiKey) {
+            // Standard OpenAI
+            this.type = 'openai';
             this.apiUrl = 'https://api.openai.com/v1/chat/completions';
             this.model = process.env.OPENAI_MODEL || 'gpt-4o';
         } else {
+            // Default to Ollama
+            this.type = 'ollama';
             this.apiUrl = process.env.OLLAMA_URL || 'http://localhost:11434/api/chat';
             this.model = process.env.OLLAMA_MODEL || 'llama3';
         }
@@ -75,7 +94,7 @@ export class StandardLLMProvider implements LLMProvider {
                  return { content: 'MOCK LLM RESPONSE', usage: { promptTokens: 0, completionTokens: 0 }};
             }
             const errMsg = error instanceof Error ? error.message : String(error);
-            console.error(`LLM Provider Error: ${errMsg}`, { model: this.model });
+            console.error(`LLM Provider Error: ${errMsg}`, { model: this.model, url: this.apiUrl });
             throw createGenericError('ENGINE_ERROR', `LLM Provider failed: ${errMsg}`);
         }
     }
