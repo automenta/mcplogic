@@ -26,7 +26,9 @@
         "check": "npm run lint && npm test",
         "todo": "grep -rn 'TODO\\|FIXME\\|HACK' src/ --include='*.ts'",
         "benchmark:tptp": "tsx benchmarks/run-tptp.ts",
-        "tasks": "tsx scripts/task-status.ts"
+        "tasks": "tsx scripts/task-status.ts",
+        "demo": "tsx scripts/demo.ts",
+        "test:llm": "tsx scripts/test_llm.ts"
     },
     "keywords": [
         "mcp",
