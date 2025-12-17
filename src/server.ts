@@ -57,8 +57,8 @@ const toolHandlers: Record<string, ToolHandler> = {
     'get-category-axioms': (args, c) =>
         Handlers.getCategoryAxiomsHandler(args, c.categoricalHelpers),
 
-    'translate-text': (args) =>
-        LLMHandlers.translateTextHandler(args),
+    'translate-text': (args, c) =>
+        LLMHandlers.translateTextHandler(args, c.inputRouter),
 
     'agent-reason': (args) =>
         AgentHandlers.reasonHandler(args),

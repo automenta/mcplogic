@@ -55,7 +55,12 @@ export class Optimizer {
     /**
      * Runs the evolution loop.
      */
-    async run(initialStrategies: EvolutionStrategy[], onProgress?: (msg: string) => void) {
+    async run(
+        initialStrategies: EvolutionStrategy[],
+        onProgress?: (msg: string) => void,
+        overrides?: Partial<EvolutionConfig>
+    ) {
+        const config = { ...this.config, ...overrides };
         let population = [...initialStrategies];
         const evalCases = this.loadEvaluationCases();
         const caseLookup = new Map(evalCases.map(c => [c.id, c]));
@@ -65,8 +70,8 @@ export class Optimizer {
             return population;
         }
 
-        for (let gen = 0; gen < this.config.generations; gen++) {
-            if (onProgress) onProgress(`=== Generation ${gen + 1} / ${this.config.generations} ===`);
+        for (let gen = 0; gen < config.generations; gen++) {
+            if (onProgress) onProgress(`=== Generation ${gen + 1} / ${config.generations} ===`);
 
             // 1. Evaluate current population
             for (const strategy of population) {
@@ -83,12 +88,12 @@ export class Optimizer {
 
             // 2. Selection (Elitism)
             population.sort((a, b) => b.metadata.successRate - a.metadata.successRate);
-            const elites = population.slice(0, this.config.elitismCount);
+            const elites = population.slice(0, config.elitismCount);
 
             // 3. Reproduction & Mutation
             const newPopulation = [...elites];
 
-            while (newPopulation.length < this.config.populationSize) {
+            while (newPopulation.length < config.populationSize) {
                 // Select parent (tournament or simple top)
                 const parent = elites[Math.floor(Math.random() * elites.length)];
 

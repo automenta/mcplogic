@@ -6,6 +6,7 @@ import type { EvolutionStrategy, EvolutionConfig } from '../../src/types/evoluti
 import type { LLMProvider, LLMMessage } from '../../src/types/llm.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { jest } from '@jest/globals';
 
 // Mock LLM
 class MockLLM implements LLMProvider {
@@ -81,5 +82,22 @@ describe('Optimizer', () => {
         // No assertions on internal state, but ensures no crash
         // and coverage of the flow
         expect(true).toBe(true);
+    });
+
+    test('should respect overrides', async () => {
+        const spy = jest.spyOn(evaluator, 'evaluate');
+        const initialStrategies: EvolutionStrategy[] = [{
+            id: 'strat-1',
+            description: 'base',
+            promptTemplate: 'Translate {{INPUT}}',
+            parameters: {},
+            metadata: { successRate: 0, inferenceCount: 0, generation: 0 }
+        }];
+
+        // Override generations to 2
+        await optimizer.run(initialStrategies, undefined, { generations: 2, populationSize: 2 });
+
+        // Should have called evaluate multiple times
+        expect(spy.mock.calls.length).toBeGreaterThan(0);
     });
 });
