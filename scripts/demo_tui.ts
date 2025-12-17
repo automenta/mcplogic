@@ -2,85 +2,99 @@ import { spawn } from 'child_process';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import * as readline from 'readline';
 
 // Configuration
 const MOCK_PORT = 3001;
+const USE_MOCK = process.argv.includes('--mock');
 
-// Test Scenarios
-const SCENARIOS = [
+// Mock Data
+const MOCK_SCENARIOS = [
     {
-        name: 'Basic Syllogism',
-        input: 'All humans are mortal. Socrates is human.',
-        mockResponse: `all x (Human(x) -> Mortal(x))
-Human(Socrates)
-conclusion: Mortal(Socrates)`
+        pattern: /all humans are mortal/i,
+        response: `all x (Human(x) -> Mortal(x))`
     },
     {
-        name: 'Chatty Response',
-        input: 'Please translate: Birds fly.',
-        mockResponse: `Sure! Here is the First-Order Logic translation for your request:
-
-all x (Bird(x) -> Fly(x))
-
-Let me know if you need anything else!`
+        pattern: /socrates is human/i,
+        response: `Human(Socrates)`
     },
     {
-        name: 'Complex Quantifiers',
-        input: 'Every voter casts a ballot for a candidate.',
-        mockResponse: "```prolog\nall x (Voter(x) -> exists y (Candidate(y) & CastsBallotFor(x,y)))\n```"
-    },
-    {
-        name: 'Negation',
-        input: 'Not all birds fly.',
-        mockResponse: `-(all x (Bird(x) -> Fly(x)))`
+        pattern: /is socrates mortal/i,
+        response: `conclusion: Mortal(Socrates)`
     }
 ];
 
-// 1. Start Mock LLM Server
-const mockServer = createServer((req: IncomingMessage, res: ServerResponse) => {
-    let body = '';
-    req.on('data', chunk => { body += chunk.toString(); });
-    req.on('end', () => {
-        if (req.url?.includes('/chat/completions') && req.method === 'POST') {
-            const parsed = JSON.parse(body);
-            const content = parsed.messages[parsed.messages.length - 1].content;
+let mockServer: any = null;
 
-            // Simple heuristic to match scenario based on input substring
-            const scenario = SCENARIOS.find(s => content.includes(s.input)) || SCENARIOS[0];
+// Helper to start mock server
+function startMockServer(): Promise<void> {
+    return new Promise((resolve) => {
+        mockServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+            let body = '';
+            req.on('data', chunk => { body += chunk.toString(); });
+            req.on('end', () => {
+                if (req.url?.includes('/chat/completions') && req.method === 'POST') {
+                    const parsed = JSON.parse(body);
+                    const content = parsed.messages[parsed.messages.length - 1].content;
 
-            const response = {
-                id: 'chatcmpl-mock',
-                object: 'chat.completion',
-                created: Date.now(),
-                model: 'mock-model',
-                choices: [{
-                    message: {
-                        role: 'assistant',
-                        content: scenario.mockResponse
-                    }
-                }]
-            };
+                    // Find matching scenario
+                    const scenario = MOCK_SCENARIOS.find(s => s.pattern.test(content));
+                    const responseText = scenario ? scenario.response : `Predicate(${content.replace(/\s/g, '_')})`;
 
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(response));
-        } else {
-            res.writeHead(404);
-            res.end('Not Found');
-        }
+                    const response = {
+                        id: 'chatcmpl-mock',
+                        object: 'chat.completion',
+                        created: Date.now(),
+                        model: 'mock-model',
+                        choices: [{
+                            message: {
+                                role: 'assistant',
+                                content: responseText
+                            }
+                        }]
+                    };
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(response));
+                } else {
+                    res.writeHead(404);
+                    res.end('Not Found');
+                }
+            });
+        });
+        mockServer.listen(MOCK_PORT, () => {
+            // console.log(`[Demo] Mock LLM running on port ${MOCK_PORT}`);
+            resolve();
+        });
     });
-});
+}
 
-async function runDemo() {
+async function runInteractiveMode() {
+    // 1. Start Mock LLM Server if needed
+    if (USE_MOCK) {
+        await startMockServer();
+        console.log('[Demo] Mock Server Started.');
+    }
+
     // 2. Setup Environment
-    const env = {
-        ...process.env,
-        OPENAI_BASE_URL: `http://localhost:${MOCK_PORT}/v1`,
-        OPENAI_API_KEY: 'test-key',
-        OLLAMA_URL: undefined
-    };
+    const env = { ...process.env };
+
+    if (USE_MOCK) {
+        env.OPENAI_BASE_URL = `http://localhost:${MOCK_PORT}/v1`;
+        env.OPENAI_API_KEY = 'test-key';
+        env.OLLAMA_URL = undefined;
+        console.log('[Demo] Running in MOCK mode.');
+    } else {
+        if (!env.OPENAI_BASE_URL && !env.OPENAI_API_KEY && !env.OLLAMA_URL) {
+            console.warn('[Demo] WARNING: No LLM environment variables found.');
+            console.warn('[Demo] Please set OPENAI_BASE_URL, OPENAI_API_KEY, or OLLAMA_URL.');
+            console.warn('[Demo] Or run with --mock to use internal mock server.');
+            process.exit(1);
+        }
+        console.log('[Demo] Running in REAL mode (connecting to configured LLM).');
+    }
 
     // 3. Connect MCP Client
-    // Using tsx to run the server from source for the demo
     const transport = new StdioClientTransport({
         command: 'npx',
         args: ['tsx', '-e', 'import { runServer } from "./src/server.ts"; runServer();'],
@@ -91,37 +105,140 @@ async function runDemo() {
 
     try {
         await client.connect(transport);
-        console.log('[Demo] Connected to MCP Server (Mocking LLM).');
+        console.log('[Demo] Connected to MCP Logic Server.');
+    } catch (e) {
+        console.error('[Demo] Failed to connect to MCP server:', e);
+        if (mockServer) mockServer.close();
+        process.exit(1);
+    }
 
-        console.log('\n--- Running Translation Scenarios ---');
+    // 4. Interactive Loop
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        prompt: '\n> '
+    });
 
-        for (const scenario of SCENARIOS) {
-            console.log(`\nInput: "${scenario.input}"`);
+    const sessionPremises: string[] = [];
 
-            const result = await client.callTool({
-                name: 'translate-text',
-                arguments: { text: scenario.input }
-            });
+    console.log('\n--- Interactive Logic Demo ---');
+    console.log('Commands:');
+    console.log('  <text>        : Translate text to FOL and add as premise.');
+    console.log('  prove <text>  : Translate text to FOL and try to prove it.');
+    console.log('  list          : List current premises.');
+    console.log('  clear         : Clear all premises.');
+    console.log('  exit          : Quit.');
 
-            const content = JSON.parse((result as any).content[0].text);
+    rl.prompt();
 
-            if (content.success) {
-                console.log('Translation Success!');
-                if (content.premises.length) console.log('Premises:', content.premises);
-                if (content.conclusion) console.log('Conclusion:', content.conclusion);
-            } else {
-                console.log('Translation Failed:', content.errors);
-            }
+    rl.on('line', async (line) => {
+        const input = line.trim();
+        if (!input) {
+            rl.prompt();
+            return;
         }
 
-    } catch (error) {
-        console.error('[Demo] Error:', error);
-    } finally {
-        mockServer.close();
-        process.exit(0);
-    }
+        try {
+            if (input === 'exit') {
+                rl.close();
+                return;
+            }
+
+            if (input === 'clear') {
+                sessionPremises.length = 0;
+                console.log('Premises cleared.');
+                rl.prompt();
+                return;
+            }
+
+            if (input === 'list') {
+                console.log('Current Premises:');
+                if (sessionPremises.length === 0) console.log('  (none)');
+                sessionPremises.forEach((p, i) => console.log(`  ${i + 1}. ${p}`));
+                rl.prompt();
+                return;
+            }
+
+            if (input.startsWith('prove ')) {
+                const textToProve = input.substring(6).trim();
+                console.log(`Analyzing goal: "${textToProve}"...`);
+
+                // 1. Translate Goal
+                const transResult = await client.callTool({
+                    name: 'translate-text',
+                    arguments: { text: textToProve }
+                });
+
+                const transContent = JSON.parse((transResult as any).content[0].text);
+
+                let goalFormula: string | undefined;
+
+                if (transContent.conclusion) {
+                    goalFormula = transContent.conclusion;
+                } else if (transContent.premises && transContent.premises.length > 0) {
+                    goalFormula = transContent.premises[0]; // Assume first premise is goal if not marked
+                }
+
+                if (!goalFormula) {
+                    console.error('Failed to extract goal formula from LLM output.');
+                } else {
+                    console.log(`Goal Formula: ${goalFormula}`);
+
+                    // 2. Call Prove
+                    console.log('Proving...');
+                    const proveResult = await client.callTool({
+                        name: 'prove',
+                        arguments: {
+                            premises: sessionPremises,
+                            goal: goalFormula
+                        }
+                    });
+
+                    const proveContent = JSON.parse((proveResult as any).content[0].text);
+                    console.log(`Result: ${proveContent.result.toUpperCase()}`);
+                    if (proveContent.explanation) {
+                        console.log(`Explanation: ${proveContent.explanation}`);
+                    }
+                }
+
+            } else {
+                // Treat as Premise
+                console.log(`Translating premise: "${input}"...`);
+
+                const transResult = await client.callTool({
+                    name: 'translate-text',
+                    arguments: { text: input }
+                });
+
+                const transContent = JSON.parse((transResult as any).content[0].text);
+
+                if (transContent.premises && transContent.premises.length > 0) {
+                    console.log('Generated Formulas:');
+                    transContent.premises.forEach((p: string) => {
+                        console.log(`  + ${p}`);
+                        sessionPremises.push(p);
+                    });
+                } else {
+                    console.log('No formulas generated.');
+                    if (transContent.errors) console.error('Errors:', transContent.errors);
+                }
+            }
+
+        } catch (error) {
+            console.error('Error:', error);
+        }
+
+        rl.prompt();
+    });
+
+    rl.on('close', () => {
+        console.log('\nGoodbye.');
+        if (mockServer) {
+             mockServer.close();
+        }
+        // Force exit to kill MCP subprocess if it hangs
+        setTimeout(() => process.exit(0), 100);
+    });
 }
 
-mockServer.listen(MOCK_PORT, async () => {
-    await runDemo();
-});
+runInteractiveMode();
