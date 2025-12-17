@@ -15,13 +15,11 @@ async function runInteractiveMode() {
         console.warn('[Demo] The "translate-text" tool requires a configured LLM.');
         console.warn('[Demo] Please set OPENAI_BASE_URL (for local), OPENAI_API_KEY, or OLLAMA_URL.');
         console.warn('[Demo] See AGENTS.md for setup instructions.\n');
-        // We continue, as the user might only want to use 'prove' with manual premises.
     } else {
         console.log('[Demo] LLM Configuration detected. Ready for Natural Language inputs.');
     }
 
     // 2. Connect MCP Client
-    // We spawn the server process directly.
     const transport = new StdioClientTransport({
         command: 'npx',
         args: ['tsx', '-e', 'import { runServer } from "./src/server.ts"; runServer();'],
@@ -113,18 +111,35 @@ async function runInteractiveMode() {
 
                     // 2. Call Prove
                     console.log('Proving...');
-                    const proveResult = await client.callTool({
-                        name: 'prove',
-                        arguments: {
-                            premises: sessionPremises,
-                            goal: goalFormula
-                        }
-                    });
+                    let proveResult;
+                    try {
+                         proveResult = await client.callTool({
+                            name: 'prove',
+                            arguments: {
+                                premises: sessionPremises,
+                                goal: goalFormula
+                            }
+                        });
+                    } catch (e) {
+                         console.error('Prove tool failed:', e);
+                         rl.prompt();
+                         return;
+                    }
 
-                    const proveContent = JSON.parse((proveResult as any).content[0].text);
-                    console.log(`Result: ${proveContent.result.toUpperCase()}`);
-                    if (proveContent.explanation) {
-                        console.log(`Explanation: ${proveContent.explanation}`);
+                    if ((proveResult as any).isError) {
+                        const errorContent = JSON.parse((proveResult as any).content[0].text);
+                        console.error('Prover Error:', errorContent);
+                    } else {
+                        const proveContent = JSON.parse((proveResult as any).content[0].text);
+                        // console.log('Raw Result:', proveContent);
+                        if (proveContent.result) {
+                             console.log(`Result: ${proveContent.result.toUpperCase()}`);
+                        } else {
+                             console.log('Result: UNKNOWN (No result field returned)');
+                        }
+                        if (proveContent.explanation) {
+                            console.log(`Explanation: ${proveContent.explanation}`);
+                        }
                     }
                 }
 
@@ -160,7 +175,6 @@ async function runInteractiveMode() {
 
     rl.on('close', () => {
         console.log('\nGoodbye.');
-        // Force exit to kill MCP subprocess if it hangs
         setTimeout(() => process.exit(0), 100);
     });
 }

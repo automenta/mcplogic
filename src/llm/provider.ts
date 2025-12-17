@@ -18,11 +18,6 @@ export class StandardLLMProvider implements LLMProvider {
         if (baseUrl) {
             // Custom OpenAI-compatible endpoint (e.g., local llama.cpp, vLLM)
             this.type = 'openai';
-            // Ensure we handle the path correctly. We assume the user provides the base URL
-            // (e.g. http://localhost:8080/v1) and we append /chat/completions,
-            // OR they provide the full URL if they know what they are doing.
-            // For safety with standard tools, we'll try to detect if it looks like a base or full URL.
-            // But simpler is to assume it is the BASE URL for the API (like OpenAI SDK).
             this.apiUrl = baseUrl.replace(/\/$/, '') + '/chat/completions';
 
             // If the user provided a specific URL that already ends in chat/completions, fix it.
@@ -30,7 +25,7 @@ export class StandardLLMProvider implements LLMProvider {
                 this.apiUrl = baseUrl;
             }
 
-            this.model = process.env.OPENAI_MODEL || 'model'; // Local servers often ignore model name, but 'model' is safe
+            this.model = process.env.OPENAI_MODEL || 'model';
         } else if (this.apiKey) {
             // Standard OpenAI
             this.type = 'openai';
