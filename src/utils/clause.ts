@@ -6,6 +6,8 @@
  */
 
 import { Clause, Literal, SkolemEnv, DIMACSResult, ClausifyOptions, ClausifyResult } from '../types/clause.js';
+import { astToString } from './ast.js';
+import { ASTNode } from '../types/ast.js';
 
 export type {
     Clause,
@@ -35,7 +37,16 @@ export function areComplementary(l1: Literal, l2: Literal): boolean {
     if (l1.predicate !== l2.predicate) return false;
     if (l1.negated === l2.negated) return false;
     if (l1.args.length !== l2.args.length) return false;
-    return l1.args.every((arg, i) => arg === l2.args[i]);
+
+    // Deep comparison of AST arguments
+    // We can rely on astToString as a canonical representation for comparison
+    // since we don't have a deepEquals utility handy and this is safe for terms.
+    for (let i = 0; i < l1.args.length; i++) {
+        if (astToString(l1.args[i]) !== astToString(l2.args[i])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**
@@ -56,8 +67,9 @@ export function isTautology(clause: Clause): boolean {
  * Format a literal as a string.
  */
 export function literalToString(lit: Literal): string {
-    const atom = lit.args.length > 0
-        ? `${lit.predicate}(${lit.args.join(', ')})`
+    const args = lit.args.map(astToString);
+    const atom = args.length > 0
+        ? `${lit.predicate}(${args.join(', ')})`
         : lit.predicate;
     return lit.negated ? `¬${atom}` : atom;
 }
@@ -82,8 +94,9 @@ export function cnfToString(clauses: Clause[]): string {
  * Convert a literal to its unique atom key (without negation).
  */
 export function atomToKey(lit: Literal): string {
-    return lit.args.length > 0
-        ? `${lit.predicate}(${lit.args.join(',')})`
+    const args = lit.args.map(astToString);
+    return args.length > 0
+        ? `${lit.predicate}(${args.join(',')})`
         : lit.predicate;
 }
 

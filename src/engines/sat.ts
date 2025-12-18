@@ -12,7 +12,7 @@ import { ProveResult, Verbosity } from '../types/index.js';
 import { buildProveResult } from '../utils/response.js';
 import { clausify, isHornFormula } from '../clausifier.js';
 import { parse } from '../parser.js';
-import { createAnd, createNot } from '../utils/ast.js';
+import { createAnd, createNot, astToString } from '../utils/ast.js';
 import {
     ReasoningEngine,
     EngineCapabilities,
@@ -40,11 +40,12 @@ export class SATEngine implements ReasoningEngine {
     /**
      * Convert a literal to a unique string key for the SAT solver.
      */
-    private literalToKey(lit: { predicate: string; args: string[] }): string {
-        if (lit.args.length === 0) {
+    private literalToKey(lit: Literal): string {
+        const argStrings = lit.args.map(astToString);
+        if (argStrings.length === 0) {
             return lit.predicate;
         }
-        return `${lit.predicate}(${lit.args.join(',')})`;
+        return `${lit.predicate}(${argStrings.join(',')})`;
     }
 
     /**
@@ -144,16 +145,27 @@ export class SATEngine implements ReasoningEngine {
         for (const clause of clauses) {
             for (const lit of clause.literals) {
                 for (const arg of lit.args) {
+                    const argStr = astToString(arg);
                     // standardizeVariables typically produces 'X', 'Y', 'Z', 'X1', 'Y1' etc.
                     // Constants are lowercase (from parser).
                     // Skolem constants are sk_N.
 
-                    // Check if it looks like a variable (starts with Uppercase)
-                    if (/^[A-Z]/.test(arg)) {
-                        variables.add(arg);
-                    } else {
-                        constants.add(arg);
+                    // Check if it looks like a variable (starts with Uppercase) or from standardize vars (_v)
+                    // Note: AST variable node check would be better, but we only have nodes here.
+
+                    if (arg.type === 'variable') {
+                        variables.add(arg.name!);
+                    } else if (arg.type === 'constant') {
+                         constants.add(arg.name!);
+                    } else if (arg.type === 'function') {
+                        // For function terms, we might need deeper analysis, but simple grounding
+                        // usually replaces top-level variables.
+                        // Ideally we traverse, but for now we'll stick to simple cases.
+                        // Assuming simple constants or variables for args.
                     }
+
+                    // Fallback to string check if needed for legacy reasons (e.g. if type not set correctly)
+                    // but we should trust types now.
                 }
             }
         }
@@ -170,7 +182,9 @@ export class SATEngine implements ReasoningEngine {
             const clauseVars = new Set<string>();
             for (const lit of clause.literals) {
                 for (const arg of lit.args) {
-                    if (/^[A-Z]/.test(arg)) clauseVars.add(arg);
+                     if (arg.type === 'variable') {
+                        clauseVars.add(arg.name!);
+                     }
                 }
             }
 
@@ -194,7 +208,12 @@ export class SATEngine implements ReasoningEngine {
                 const newLiterals = clause.literals.map(lit => ({
                     predicate: lit.predicate,
                     negated: lit.negated,
-                    args: lit.args.map(a => assign.get(a) || a)
+                    args: lit.args.map(a => {
+                        if (a.type === 'variable' && assign.has(a.name!)) {
+                            return { type: 'constant', name: assign.get(a.name!) } as const;
+                        }
+                        return a;
+                    })
                 }));
                 instantiatedClauses.push({ literals: newLiterals, origin: clause.origin });
             }

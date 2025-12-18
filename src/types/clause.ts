@@ -5,6 +5,7 @@
  * Used by the clausifier to transform arbitrary FOL into clause form.
  */
 
+import { ASTNode } from './ast.js';
 import { LogicError } from './errors.js';
 
 /**
@@ -15,7 +16,7 @@ export interface Literal {
     /** Predicate name */
     predicate: string;
     /** Arguments (variable or constant names) */
-    args: string[];
+    args: ASTNode[];
     /** Whether this literal is negated */
     negated: boolean;
 }

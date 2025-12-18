@@ -4,7 +4,7 @@ import {
 import { validateFormulas } from '../syntaxValidator.js';
 import { SessionManager } from '../sessionManager.js';
 import { EngineManager } from '../engines/manager.js';
-import { buildProveResponse } from './utils.js';
+import { buildProveResponse } from '../utils/response.js';
 
 export function createSessionHandler(
     args: {
