@@ -18,7 +18,7 @@ export interface PrologAnswer {
 }
 
 // In tau-prolog type definitions, session is a class, but we use it as type here
-export type Session = pl.type.Session;
+export type Session = any;
 
 // Re-export type for compatibility
 export type PrologSession = Session;

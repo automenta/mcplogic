@@ -1,5 +1,5 @@
 import { ASTNode } from '../../types/index.js';
-import { SkolemEnv } from '../clause.js';
+import { SkolemEnv } from '../../logic/clause.js';
 
 /**
  * Skolemize - replace existentially quantified variables with Skolem functions.
