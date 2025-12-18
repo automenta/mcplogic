@@ -11,6 +11,8 @@ import { allMappings } from '../utils/enumerate.js';
 import { ProveResult, Verbosity } from '../types/index.js';
 import { buildProveResult } from '../utils/response.js';
 import { clausify, isHornFormula } from '../clausifier.js';
+import { parse } from '../parser.js';
+import { createAnd, createNot } from '../utils/ast.js';
 import {
     ReasoningEngine,
     EngineCapabilities,
@@ -217,12 +219,21 @@ export class SATEngine implements ReasoningEngine {
 
         try {
             // Build the refutation formula: premises & -conclusion
-            const wrappedPremises = premises.map(p => `(${p})`);
-            const wrappedNegConclusion = `(-(${conclusion}))`;
-            const refutationFormula = [...wrappedPremises, wrappedNegConclusion].join(' & ');
+            // Use AST construction to avoid string parsing issues
+            const premiseNodes = premises.map(p => parse(p));
+            const conclusionNode = parse(conclusion);
+            const negatedConclusion = createNot(conclusionNode);
+
+            // Combine all formulas with AND
+            const allNodes = [...premiseNodes, negatedConclusion];
+            // If only one node (no premises), just use it. If multiple, reduce with AND.
+            // Note: createAnd takes 2 args.
+            const refutationAST = allNodes.length > 0
+                ? allNodes.reduce((acc, node) => createAnd(acc, node))
+                : negatedConclusion; // Should not happen given premises+conclusion
 
             // Clausify 
-            const clausifyResult = clausify(refutationFormula);
+            const clausifyResult = clausify(refutationAST);
 
             if (!clausifyResult.success || !clausifyResult.clauses) {
                 return buildProveResult({
