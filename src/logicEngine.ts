@@ -19,7 +19,7 @@ import {
 } from './types/index.js';
 import { buildProveResult } from './utils/response.js';
 import { ProveOptions } from './types/options.js';
-import { META_INTERPRETER, generateDynamicDirectives, parseTraceOutput } from './utils/trace.js';
+import { META_INTERPRETER, generateDynamicDirectives, parseTraceOutput } from './engines/prolog/trace.js';
 import { TauPrologAdapter } from './engines/prolog/adapter.js';
 
 // Re-export ProveOptions to ensure it's used correctly by consumers

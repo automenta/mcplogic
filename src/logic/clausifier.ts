@@ -22,7 +22,7 @@ import {
     ClausifyResult,
     createSkolemEnv,
     isTautology,
-} from '../utils/clause.js';
+} from './clause.js';
 import {
     toNNF,
     standardizeVariables,
@@ -30,7 +30,7 @@ import {
     dropUniversals,
 } from '../utils/transform.js';
 import { createClausificationError, createGenericError } from '../types/errors.js';
-import { toCNF } from '../utils/cnf.js';
+import { toCNF } from './cnf.js';
 
 /** Default clausification options */
 const DEFAULT_OPTIONS: Required<ClausifyOptions> = {
@@ -119,11 +119,11 @@ export function isHornFormula(clauses: Clause[]): boolean {
     return true;
 }
 
-export { clausesToDIMACS } from '../utils/clause.js';
+export { clausesToDIMACS } from './clause.js';
 export {
     toNNF,
     standardizeVariables,
     skolemize,
     dropUniversals,
 } from '../utils/transform.js';
-export { toCNF } from '../utils/cnf.js';
+export { toCNF } from './cnf.js';

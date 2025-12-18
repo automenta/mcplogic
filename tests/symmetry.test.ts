@@ -1,4 +1,4 @@
-import { symmetricMappings, allMappings } from '../src/utils/enumerate.js';
+import { symmetricMappings, allMappings } from '../src/utils/math/enumerate.js';
 
 describe('Symmetry Breaking', () => {
     it('reduces 3 keys from 64 to 5', () => {

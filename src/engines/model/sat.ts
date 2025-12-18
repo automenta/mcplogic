@@ -1,7 +1,7 @@
 import { Model, ModelOptions, Literal } from '../../types/index.js';
 import { parse } from '../../parser.js';
 import { astToString } from '../../utils/ast.js';
-import { groundFormula } from '../../utils/grounding.js';
+import { groundFormula } from '../../logic/grounding.js';
 import { clausify } from '../../clausifier.js';
 import { SATEngine } from '../sat.js';
 

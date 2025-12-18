@@ -13,7 +13,7 @@ import {
 } from '../src/clausifier';
 import { clausesToProlog } from '../src/translator';
 import { parse } from '../src/parser';
-import { createSkolemEnv, clauseToString, cnfToString } from '../src/utils/clause';
+import { createSkolemEnv, clauseToString, cnfToString } from '../src/logic/clause';
 
 describe('Clausifier', () => {
     describe('toNNF - Negation Normal Form', () => {
