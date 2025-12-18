@@ -1,4 +1,4 @@
-import { createModelFinder } from '../src/modelFinder.js';
+import { createModelFinder } from '../src/model/index.js';
 
 describe('SAT Multiple Model Finding', () => {
     test('finds multiple models for P(a) | P(b)', async () => {

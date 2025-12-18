@@ -1,4 +1,4 @@
-import { ModelFinder } from '../src/modelFinder';
+import { ModelFinder } from '../src/model/index';
 import { createTestModelFinder, expectModelFound } from './fixtures.js';
 
 describe('SAT Model Finding', () => {

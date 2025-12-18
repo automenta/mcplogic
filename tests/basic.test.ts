@@ -2,10 +2,11 @@
  * Basic tests for the MCP Logic Node.js implementation
  */
 
-import { parse, astToString } from '../src/parser.js';
-import { validateFormulas } from '../src/syntaxValidator.js';
+import { parse } from '../src/parser/index.js';
+import { astToString } from '../src/utils/ast-modules/index.js';
+import { validateFormulas } from '../src/validation/syntax.js';
 import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../src/axioms/categorical.js';
-import { ModelFinder } from '../src/modelFinder.js';
+import { ModelFinder } from '../src/model/index.js';
 import { FORMULAS, createTestModelFinder, expectModelFound } from './fixtures.js';
 
 describe('Parser', () => {

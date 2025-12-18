@@ -2,7 +2,7 @@ import {
     Verbosity,
     ModelResponse,
 } from '../types/index.js';
-import { ModelFinder, createModelFinder } from '../modelFinder.js';
+import { ModelFinder, createModelFinder } from '../model/index.js';
 import { buildModelResponse } from '../utils/response.js';
 
 export async function findModelHandler(

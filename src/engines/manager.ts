@@ -7,7 +7,7 @@
 
 import { Clause } from '../types/clause.js';
 import { ProveResult } from '../types/index.js';
-import { clausify, isHornFormula } from '../clausifier.js';
+import { clausify, isHornFormula } from '../logic/clausifier.js';
 import {
     EngineCapabilities,
     EngineProveOptions,

@@ -1,6 +1,6 @@
 import { HeuristicTranslator } from '../llm/translator.js';
 import { TranslateRequest, TranslateResult } from '../types/llm.js';
-import { parse } from '../parser.js';
+import { parse } from '../parser/index.js';
 import { InputRouter } from '../evolution/index.js';
 
 const fallbackTranslator = new HeuristicTranslator();

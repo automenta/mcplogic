@@ -1,7 +1,8 @@
 
 import { Ontology, OntologyConfig } from '../types/ontology.js';
-import { parse, astToString, ASTNode } from '../parser.js';
-import { traverse } from '../utils/ast.js';
+import { parse } from '../parser/index.js';
+import { astToString, traverse } from '../utils/ast-modules/index.js';
+import { ASTNode } from '../types/index.js';
 import { createGenericError } from '../types/errors.js';
 
 /**

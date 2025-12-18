@@ -4,7 +4,7 @@
  * Equivalent to Mace4 - finds finite models or counterexamples.
  */
 
-import { parse } from '../parser.js';
+import { parse } from '../parser/index.js';
 import { Model, ModelResult, ModelOptions, DEFAULTS } from '../types/index.js';
 import { extractSignature, getFreeVariables } from '../utils/ast.js';
 import { createGenericError } from '../types/errors.js';

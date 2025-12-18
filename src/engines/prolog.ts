@@ -8,8 +8,8 @@
 import { LogicEngine, ProveOptions } from '../logicEngine.js';
 import { ProveResult } from '../types/index.js';
 import { Clause } from '../types/clause.js';
-import { isHornFormula } from '../clausifier.js';
-import { clausesToProlog } from '../translator.js';
+import { isHornFormula } from '../logic/clausifier.js';
+import { clausesToProlog } from './prolog/translator.js';
 import {
     ReasoningEngine,
     EngineCapabilities,
@@ -38,7 +38,8 @@ export class PrologEngine implements ReasoningEngine {
      * @param inferenceLimit Maximum inference steps
      */
     constructor(timeout: number = 5000, inferenceLimit: number = 1000) {
-        this.engine = new LogicEngine(timeout, inferenceLimit);
+        // LogicEngine no longer accepts timeout in constructor
+        this.engine = new LogicEngine(inferenceLimit);
     }
 
     /**

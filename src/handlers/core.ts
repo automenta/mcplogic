@@ -4,7 +4,7 @@ import {
     ModelResponse,
     DEFAULTS, // Added DEFAULTS for highPower logic
 } from '../types/index.js';
-import { validateFormulas, ValidationReport } from '../syntaxValidator.js';
+import { validateFormulas, ValidationReport } from '../validation/syntax.js';
 import { EngineManager, EngineSelection } from '../engines/manager.js';
 import { buildProveResponse } from '../utils/response.js';
 

@@ -2,7 +2,7 @@ import type { EvaluationCase, EvaluationResult, EvolutionStrategy } from '../typ
 import type { IPerformanceDatabase } from './storage.js';
 import type { LLMProvider } from '../types/llm.js';
 import { randomUUID } from 'crypto';
-import { parse } from '../parser.js';
+import { parse } from '../parser/index.js';
 import { toNNF, standardizeVariables } from '../utils/transform.js';
 import { astToString } from '../utils/ast.js';
 import { parseLLMOutput } from '../llm/outputParser.js';

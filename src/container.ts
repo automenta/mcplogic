@@ -1,6 +1,6 @@
-import { ModelFinder, createModelFinder } from './modelFinder.js';
+import { ModelFinder, createModelFinder } from './model/index.js';
 import { CategoricalHelpers } from './axioms/categorical.js';
-import { SessionManager, createSessionManager } from './sessionManager.js';
+import { SessionManager, createSessionManager } from './session/manager.js';
 import { EngineManager, createEngineManager } from './engines/manager.js';
 import {
     Optimizer, Evaluator, StrategyEvolver, CurriculumGenerator,

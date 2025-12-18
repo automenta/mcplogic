@@ -13,9 +13,9 @@
  * 8. Extract clauses
  */
 
-import { parse } from '../parser.js';
+import { parse } from '../parser/index.js';
 import type { ASTNode } from '../types/ast.js';
-import { countNodes } from '../utils/ast.js';
+import { countNodes } from '../utils/ast-modules/index.js';
 import {
     Clause,
     ClausifyOptions,

@@ -2,8 +2,8 @@
 import { readFileSync } from 'fs';
 import * as readline from 'readline';
 import { createEngineManager } from './engines/manager.js';
-import { createModelFinder } from './modelFinder.js';
-import { parse } from './parser.js';
+import { createModelFinder } from './model/index.js';
+import { parse } from './parser/index.js';
 import { DEFAULTS } from './types/index.js';
 
 const VERSION = '1.0.0';

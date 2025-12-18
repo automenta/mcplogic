@@ -10,9 +10,9 @@ import {
     dropUniversals,
     isHornFormula,
     clausesToDIMACS,
-} from '../src/clausifier';
-import { clausesToProlog } from '../src/translator';
-import { parse } from '../src/parser';
+} from '../src/logic/clausifier.js';
+import { clausesToProlog } from '../src/engines/prolog/translator.js';
+import { parse } from '../src/parser/index.js';
 import { createSkolemEnv, clauseToString, cnfToString } from '../src/logic/clause';
 
 describe('Clausifier', () => {

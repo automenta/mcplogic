@@ -5,13 +5,13 @@
  * Sessions auto-expire after TTL and are garbage collected periodically.
  */
 
-import { buildPrologProgram } from './translator.js';
-import { OntologyManager } from './ontology/manager.js';
-import { OntologyConfig } from './types/ontology.js';
+import { buildPrologProgram } from '../engines/prolog/translator.js';
+import { OntologyManager } from '../ontology/manager.js';
+import { OntologyConfig } from '../types/ontology.js';
 import {
     createSessionNotFoundError,
     createSessionLimitError,
-} from './types/errors.js';
+} from '../types/errors.js';
 
 // Browser-safe UUID generation
 function generateUUID(): string {
