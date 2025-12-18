@@ -5,4 +5,4 @@
  * Re-exports from module components for backward compatibility.
  */
 
-export * from './ast/index.js';
+export * from './ast-modules/index.js';
