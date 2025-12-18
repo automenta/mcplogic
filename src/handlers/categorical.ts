@@ -1,5 +1,16 @@
 import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../axioms/categorical.js';
 
+export interface CommutativityResponse {
+    premises: string[];
+    conclusion: string;
+    note: string;
+}
+
+export interface AxiomsResponse {
+    concept: string;
+    axioms: string[];
+}
+
 export function verifyCommutativityHandler(
     args: {
         path_a: string[];
@@ -9,7 +20,7 @@ export function verifyCommutativityHandler(
         with_category_axioms?: boolean;
     },
     categoricalHelpers: CategoricalHelpers
-): object {
+): CommutativityResponse {
     const { path_a, path_b, object_start, object_end, with_category_axioms = true } = args;
 
     const { premises, conclusion } = categoricalHelpers.verifyCommutativity(
@@ -37,7 +48,7 @@ export function getCategoryAxiomsHandler(
         functor_name?: string;
     },
     categoricalHelpers: CategoricalHelpers
-): object {
+): AxiomsResponse {
     const { concept, functor_name = 'F' } = args;
 
     let axioms: string[];
