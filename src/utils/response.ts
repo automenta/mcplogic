@@ -9,7 +9,8 @@ import {
     ModelResponse,
     MinimalModelResponse,
     StandardModelResponse,
-    DetailedModelResponse
+    DetailedModelResponse,
+    Model
 } from '../types/index.js';
 
 export interface BaseResultData {
@@ -170,4 +171,38 @@ export function buildModelResponse(result: ModelResult, verbosity: Verbosity = '
         },
     };
     return response;
+}
+
+/**
+ * Format model as human-readable string
+ */
+export function formatModelString(model: Model): string {
+    const lines: string[] = [];
+    lines.push(`Domain size: ${model.domainSize}`);
+    lines.push(`Domain: {${model.domain.join(', ')}}`);
+
+    if (model.constants.size > 0) {
+        lines.push('Constants:');
+        for (const [name, value] of model.constants) {
+            lines.push(`  ${name} = ${value}`);
+        }
+    }
+
+    if (model.functions.size > 0) {
+        lines.push('Functions:');
+        for (const [name, table] of model.functions) {
+            const entries = Array.from(table.entries())
+                .map(([args, val]) => `(${args})->${val}`)
+                .join(', ');
+            lines.push(`  ${name}: {${entries}}`);
+        }
+    }
+
+    lines.push('Predicates:');
+    for (const [name, extension] of model.predicates) {
+        const tuples = Array.from(extension).map(s => `(${s})`).join(', ');
+        lines.push(`  ${name}: {${tuples}}`);
+    }
+
+    return lines.join('\n');
 }

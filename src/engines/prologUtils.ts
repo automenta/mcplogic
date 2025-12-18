@@ -4,6 +4,29 @@
  * Low-level interactions with the Tau-Prolog session.
  */
 
+export interface PrologTerm {
+    id: string;
+    args?: PrologTerm[];
+    indicator?: string;
+    toString(): string;
+}
+
+export interface PrologAnswer {
+    links: Record<string, PrologTerm>;
+}
+
+export interface PrologSession {
+    consult(program: string, callbacks: { success: () => void; error: (err: any) => void }): void;
+    query(goal: string, callbacks: { success: () => void; error: (err: any) => void }): void;
+    answer(callbacks: {
+        success: (ans: PrologAnswer) => void;
+        fail: () => void;
+        error: (err: any) => void;
+        limit: () => void
+    }): void;
+    format_answer(answer: PrologAnswer): string;
+}
+
 /**
  * Format Prolog error from Tau-Prolog object
  */
@@ -32,7 +55,7 @@ export function termToString(term: any): string {
 /**
  * Consult a Prolog program
  */
-export function consult(session: any, program: string): Promise<{ success: boolean; error?: string }> {
+export function consult(session: PrologSession, program: string): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
         session.consult(program, {
             success: () => resolve({ success: true }),
@@ -47,7 +70,7 @@ export function consult(session: any, program: string): Promise<{ success: boole
 /**
  * Run a Prolog query and collect answers
  */
-export function query(session: any, goal: string): Promise<{
+export function query(session: PrologSession, goal: string): Promise<{
     found: boolean;
     bindings?: Record<string, string>[];
     error?: string;
@@ -68,7 +91,7 @@ export function query(session: any, goal: string): Promise<{
 /**
  * Collect all answers from a query
  */
-function collectAnswers(session: any): Promise<{
+function collectAnswers(session: PrologSession): Promise<{
     found: boolean;
     bindings: Record<string, string>[];
     hitLimit?: boolean;
@@ -79,7 +102,7 @@ function collectAnswers(session: any): Promise<{
 
         const getNext = () => {
             session.answer({
-                success: (answer: any) => {
+                success: (answer: PrologAnswer) => {
                     if (answer) {
                         bindings.push(extractBindings(answer));
                         getNext(); // Get next answer
@@ -107,7 +130,7 @@ function collectAnswers(session: any): Promise<{
 /**
  * Extract variable bindings from Prolog answer
  */
-function extractBindings(answer: any): Record<string, string> {
+function extractBindings(answer: PrologAnswer): Record<string, string> {
     const bindings: Record<string, string> = {};
 
     if (answer && answer.links) {
