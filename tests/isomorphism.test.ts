@@ -1,4 +1,4 @@
-import { createModelFinder } from '../src/modelFinder.js';
+import { createModelFinder } from '../src/model/index.js';
 import { Model } from '../src/types/index.js';
 
 describe('Isomorphism Filtering', () => {

@@ -3,7 +3,7 @@
  */
 
 import { PrologEngine, createPrologEngine } from '../src/engines/prolog.js';
-import { buildPrologProgram, folGoalToProlog, folToProlog } from '../src/translator.js';
+import { buildPrologProgram, folGoalToProlog, folToProlog } from '../src/engines/prolog/translator.js';
 import { createTestEngine } from './fixtures.js';
 
 describe('PrologEngine', () => {

@@ -2,7 +2,8 @@
  * Extended parser tests for robustness
  */
 
-import { parse, astToString, Tokenizer, Parser } from '../src/parser.js';
+import { parse, Tokenizer, Parser } from '../src/parser/index.js';
+import { astToString } from '../src/utils/ast-modules/index.js';
 
 describe('Parser - Extended Coverage', () => {
     describe('Tokenizer', () => {

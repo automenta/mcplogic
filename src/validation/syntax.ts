@@ -4,7 +4,7 @@
  * Validates formulas using the parser and provides linting/heuristics.
  */
 
-import { parse } from './parser.js';
+import { parse } from '../parser/index.js';
 
 export interface ValidationResult {
     valid: boolean;

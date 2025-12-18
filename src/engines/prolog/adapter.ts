@@ -5,7 +5,7 @@
  */
 
 import pl from 'tau-prolog';
-import { PrologSession, consult, query, PrologAnswer } from '../prologUtils.js';
+import { PrologSession, consult, query } from '../prologUtils.js';
 
 export interface PrologAdapter {
     consult(program: string): Promise<{ success: boolean; error?: string }>;

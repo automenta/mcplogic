@@ -1,8 +1,8 @@
 import {
     Verbosity,
 } from '../types/index.js';
-import { validateFormulas } from '../syntaxValidator.js';
-import { SessionManager } from '../sessionManager.js';
+import { validateFormulas } from '../validation/syntax.js';
+import { SessionManager } from '../session/manager.js';
 import { EngineManager } from '../engines/manager.js';
 import { buildProveResponse } from '../utils/response.js';
 

@@ -6,7 +6,7 @@
  */
 
 import { EngineManager, createEngineManager } from '../src/engines/manager';
-import { clausify, isHornFormula } from '../src/clausifier';
+import { clausify, isHornFormula } from '../src/logic/clausifier';
 
 describe('EngineManager', () => {
     let manager: EngineManager;

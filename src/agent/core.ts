@@ -7,8 +7,8 @@ import {
     AgentActionType
 } from '../types/agent.js';
 import { EngineManager, createEngineManager } from '../engines/manager.js';
-import { ModelFinder, createModelFinder } from '../modelFinder.js';
-import { parse } from '../parser.js';
+import { parse } from '../parser/index.js';
+import { ModelFinder, createModelFinder } from '../model/index.js';
 
 /**
  * An agent that reasons about a goal using available tools.

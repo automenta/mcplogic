@@ -4,15 +4,15 @@
  * Converts between Prover9-style formulas and Tau-Prolog compatible format.
  */
 
-import { parse } from './parser.js';
-import type { ASTNode } from './types/index.js';
+import { parse } from '../../parser/index.js';
+import type { ASTNode } from '../../types/index.js';
 import {
     createClausificationError,
     createEngineError,
-} from './types/errors.js';
-import { clausify } from './clausifier.js';
-import { Clause, Literal } from './types/clause.js';
-import { astToString } from './utils/ast.js';
+} from '../../types/errors.js';
+import { clausify } from '../../logic/clausifier.js';
+import { Clause, Literal } from '../../types/clause.js';
+import { astToString } from '../../utils/ast-modules/index.js';
 
 /**
  * Options for translation

@@ -2,7 +2,7 @@
  * Shared test fixtures for consistent, DRY testing.
  */
 import { createLogicEngine } from '../src/logicEngine';
-import { createModelFinder } from '../src/modelFinder';
+import { createModelFinder } from '../src/model/index';
 import { ProveResult, ModelResult } from '../src/types/responses';
 // Note: We might need to import specific types if they aren't exported from index
 // but based on the plan, let's assume standard imports work.
