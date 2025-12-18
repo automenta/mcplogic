@@ -170,9 +170,17 @@ export function standardizeVariables(node: ASTNode): ASTNode {
             case 'exists': {
                 const oldVar = n.variable!;
                 const newVar = `_v${counter++}`;
+                const previousMapping = renaming.get(oldVar);
+
                 renaming.set(oldVar, newVar);
                 const newBody = standardize(n.body!);
-                renaming.delete(oldVar);
+
+                if (previousMapping) {
+                    renaming.set(oldVar, previousMapping);
+                } else {
+                    renaming.delete(oldVar);
+                }
+
                 return {
                     type: n.type,
                     variable: newVar,

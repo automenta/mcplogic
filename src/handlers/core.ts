@@ -6,8 +6,7 @@ import {
 } from '../types/index.js';
 import { validateFormulas, ValidationReport } from '../syntaxValidator.js';
 import { EngineManager, EngineSelection } from '../engines/manager.js';
-import { ModelFinder } from '../modelFinder.js';
-import { buildProveResponse, buildModelResponse } from './utils.js';
+import { buildProveResponse } from '../utils/response.js';
 
 export async function proveHandler(
     args: {

@@ -3,7 +3,7 @@ import {
     ModelResponse,
 } from '../types/index.js';
 import { ModelFinder, createModelFinder } from '../modelFinder.js';
-import { buildModelResponse } from './utils.js';
+import { buildModelResponse } from '../utils/response.js';
 
 export async function findModelHandler(
     args: {
