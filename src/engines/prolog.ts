@@ -5,7 +5,7 @@
  * Provides the Tau-Prolog backend for Horn clause reasoning.
  */
 
-import { LogicEngine, ProveOptions } from '../logicEngine.js';
+import { LogicEngine, ProveOptions } from './prolog/logicEngine.js';
 import { ProveResult } from '../types/index.js';
 import { Clause } from '../types/clause.js';
 import { isHornFormula } from '../logic/clausifier.js';

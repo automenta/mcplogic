@@ -4,23 +4,23 @@
  * Provides async interface for proving and model finding using Tau-Prolog.
  */
 
-import { buildPrologProgram, folGoalToProlog } from './engines/prolog/translator.js';
-import { getArithmeticSetup } from './axioms/arithmetic.js';
-import { parse } from './parser/index.js';
-import { extractSignature } from './utils/ast-modules/index.js';
+import { buildPrologProgram, folGoalToProlog } from './translator.js';
+import { getArithmeticSetup } from '../../axioms/arithmetic.js';
+import { parse } from '../../parser/index.js';
+import { extractSignature } from '../../utils/ast-modules/index.js';
 import {
     generateMinimalEqualityAxioms,
     getEqualityBridge
-} from './axioms/equality.js';
+} from '../../axioms/equality.js';
 import {
     ProveResult,
     createInferenceLimitError,
     createEngineError,
-} from './types/index.js';
-import { buildProveResult } from './utils/response.js';
-import { ProveOptions } from './types/options.js';
-import { META_INTERPRETER, generateDynamicDirectives, parseTraceOutput } from './engines/prolog/trace.js';
-import { TauPrologAdapter } from './engines/prolog/adapter.js';
+} from '../../types/index.js';
+import { buildProveResult } from '../../utils/response.js';
+import { ProveOptions } from '../../types/options.js';
+import { META_INTERPRETER, generateDynamicDirectives, parseTraceOutput } from './trace.js';
+import { TauPrologAdapter } from './adapter.js';
 
 // Re-export ProveOptions to ensure it's used correctly by consumers
 export type { ProveResult, ProveOptions };
