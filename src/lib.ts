@@ -7,7 +7,7 @@
  */
 
 // Core Engine
-export { createLogicEngine, LogicEngine } from './engines/prolog/logicEngine.js';
+export { createLogicEngine, LogicEngine } from './engines/prolog/engine.js';
 
 // Model Finder
 export { createModelFinder, ModelFinder } from './model/index.js';

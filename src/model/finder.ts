@@ -8,7 +8,7 @@ import { parse } from '../parser/index.js';
 import { Model, ModelResult, ModelOptions, DEFAULTS } from '../types/index.js';
 import { extractSignature, getFreeVariables } from '../utils/ast-modules/index.js';
 import { createGenericError } from '../types/errors.js';
-import { SATEngine } from '../engines/sat.js';
+import { SATEngine } from '../engines/sat/index.js';
 import { findModelsSAT } from '../engines/model/sat.js';
 import { findModelsBacktracking } from '../engines/model/backtracking.js';
 import { formatModelString } from '../utils/response.js';

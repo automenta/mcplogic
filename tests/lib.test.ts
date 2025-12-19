@@ -1,6 +1,6 @@
 
 import { createLogicEngine, parse } from '../src/lib.js';
-import { LogicEngine } from '../src/engines/prolog/logicEngine.js';
+import { LogicEngine } from '../src/engines/prolog/engine.js';
 
 describe('Library Export', () => {
     test('should import createLogicEngine and use it', async () => {

@@ -1,7 +1,7 @@
 /**
  * Shared test fixtures for consistent, DRY testing.
  */
-import { createLogicEngine } from '../src/engines/prolog/logicEngine';
+import { createLogicEngine } from '../src/engines/prolog/engine';
 import { createModelFinder } from '../src/model/index';
 import { ProveResult, ModelResult } from '../src/types/responses';
 // Note: We might need to import specific types if they aren't exported from index
