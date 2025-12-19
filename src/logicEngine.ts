@@ -7,7 +7,7 @@
 import { buildPrologProgram, folGoalToProlog } from './engines/prolog/translator.js';
 import { getArithmeticSetup } from './axioms/arithmetic.js';
 import { parse } from './parser/index.js';
-import { extractSignature } from './utils/ast.js';
+import { extractSignature } from './utils/ast-modules/index.js';
 import {
     generateMinimalEqualityAxioms,
     getEqualityBridge

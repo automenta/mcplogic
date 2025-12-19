@@ -28,7 +28,7 @@ import {
     standardizeVariables,
     skolemize,
     dropUniversals,
-} from '../utils/transform.js';
+} from '../utils/transform/index.js';
 import { createClausificationError, createGenericError } from '../types/errors.js';
 import { toCNF } from './cnf.js';
 
@@ -125,5 +125,5 @@ export {
     standardizeVariables,
     skolemize,
     dropUniversals,
-} from '../utils/transform.js';
+} from '../utils/transform/index.js';
 export { toCNF } from './cnf.js';

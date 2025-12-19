@@ -6,9 +6,9 @@
  */
 
 import { SATEngine, createSATEngine } from '../src/engines/sat';
-import { clausify } from '../src/clausifier';
+import { clausify } from '../src/logic/clausifier';
 import { Clause } from '../src/types/clause';
-import { createConstant } from '../src/utils/ast';
+import { createConstant } from '../src/utils/ast-modules/index';
 
 describe('SATEngine', () => {
     let engine: SATEngine;

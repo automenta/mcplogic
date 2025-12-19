@@ -1,6 +1,6 @@
 import { ASTNode } from '../types/ast.js';
 import { Clause, ClausifyOptions, Literal } from '../types/clause.js';
-import { distribute } from '../utils/transform.js';
+import { distribute } from '../utils/transform/index.js';
 import { createClausificationError } from '../types/errors.js';
 
 /**

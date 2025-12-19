@@ -1,6 +1,6 @@
 import { parse } from '../src/parser/index.js';
 import { astToString } from '../src/utils/ast-modules/index.js';
-import { standardizeVariables } from '../src/utils/transform.js';
+import { standardizeVariables } from '../src/utils/transform/index.js';
 
 describe('Variable Standardization Shadowing', () => {
     test('handles variable shadowing correctly', () => {

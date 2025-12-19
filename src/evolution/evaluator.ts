@@ -3,8 +3,8 @@ import type { IPerformanceDatabase } from './storage.js';
 import type { LLMProvider } from '../types/llm.js';
 import { randomUUID } from 'crypto';
 import { parse } from '../parser/index.js';
-import { toNNF, standardizeVariables } from '../utils/transform.js';
-import { astToString } from '../utils/ast.js';
+import { toNNF, standardizeVariables } from '../utils/transform/index.js';
+import { astToString } from '../utils/ast-modules/index.js';
 import { parseLLMOutput } from '../llm/outputParser.js';
 
 export class Evaluator {
