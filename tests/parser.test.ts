@@ -3,7 +3,7 @@
  */
 
 import { parse, Tokenizer, Parser } from '../src/parser/index.js';
-import { astToString } from '../src/utils/ast-modules/index.js';
+import { astToString } from '../src/ast/index.js';
 
 describe('Parser - Extended Coverage', () => {
     describe('Tokenizer', () => {

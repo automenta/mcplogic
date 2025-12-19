@@ -1,4 +1,4 @@
-import { ASTNode } from '../../types/index.js';
+import { ASTNode } from '../types/index.js';
 
 export function createAnd(left: ASTNode, right: ASTNode): ASTNode {
     return { type: 'and', left, right };

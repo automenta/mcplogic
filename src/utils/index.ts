@@ -1,3 +1,3 @@
-export * from './ast-modules/index.js';
+export * from '../ast/index.js';
 export * from './response.js';
-export * from './transform/index.js';
+export * from '../logic/transform/index.js';

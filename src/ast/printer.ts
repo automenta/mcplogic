@@ -1,5 +1,5 @@
-import type { ASTNode } from '../../types/index.js';
-import { createGenericError } from '../../types/errors.js';
+import type { ASTNode } from '../types/index.js';
+import { createGenericError } from '../types/errors.js';
 
 /**
  * Pretty-print an AST back to FOL string

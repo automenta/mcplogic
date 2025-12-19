@@ -12,7 +12,7 @@ import {
 } from '../../types/errors.js';
 import { clausify } from '../../logic/clausifier.js';
 import { Clause, Literal } from '../../types/clause.js';
-import { astToString } from '../../utils/ast-modules/index.js';
+import { astToString } from '../../ast/index.js';
 
 /**
  * Options for translation

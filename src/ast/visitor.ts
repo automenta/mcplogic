@@ -1,4 +1,4 @@
-import type { ASTNode } from '../../types/index.js';
+import type { ASTNode } from '../types/index.js';
 
 /**
  * Generic AST Visitor
