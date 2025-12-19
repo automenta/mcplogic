@@ -3,7 +3,7 @@ import { parse } from '../../parser/index.js';
 import { astToString } from '../../utils/ast-modules/index.js';
 import { clausify } from '../../logic/clausifier.js';
 import { groundFormula } from '../../logic/grounding.js';
-import { SATEngine } from '../sat/index.js';
+import { SATEngine } from '../../engines/sat/index.js';
 
 /**
  * Find models using SAT solver
