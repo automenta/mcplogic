@@ -28,7 +28,8 @@
         "benchmark:tptp": "tsx benchmarks/run-tptp.ts",
         "tasks": "tsx scripts/task-status.ts",
         "demo": "tsx scripts/demo.ts",
-        "test:llm": "tsx scripts/test_llm.ts"
+        "test:llm": "tsx scripts/test_llm.ts",
+        "agent": "tsx src/apps/cli/index.ts"
     },
     "keywords": [
         "mcp",
@@ -40,9 +41,15 @@
     "author": "",
     "license": "MIT",
     "dependencies": {
+        "@ai-sdk/openai": "^2.0.88",
+        "@inquirer/prompts": "^8.1.0",
         "@modelcontextprotocol/sdk": "^1.0.0",
+        "ai": "^5.0.115",
+        "chalk": "^5.6.2",
+        "dotenv": "^17.2.3",
         "logic-solver": "^2.0.1",
-        "tau-prolog": "^0.3.4"
+        "tau-prolog": "^0.3.4",
+        "zod": "^4.2.1"
     },
     "devDependencies": {
         "@playwright/test": "^1.57.0",
