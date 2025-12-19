@@ -3,6 +3,10 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { streamText, CoreMessage } from 'ai';
 import { input } from '@inquirer/prompts';
 import chalk from 'chalk';
+import boxen from 'boxen';
+import ora from 'ora';
+import fs from 'fs/promises';
+import path from 'path';
 import { StateManager } from './state.js';
 import { tools } from './tools.js';
 
@@ -51,7 +55,10 @@ Always explain your reasoning steps. Be concise but rigorous.`
 
             // Handle Slash Commands
             if (userQuery.startsWith('/')) {
-                const [cmd, ...args] = userQuery.slice(1).split(' ');
+                const parts = userQuery.slice(1).split(' ');
+                const cmd = parts[0];
+                const args = parts.slice(1);
+
                 switch (cmd) {
                     case 'exit':
                     case 'quit':
@@ -69,16 +76,43 @@ Always explain your reasoning steps. Be concise but rigorous.`
                     case 'help':
                         console.log(chalk.yellow(`
 Commands:
-  /help       Show this help
-  /clear      Clear conversation history
-  /memory     View current context
-  /model      Show current model info
-  /exit       Quit
+  /help           Show this help
+  /clear          Clear conversation history
+  /memory         View current context
+  /model          Show current model info
+  /load <file>    Load text content from a file
+  /save <file>    Save conversation history to a JSON file
+  /exit           Quit
 `));
                         continue;
                     case 'model':
                         console.log(chalk.cyan(`Current Model: ${MODEL_NAME}`));
                         console.log(chalk.dim(`Provider URL: ${OPENAI_BASE_URL}`));
+                        continue;
+                    case 'load':
+                        if (args.length === 0) {
+                            console.log(chalk.red('Usage: /load <filepath>'));
+                            continue;
+                        }
+                        try {
+                            const content = await fs.readFile(args[0], 'utf-8');
+                            messages.push({ role: 'user', content: `[Loaded from ${args[0]}]:\n${content}` });
+                            console.log(chalk.green(`Loaded ${args[0]} into context.`));
+                        } catch (e) {
+                            console.log(chalk.red(`Failed to load file: ${(e as Error).message}`));
+                        }
+                        continue;
+                    case 'save':
+                         if (args.length === 0) {
+                            console.log(chalk.red('Usage: /save <filepath>'));
+                            continue;
+                        }
+                        try {
+                            await fs.writeFile(args[0], JSON.stringify(messages, null, 2), 'utf-8');
+                            console.log(chalk.green(`Saved conversation to ${args[0]}.`));
+                        } catch (e) {
+                             console.log(chalk.red(`Failed to save file: ${(e as Error).message}`));
+                        }
                         continue;
                     default:
                         console.log(chalk.red(`Unknown command: /${cmd}`));
@@ -91,40 +125,63 @@ Commands:
 
             process.stdout.write(chalk.blue('Agent > '));
 
-            // Cast options to any to avoid potential type definition mismatches with maxSteps
+            const spinner = ora('Thinking...').start();
+
+            // Cast options to any to avoid potential type definition mismatches
             const result = streamText({
                 model: openai(MODEL_NAME),
                 messages: [systemMessage, ...messages],
                 tools: tools,
                 maxSteps: 10,
-                onStepFinish: (step: any) => {
-                    // Log tool calls nicely
-                    if (step.toolCalls && step.toolCalls.length > 0) {
-                        step.toolCalls.forEach((call: any) => {
-                            console.log(chalk.dim(`\n[Tool Call] ${call.toolName}`));
-                        });
-                    }
-                },
             } as any);
 
-            let fullResponse = '';
-            for await (const delta of result.textStream) {
-                process.stdout.write(delta);
-                fullResponse += delta;
+            let fullResponseText = '';
+
+            for await (const part of result.fullStream) {
+                switch (part.type) {
+                    case 'text-delta':
+                        if (spinner.isSpinning) spinner.stop();
+                        // @ts-ignore
+                        const text = part.textDelta ?? part.text;
+                        process.stdout.write(text);
+                        fullResponseText += text;
+                        break;
+                    case 'tool-call':
+                        if (!spinner.isSpinning) {
+                            process.stdout.write('\n'); // newline if we were printing text
+                        }
+                        spinner.start(chalk.dim(`Executing ${part.toolName}...`));
+                        break;
+                    case 'tool-result':
+                         // Stop spinner to print result
+                         if (spinner.isSpinning) spinner.stop();
+
+                         // Create a concise summary or full dump depending on verbosity
+                         // For now, full dump in a box
+                         // @ts-ignore
+                         const toolResult = part.result ?? part.output;
+                         const output = JSON.stringify(toolResult, null, 2);
+                         const truncated = output.length > 2000 ? output.slice(0, 2000) + '...' : output;
+
+                         console.log(boxen(truncated, {
+                             title: chalk.bold.cyan(`Tool: ${part.toolName}`),
+                             padding: 0,
+                             borderColor: 'gray',
+                             dimBorder: true
+                         }));
+                         break;
+                    case 'error':
+                        if (spinner.isSpinning) spinner.stop();
+                        console.error(chalk.red(`\nError: ${part.error}`));
+                        break;
+                }
             }
-            console.log('\n'); // Newline after stream
+            if (spinner.isSpinning) spinner.stop();
+            console.log('\n');
 
-            // Update messages with the result from the stream
-            // result.response is a promise that resolves to the final response object
+            // Correctly persist ALL new messages (including tool calls)
             const response = await result.response;
-
-            // To properly persist the conversation, we should ideally append the NEW messages
-            // (including tool calls and results).
-            // Since accessing them cleanly from the stream result requires careful handling,
-            // we will just append the *final* assistant response text for now to keep state simple.
-            // A more advanced version would use `response.messages` if available or reconstruct it.
-
-            messages.push({ role: 'assistant', content: fullResponse });
+            messages.push(...response.messages);
             await stateManager.save({ ...state, messages });
 
         } catch (error) {
