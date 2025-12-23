@@ -134,3 +134,48 @@ export function getEqualityBridge(): string[] {
         'neq(X, Y) :- X \\\\== Y.',
     ];
 }
+
+import type { Clause, ClausifyResult } from '../types/clause.js';
+import { clausify } from '../logic/clausifier.js';
+
+/**
+ * Generate equality axioms for SAT Engine.
+ *
+ * @param clauses - The set of clauses to analyze for equality usage
+ * @returns ClausifyResult containing the equality axioms as clauses
+ */
+export function generateEqualityAxiomsForSAT(clauses: Clause[]): ClausifyResult {
+    const predicates = new Map<string, number>();
+    for (const c of clauses) {
+        for (const l of c.literals) {
+            if (l.predicate !== '=') {
+                predicates.set(l.predicate, l.args.length);
+            }
+        }
+    }
+
+    const axioms: string[] = [];
+    // Reflexivity
+    axioms.push('all x (x = x)');
+    // Symmetry
+    axioms.push('all x all y (x = y -> y = x)');
+    // Transitivity
+    axioms.push('all x all y all z (x = y & y = z -> x = z)');
+
+    // Substitution for each predicate
+    for (const [pred, arity] of predicates) {
+        const vars1 = Array.from({ length: arity }, (_, i) => `X${i+1}`);
+        const vars2 = Array.from({ length: arity }, (_, i) => `Y${i+1}`);
+        const eqs = vars1.map((v, i) => `${v} = ${vars2[i]}`).join(' & ');
+        const term1 = `${pred}(${vars1.join(', ')})`;
+        const term2 = `${pred}(${vars2.join(', ')})`;
+        axioms.push(`all ${vars1.join(' all ')} all ${vars2.join(' all ')} (${eqs} -> (${term1} <-> ${term2}))`);
+    }
+
+    if (axioms.length > 0) {
+        const axiomsStr = axioms.join(' & ');
+        return clausify(axiomsStr);
+    }
+
+    return { success: true, clauses: [], statistics: { originalSize: 0, clauseCount: 0, maxClauseSize: 0, timeMs: 0 } };
+}

@@ -7,10 +7,9 @@
 
 import Logic from 'logic-solver';
 import { Clause, Literal } from '../../types/clause.js';
-import { allMappings } from '../../utils/math/enumerate.js';
-import { ProveResult, Verbosity } from '../../types/index.js';
+import { ProveResult } from '../../types/index.js';
 import { buildProveResult } from '../../utils/response.js';
-import { clausify, isHornFormula } from '../../logic/clausifier.js';
+import { clausify } from '../../logic/clausifier.js';
 import { parse } from '../../parser/index.js';
 import { createAnd, createNot, astToString } from '../../ast/index.js';
 import {
@@ -19,6 +18,9 @@ import {
     EngineProveOptions,
     SatResult
 } from '../interface.js';
+import { instantiateClauses } from '../../logic/herbrand/index.js';
+import { generateEqualityAxiomsForSAT } from '../../axioms/equality.js';
+import { literalToKey } from './serialization.js';
 
 /**
  * SAT solver-based reasoning engine.
@@ -36,17 +38,6 @@ export class SATEngine implements ReasoningEngine {
         arithmetic: false, // No built-in arithmetic
         streaming: false,
     };
-
-    /**
-     * Convert a literal to a unique string key for the SAT solver.
-     */
-    private literalToKey(lit: Literal): string {
-        const argStrings = lit.args.map(astToString);
-        if (argStrings.length === 0) {
-            return lit.predicate;
-        }
-        return `${lit.predicate}(${argStrings.join(',')})`;
-    }
 
     /**
      * Check satisfiability of clauses using the SAT solver.
@@ -85,7 +76,7 @@ export class SATEngine implements ReasoningEngine {
                 }
 
                 const disjuncts = clause.literals.map(lit => {
-                    const key = this.literalToKey(lit);
+                    const key = literalToKey(lit);
                     variables.add(key);
                     return lit.negated ? Logic.not(key) : key;
                 });
@@ -135,94 +126,6 @@ export class SATEngine implements ReasoningEngine {
     }
 
     /**
-     * Instantiate clauses with constants (Herbrand instantiation Level 0)
-     */
-    private instantiateClauses(clauses: Clause[]): Clause[] {
-        // 1. Collect all constants and variables
-        const constants = new Set<string>();
-        const variables = new Set<string>();
-
-        for (const clause of clauses) {
-            for (const lit of clause.literals) {
-                for (const arg of lit.args) {
-                    const argStr = astToString(arg);
-                    // standardizeVariables typically produces 'X', 'Y', 'Z', 'X1', 'Y1' etc.
-                    // Constants are lowercase (from parser).
-                    // Skolem constants are sk_N.
-
-                    // Check if it looks like a variable (starts with Uppercase) or from standardize vars (_v)
-                    // Note: AST variable node check would be better, but we only have nodes here.
-
-                    if (arg.type === 'variable') {
-                        variables.add(arg.name!);
-                    } else if (arg.type === 'constant') {
-                         constants.add(arg.name!);
-                    } else if (arg.type === 'function') {
-                        // For function terms, we might need deeper analysis, but simple grounding
-                        // usually replaces top-level variables.
-                        // Ideally we traverse, but for now we'll stick to simple cases.
-                        // Assuming simple constants or variables for args.
-                    }
-
-                    // Fallback to string check if needed for legacy reasons (e.g. if type not set correctly)
-                    // but we should trust types now.
-                }
-            }
-        }
-
-        // If no constants, add a dummy constant 'c'
-        if (constants.size === 0) {
-            constants.add('c');
-        }
-
-        const constantList = Array.from(constants);
-        const instantiatedClauses: Clause[] = [];
-
-        for (const clause of clauses) {
-            const clauseVars = new Set<string>();
-            for (const lit of clause.literals) {
-                for (const arg of lit.args) {
-                     if (arg.type === 'variable') {
-                        clauseVars.add(arg.name!);
-                     }
-                }
-            }
-
-            if (clauseVars.size === 0) {
-                instantiatedClauses.push(clause);
-                continue;
-            }
-
-            // Generate substitutions
-            // For now, only handle up to 3 variables to avoid explosion
-            if (clauseVars.size > 3) {
-                // Fallback: keep original (uninstantiated) which will likely be ignored or fail unification
-                instantiatedClauses.push(clause);
-                continue;
-            }
-
-            const vars = Array.from(clauseVars);
-            const assignments = allMappings(vars, constantList);
-
-            for (const assign of assignments) {
-                const newLiterals = clause.literals.map(lit => ({
-                    predicate: lit.predicate,
-                    negated: lit.negated,
-                    args: lit.args.map(a => {
-                        if (a.type === 'variable' && assign.has(a.name!)) {
-                            return { type: 'constant', name: assign.get(a.name!) } as const;
-                        }
-                        return a;
-                    })
-                }));
-                instantiatedClauses.push({ literals: newLiterals, origin: clause.origin });
-            }
-        }
-
-        return instantiatedClauses;
-    }
-
-    /**
      * Prove a conclusion from premises using refutation.
      * 
      * Method: Clausify (premises ∧ ¬conclusion) and check for UNSAT.
@@ -267,44 +170,14 @@ export class SATEngine implements ReasoningEngine {
 
             // Inject equality axioms if enabled
             if (options?.enableEquality) {
-                const predicates = new Map<string, number>();
-                for (const c of allClauses) {
-                    for (const l of c.literals) {
-                        if (l.predicate !== '=') {
-                            predicates.set(l.predicate, l.args.length);
-                        }
-                    }
-                }
-
-                const axioms: string[] = [];
-                // Reflexivity
-                axioms.push('all x (x = x)');
-                // Symmetry
-                axioms.push('all x all y (x = y -> y = x)');
-                // Transitivity
-                axioms.push('all x all y all z (x = y & y = z -> x = z)');
-
-                // Substitution for each predicate
-                for (const [pred, arity] of predicates) {
-                    const vars1 = Array.from({ length: arity }, (_, i) => `X${i+1}`);
-                    const vars2 = Array.from({ length: arity }, (_, i) => `Y${i+1}`);
-                    const eqs = vars1.map((v, i) => `${v} = ${vars2[i]}`).join(' & ');
-                    const term1 = `${pred}(${vars1.join(', ')})`;
-                    const term2 = `${pred}(${vars2.join(', ')})`;
-                    axioms.push(`all ${vars1.join(' all ')} all ${vars2.join(' all ')} (${eqs} -> (${term1} <-> ${term2}))`);
-                }
-
-                if (axioms.length > 0) {
-                    const axiomsStr = axioms.join(' & ');
-                    const axiomsResult = clausify(axiomsStr);
-                    if (axiomsResult.success && axiomsResult.clauses) {
-                        allClauses = [...allClauses, ...axiomsResult.clauses];
-                    }
+                const axiomsResult = generateEqualityAxiomsForSAT(allClauses);
+                if (axiomsResult.success && axiomsResult.clauses) {
+                    allClauses = [...allClauses, ...axiomsResult.clauses];
                 }
             }
 
             // Instantiate variables (Grounding)
-            const groundClauses = this.instantiateClauses(allClauses);
+            const groundClauses = instantiateClauses(allClauses);
 
             // Check satisfiability
             const satResult = await this.checkSat(groundClauses);
