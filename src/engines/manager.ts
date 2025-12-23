@@ -8,6 +8,8 @@
 import { Clause } from '../types/clause.js';
 import { ProveResult } from '../types/index.js';
 import { clausify, isHornFormula } from '../logic/clausifier.js';
+import { parse } from '../parser/index.js';
+import { createAnd, createNot } from '../ast/index.js';
 import {
     EngineCapabilities,
     EngineProveOptions,
@@ -45,7 +47,8 @@ export class EngineManager {
         timeout: number = 5000,
         inferenceLimit: number = 1000
     ) {
-        this.prolog = createPrologEngine(timeout, inferenceLimit);
+        // Prolog engine now only accepts inferenceLimit
+        this.prolog = createPrologEngine(inferenceLimit);
         this.sat = createSATEngine();
     }
 
@@ -96,25 +99,41 @@ export class EngineManager {
         conclusion: string,
         options?: EngineProveOptions
     ): Promise<ProveResult & { engineUsed?: string }> {
-        // Try to clausify to analyze structure
-        const combined = [...premises, `-${conclusion}`].join(' & ');
-        const clausifyResult = clausify(combined);
+        try {
+            // Build the refutation formula: premises & -conclusion
+            const premiseNodes = premises.map(p => parse(p));
+            const conclusionNode = parse(conclusion);
+            const negatedConclusion = createNot(conclusionNode);
 
-        // If clausification fails or formula is Horn, use Prolog
-        if (!clausifyResult.success || !clausifyResult.clauses) {
+            // Combine all formulas with AND
+            const allNodes = [...premiseNodes, negatedConclusion];
+            const refutationAST = allNodes.length > 0
+                ? allNodes.reduce((acc, node) => createAnd(acc, node))
+                : negatedConclusion;
+
+            // Try to clausify to analyze structure
+            const clausifyResult = clausify(refutationAST);
+
+            // If clausification fails or formula is Horn, use Prolog
+            if (!clausifyResult.success || !clausifyResult.clauses) {
+                const result = await this.prolog.prove(premises, conclusion, options);
+                return { ...result, engineUsed: this.prolog.name };
+            }
+
+            // Check if Horn (Prolog-compatible)
+            if (isHornFormula(clausifyResult.clauses)) {
+                const result = await this.prolog.prove(premises, conclusion, options);
+                return { ...result, engineUsed: this.prolog.name };
+            }
+
+            // Non-Horn: use SAT solver
+            const result = await this.sat.prove(premises, conclusion, options);
+            return { ...result, engineUsed: this.sat.name };
+        } catch (e) {
+            // If parsing fails, fall back to Prolog (it handles errors gracefully or we just default to it)
             const result = await this.prolog.prove(premises, conclusion, options);
             return { ...result, engineUsed: this.prolog.name };
         }
-
-        // Check if Horn (Prolog-compatible)
-        if (isHornFormula(clausifyResult.clauses)) {
-            const result = await this.prolog.prove(premises, conclusion, options);
-            return { ...result, engineUsed: this.prolog.name };
-        }
-
-        // Non-Horn: use SAT solver
-        const result = await this.sat.prove(premises, conclusion, options);
-        return { ...result, engineUsed: this.sat.name };
     }
 
     /**

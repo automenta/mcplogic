@@ -328,9 +328,8 @@ export class LogicEngine {
 
 /**
  * Create a new logic engine instance
- * @param timeout Timeout in milliseconds (reserved for future use) - DEPRECATED/IGNORED
  * @param inferenceLimit Maximum inference steps (default: 1000)
  */
-export function createLogicEngine(timeout?: number, inferenceLimit?: number): LogicEngine {
+export function createLogicEngine(inferenceLimit?: number): LogicEngine {
     return new LogicEngine(inferenceLimit);
 }
