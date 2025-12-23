@@ -52,9 +52,9 @@ export function createTestEngine(options?: {
     inferenceLimit?: number;
     highPower?: boolean;
 }) {
-    const { timeout = 5000, inferenceLimit = 1000, highPower = false } = options ?? {};
+    const { inferenceLimit = 1000, highPower = false } = options ?? {};
     const limit = highPower ? 100000 : inferenceLimit;
-    return createLogicEngine(timeout, limit);
+    return createLogicEngine(limit);
 }
 
 export function createTestModelFinder(options?: {
