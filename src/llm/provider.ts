@@ -89,7 +89,7 @@ export class StandardLLMProvider implements LLMProvider {
                  return { content: 'MOCK LLM RESPONSE', usage: { promptTokens: 0, completionTokens: 0 }};
             }
             const errMsg = error instanceof Error ? error.message : String(error);
-            console.error(`LLM Provider Error: ${errMsg}`, { model: this.model, url: this.apiUrl });
+            // Log error to stderr only in verbose/debug modes if we had a logger, but for now just throw
             throw createGenericError('ENGINE_ERROR', `LLM Provider failed: ${errMsg}`);
         }
     }

@@ -72,7 +72,7 @@ export class CurriculumGenerator {
                 type: c.type || 'premise'
             }));
         } catch (e) {
-            console.error("Failed to parse generated cases:", e);
+            // Silently fail on parse error
             return [];
         }
     }
@@ -85,7 +85,7 @@ export class CurriculumGenerator {
             const filename = path.join(this.outputDir, `${domain}_generated_${Date.now()}.json`);
             fs.writeFileSync(filename, JSON.stringify(cases, null, 2));
         } catch (e) {
-            console.error(`Failed to save generated cases to ${this.outputDir}:`, e);
+            // Silently fail on I/O error
         }
     }
 }

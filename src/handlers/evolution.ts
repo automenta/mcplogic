@@ -20,8 +20,8 @@ export async function startEvolutionHandler(
 
     try {
         // Pass a no-op progress handler or one that logs to server logs/stderr if needed.
-        const progressHandler = (msg: string) => {
-             // console.error(msg); // Optional: enable for server-side logging
+        const progressHandler = (_msg: string) => {
+             // No-op for now
         };
 
         const overrides = {
