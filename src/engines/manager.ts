@@ -7,7 +7,7 @@
 
 import { Clause } from '../types/clause.js';
 import { ProveResult } from '../types/index.js';
-import { clausify, isHornFormula } from '../logic/clausifier.js';
+import { clausify, isHornFormula } from '../logic/index.js';
 import { parse } from '../parser/index.js';
 import { createAnd, createNot } from '../ast/index.js';
 import {

@@ -10,7 +10,7 @@ import { Clause, Literal } from '../../types/clause.js';
 import { allMappings } from '../../utils/math/enumerate.js';
 import { ProveResult, Verbosity } from '../../types/index.js';
 import { buildProveResult } from '../../utils/response.js';
-import { clausify, isHornFormula } from '../../logic/clausifier.js';
+import { clausify, isHornFormula } from '../../logic/index.js';
 import { parse } from '../../parser/index.js';
 import { createAnd, createNot, astToString } from '../../ast/index.js';
 import {
