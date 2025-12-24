@@ -19,24 +19,82 @@ import {
 import { listResources, getResourceContent } from './resources/index.js';
 import { listPrompts, getPrompt } from './prompts/index.js';
 
-// LogicEngine is now accessed via EngineManager
-import { CategoricalHelpers } from './axioms/categorical.js';
-import { createModelFinder } from './modelFinder.js';
-import { createSessionManager } from './sessionManager.js';
 import {
     LogicException,
     createGenericError,
     serializeLogicError,
-    Verbosity,
 } from './types/index.js';
-import { createEngineManager, EngineSelection } from './engines/manager.js';
 import * as Handlers from './handlers/index.js';
 import * as LLMHandlers from './handlers/llm.js';
 import * as AgentHandlers from './handlers/agent.js';
 import * as EvolutionHandlers from './handlers/evolution.js';
-import { Optimizer, Evaluator, StrategyEvolver, CurriculumGenerator, JsonPerformanceDatabase, InputRouter } from './evolution/index.js';
-import { StandardLLMProvider } from './llm/provider.js';
 import { TOOLS } from './tools/definitions.js';
+import { createContainer, ServerContainer } from './container.js';
+
+type ToolHandler = (
+    args: any,
+    container: ServerContainer,
+    options?: { onProgress?: (p: number | undefined, m: string) => void }
+) => Promise<any> | any;
+
+const toolHandlers: Record<string, ToolHandler> = {
+    // ==================== CORE REASONING TOOLS ====================
+    'prove': (args, c, opts) =>
+        Handlers.proveHandler(args, c.engineManager, args.verbosity, opts?.onProgress),
+
+    'check-well-formed': (args) =>
+        Handlers.checkWellFormedHandler(args),
+
+    'find-model': (args, c) =>
+        Handlers.findModelHandler(args, c.modelFinder, args.verbosity),
+
+    'find-counterexample': (args, c) =>
+        Handlers.findCounterexampleHandler(args, c.modelFinder, args.verbosity),
+
+    'verify-commutativity': (args, c) =>
+        Handlers.verifyCommutativityHandler(args, c.categoricalHelpers),
+
+    'get-category-axioms': (args, c) =>
+        Handlers.getCategoryAxiomsHandler(args, c.categoricalHelpers),
+
+    'translate-text': (args) =>
+        LLMHandlers.translateTextHandler(args),
+
+    'agent-reason': (args) =>
+        AgentHandlers.reasonHandler(args),
+
+    // ==================== EVOLUTION TOOLS ====================
+    'evolution-start': (args, c) =>
+        EvolutionHandlers.startEvolutionHandler(args, c.optimizer, c),
+
+    'evolution-list-strategies': (args, c) =>
+        EvolutionHandlers.listStrategiesHandler(args, c.strategies),
+
+    'evolution-generate-cases': (args, c) =>
+        EvolutionHandlers.generateCasesHandler(args, c.curriculumGenerator),
+
+    // ==================== SESSION MANAGEMENT TOOLS ====================
+    'create-session': (args, c) =>
+        Handlers.createSessionHandler(args, c.sessionManager),
+
+    'assert-premise': (args, c) =>
+        Handlers.assertPremiseHandler(args, c.sessionManager),
+
+    'query-session': (args, c) =>
+        Handlers.querySessionHandler(args, c.sessionManager, c.engineManager, args.verbosity),
+
+    'retract-premise': (args, c) =>
+        Handlers.retractPremiseHandler(args, c.sessionManager),
+
+    'list-premises': (args, c) =>
+        Handlers.listPremisesHandler(args, c.sessionManager, args.verbosity),
+
+    'clear-session': (args, c) =>
+        Handlers.clearSessionHandler(args, c.sessionManager),
+
+    'delete-session': (args, c) =>
+        Handlers.deleteSessionHandler(args, c.sessionManager),
+};
 
 /**
  * Create and configure the MCP server
@@ -56,77 +114,8 @@ export function createServer(): Server {
         }
     );
 
-    // Initialize engines and managers
-    const modelFinder = createModelFinder();
-    const categoricalHelpers = new CategoricalHelpers();
-    const sessionManager = createSessionManager();
-    const engineManager = createEngineManager();
-
-    // Initialize Evolution Engine components
-    const llmProvider = new StandardLLMProvider();
-    const perfDb = new JsonPerformanceDatabase();
-    const evaluator = new Evaluator(perfDb, llmProvider);
-    const evolver = new StrategyEvolver(llmProvider, perfDb);
-    const curriculumGenerator = new CurriculumGenerator(llmProvider, perfDb, 'src/evalCases/generated');
-
-    // Define strategies
-    const heuristicStrategy = {
-        id: 'heuristic-v1',
-        description: 'Standard heuristic strategy (Regex-based)',
-        promptTemplate: 'Translate the following to FOL:\n{{INPUT}}', // Unused for heuristic but required by type
-        parameters: {},
-        metadata: { successRate: 0, inferenceCount: 0, generation: 0 }
-    };
-
-    const llmStrategy = {
-        id: 'llm-default',
-        description: 'LLM-based translation strategy',
-        promptTemplate: `You are an expert in First-Order Logic (FOL).
-Translate the following natural language text into First-Order Logic formulas using Prover9 syntax.
-
-Syntax Rules:
-- Quantifiers: 'all x', 'exists x'
-- Operators: '&' (and), '|' (or), '->' (implies), '<->' (iff), '-' (not)
-- Predicates: Lowercase start, e.g., 'man(x)', 'mortal(x)'
-- Constants: Lowercase start, e.g., 'socrates'
-- Variables: Single lowercase letters (x, y, z...) are free variables (implicitly universal) unless bound.
-- Equality: '='
-
-Output Format:
-- Provide ONLY the list of formulas.
-- Do not wrap in code blocks if possible, or use \`\`\`prolog or \`\`\`text.
-- Separate formulas by newlines.
-- If there is a clear conclusion/goal to prove, prefix it with "conclusion:".
-
-Input:
-{{INPUT}}
-`,
-        parameters: {},
-        metadata: { successRate: 0, inferenceCount: 0, generation: 0 }
-    };
-
-    // Determine default strategy based on environment
-    const hasLLMConfig = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_BASE_URL || process.env.OLLAMA_URL);
-
-    // We start with the Heuristic strategy in the list, but we might set the default to LLM
-    const initialStrategies = [heuristicStrategy, llmStrategy];
-
-    // If LLM is configured, use it as default. Otherwise fallback to heuristic.
-    const defaultStrategy = hasLLMConfig ? llmStrategy : heuristicStrategy;
-
-    const optimizer = new Optimizer(perfDb, evolver, evaluator, {
-        populationSize: 5,
-        generations: 3,
-        mutationRate: 0.3,
-        elitismCount: 1,
-        evalCasesPath: 'src/evalCases'
-    });
-
-    // Initialize Router
-    const router = new InputRouter(perfDb, defaultStrategy, llmProvider);
-    LLMHandlers.setInputRouter(router);
-
-    EvolutionHandlers.initializeEvolution(optimizer, perfDb, curriculumGenerator, initialStrategies);
+    // Initialize container (DI)
+    const container = createContainer();
 
     // Handle list_tools request
     server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -198,104 +187,37 @@ Input:
 
     // Handle call_tool request
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
-        const { name, arguments: args } = request.params;
-        const verbosity: Verbosity = (args as any)?.verbosity || 'standard';
+        const { name, arguments: rawArgs } = request.params;
+        const args = rawArgs || {};
+
+        // Ensure default verbosity
+        if (!('verbosity' in args)) {
+            (args as any).verbosity = 'standard';
+        }
 
         try {
-            let result: object;
-
-            switch (name) {
-                // ==================== CORE REASONING TOOLS ====================
-                case 'prove':
-                    const progressToken = (request.params as any)._meta?.progressToken;
-                    const onProgress = progressToken ? (progress: number | undefined, message: string) => {
-                        server.notification({
-                            method: 'notifications/progress',
-                            params: {
-                                progressToken,
-                                data: {
-                                    progress,
-                                    total: 1.0,
-                                    message
-                                }
-                            }
-                        });
-                    } : undefined;
-
-                    result = await Handlers.proveHandler(args as any, engineManager, verbosity, onProgress);
-                    break;
-
-                case 'check-well-formed':
-                    result = Handlers.checkWellFormedHandler(args as any);
-                    break;
-
-                case 'find-model':
-                    result = await Handlers.findModelHandler(args as any, modelFinder, verbosity);
-                    break;
-
-                case 'find-counterexample':
-                    result = await Handlers.findCounterexampleHandler(args as any, modelFinder, verbosity);
-                    break;
-
-                case 'verify-commutativity':
-                    result = Handlers.verifyCommutativityHandler(args as any, categoricalHelpers);
-                    break;
-
-                case 'get-category-axioms':
-                    result = Handlers.getCategoryAxiomsHandler(args as any, categoricalHelpers);
-                    break;
-
-                case 'translate-text':
-                    result = await LLMHandlers.translateTextHandler(args as any);
-                    break;
-
-                case 'agent-reason':
-                    result = await AgentHandlers.reasonHandler(args as any);
-                    break;
-
-                // ==================== EVOLUTION TOOLS ====================
-                case 'evolution-start':
-                    result = await EvolutionHandlers.startEvolutionHandler(args as any);
-                    break;
-                case 'evolution-list-strategies':
-                    result = await EvolutionHandlers.listStrategiesHandler(args as any);
-                    break;
-                case 'evolution-generate-cases':
-                    result = await EvolutionHandlers.generateCasesHandler(args as any);
-                    break;
-
-                // ==================== SESSION MANAGEMENT TOOLS ====================
-                case 'create-session':
-                    result = Handlers.createSessionHandler(args as any, sessionManager);
-                    break;
-
-                case 'assert-premise':
-                    result = Handlers.assertPremiseHandler(args as any, sessionManager);
-                    break;
-
-                case 'query-session':
-                    result = await Handlers.querySessionHandler(args as any, sessionManager, engineManager, verbosity);
-                    break;
-
-                case 'retract-premise':
-                    result = Handlers.retractPremiseHandler(args as any, sessionManager);
-                    break;
-
-                case 'list-premises':
-                    result = Handlers.listPremisesHandler(args as any, sessionManager, verbosity);
-                    break;
-
-                case 'clear-session':
-                    result = Handlers.clearSessionHandler(args as any, sessionManager);
-                    break;
-
-                case 'delete-session':
-                    result = Handlers.deleteSessionHandler(args as any, sessionManager);
-                    break;
-
-                default:
-                    throw createGenericError('PARSE_ERROR', `Unknown tool: ${name}`);
+            const handler = toolHandlers[name];
+            if (!handler) {
+                throw createGenericError('PARSE_ERROR', `Unknown tool: ${name}`);
             }
+
+            // Extract progress token if present
+            const progressToken = (request.params as any)._meta?.progressToken;
+            const onProgress = progressToken ? (progress: number | undefined, message: string) => {
+                server.notification({
+                    method: 'notifications/progress',
+                    params: {
+                        progressToken,
+                        data: {
+                            progress,
+                            total: 1.0,
+                            message
+                        }
+                    }
+                });
+            } : undefined;
+
+            const result = await handler(args, container, { onProgress });
 
             return {
                 content: [

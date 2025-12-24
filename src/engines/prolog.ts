@@ -85,7 +85,7 @@ export class PrologEngine implements ReasoningEngine {
 
             // Create a simple satisfiability check
             // If the program consults without error, it's "satisfiable"
-            const isSat = await this.engine.checkSatisfiability(prologClauses);
+            const isSat = await this.engine.checkPrologSatisfiability(prologClauses);
 
             return {
                 sat: isSat,

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'fs';
 import * as readline from 'readline';
-import { createLogicEngine } from './logicEngine.js';
+import { createEngineManager } from './engines/manager.js';
 import { createModelFinder } from './modelFinder.js';
 import { parse } from './parser.js';
 import { DEFAULTS } from './types/index.js';
@@ -67,12 +67,17 @@ async function main() {
             console.log(`Proving: ${conclusion}`);
             console.log(`From ${premises.length} premises...`);
 
-            const engine = createLogicEngine(timeout, limit);
+            const engineManager = createEngineManager(timeout, limit);
             const start = Date.now();
-            const result = await engine.prove(premises, conclusion, { includeTrace: true });
+            const result = await engineManager.prove(premises, conclusion, {
+                includeTrace: true,
+                maxSeconds: timeout / 1000,
+                maxInferences: limit
+            });
             const elapsed = Date.now() - start;
 
             console.log(result.success ? '✓ PROVED' : '✗ NOT PROVED');
+            console.log(`Engine: ${result.engineUsed || 'unknown'}`);
             console.log(`Time: ${elapsed}ms`);
             if (result.inferenceSteps) console.log('\nTrace:\n' + result.inferenceSteps.join('\n'));
             process.exit(result.success ? 0 : 1);
@@ -115,7 +120,8 @@ async function main() {
 
 async function runRepl(highPower: boolean) {
     const limit = highPower ? DEFAULTS.highPowerMaxInferences : 5000;
-    const engine = createLogicEngine(30000, limit);
+    const timeout = highPower ? 300000 : 30000;
+    const engineManager = createEngineManager(timeout, limit);
     const premises: string[] = [];
 
     const rl = readline.createInterface({
@@ -144,8 +150,13 @@ async function runRepl(highPower: boolean) {
             const goal = trimmed.slice(7).trim();
             try {
                 parse(goal);
-                const result = await engine.prove(premises, goal, { includeTrace: true });
+                const result = await engineManager.prove(premises, goal, {
+                    includeTrace: true,
+                    maxSeconds: timeout / 1000,
+                    maxInferences: limit
+                });
                 console.log(result.success ? '✓ Proved' : '✗ Not proved');
+                console.log(`Engine: ${result.engineUsed || 'unknown'}`);
                 if (result.inferenceSteps) console.log(result.inferenceSteps.join('\n'));
             } catch (e) {
                 console.log(`✗ ${(e as Error).message}`);
