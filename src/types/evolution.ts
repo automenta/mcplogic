@@ -4,7 +4,7 @@
  * Represents a strategy for translating Natural Language to FOL.
  * This is the "genome" that the evolution engine optimizes.
  */
-export interface TranslationStrategy {
+export interface EvolutionStrategy {
     id: string;
     description: string;
     // Template for the prompt sent to the LLM
@@ -17,6 +17,11 @@ export interface TranslationStrategy {
         inferenceCount: number;
         generation: number;
         parent?: string;
+        // Hash for integrity/deduplication
+        hash?: string;
+        // Cost metrics
+        avgLatencyMs?: number;
+        avgCost?: number;
     };
 }
 
@@ -24,15 +29,28 @@ export interface TranslationStrategy {
  * Result of evaluating a strategy against a test case.
  */
 export interface EvaluationResult {
+    id: string; // Unique run ID
     strategyId: string;
+    strategyHash: string;
     caseId: string;
     success: boolean;
     metrics: {
         accuracy: number;
         latencyMs: number;
         tokenCount: number;
+        // Detailed metrics
+        syntaxValid?: boolean;
+        semanticMatch?: boolean;
     };
+    cost: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+    };
+    rawOutput: string;
     trace?: string[];
+    timestamp: number;
+    llmModelId: string;
 }
 
 /**
@@ -40,9 +58,11 @@ export interface EvaluationResult {
  */
 export interface EvaluationCase {
     id: string;
+    domain?: string;
     input: string; // Natural language input
     expected: string[]; // Expected FOL formulas (canonical)
     type: 'premise' | 'goal';
+    metadata?: Record<string, unknown>;
 }
 
 /**
@@ -53,4 +73,7 @@ export interface EvolutionConfig {
     generations: number;
     mutationRate: number;
     elitismCount: number;
+    evalCasesPath: string;
+    storagePath?: string;
+    llmModelId?: string;
 }

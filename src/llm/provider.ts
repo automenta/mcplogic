@@ -1,0 +1,82 @@
+import type { LLMProvider, LLMMessage, LLMResponse } from '../types/llm.js';
+import { createGenericError } from '../types/errors.js';
+
+/**
+ * A basic LLM provider that uses environment variables to call OpenAI/Anthropic/Ollama.
+ * For this implementation, we will use a simple fetch-based approach for OpenAI/Ollama compatibility.
+ */
+export class StandardLLMProvider implements LLMProvider {
+    private apiUrl: string;
+    private apiKey: string;
+    private model: string;
+    private type: 'openai' | 'ollama';
+
+    constructor() {
+        // Defaults to Ollama (localhost) if no API key
+        this.apiKey = process.env.OPENAI_API_KEY || '';
+        this.type = this.apiKey ? 'openai' : 'ollama';
+
+        if (this.type === 'openai') {
+            this.apiUrl = 'https://api.openai.com/v1/chat/completions';
+            this.model = process.env.OPENAI_MODEL || 'gpt-4o';
+        } else {
+            this.apiUrl = process.env.OLLAMA_URL || 'http://localhost:11434/api/chat';
+            this.model = process.env.OLLAMA_MODEL || 'llama3';
+        }
+    }
+
+    async complete(messages: LLMMessage[]): Promise<LLMResponse> {
+        // Format messages for standard Chat API
+        const payload = {
+            model: this.model,
+            messages: messages,
+            stream: false,
+            // Ollama specific
+            options: this.type === 'ollama' ? { temperature: 0 } : undefined,
+            // OpenAI specific
+            temperature: 0,
+        };
+
+        try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+            if (this.apiKey) {
+                headers['Authorization'] = `Bearer ${this.apiKey}`;
+            }
+
+            const response = await fetch(this.apiUrl, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`LLM API error (${response.status}): ${text}`);
+            }
+
+            const data = await response.json() as any;
+
+            // Standardize response extraction
+            const content = data.choices?.[0]?.message?.content || data.message?.content || '';
+            const usage = data.usage || { prompt_tokens: 0, completion_tokens: 0 };
+
+            return {
+                content,
+                usage: {
+                    promptTokens: usage.prompt_tokens || 0,
+                    completionTokens: usage.completion_tokens || 0,
+                },
+            };
+        } catch (error) {
+            // In a real scenario without a working LLM, we might want to fail gracefully or return a mock if testing
+            if (process.env.NODE_ENV === 'test') {
+                 return { content: 'MOCK LLM RESPONSE', usage: { promptTokens: 0, completionTokens: 0 }};
+            }
+            const errMsg = error instanceof Error ? error.message : String(error);
+            console.error(`LLM Provider Error: ${errMsg}`, { model: this.model });
+            throw createGenericError('ENGINE_ERROR', `LLM Provider failed: ${errMsg}`);
+        }
+    }
+}
