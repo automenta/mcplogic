@@ -74,7 +74,7 @@ export function clausesToProlog(clauses: Clause[]): string[] {
             }
         } else {
             // Not a Horn clause - cannot directly convert
-            throw new Error('Cannot convert non-Horn clause to Prolog');
+            throw createEngineError('Cannot convert non-Horn clause to Prolog');
         }
     }
 
@@ -178,17 +178,23 @@ function astToMetaProlog(node: ASTNode): string | null {
             return `\\+ ${astToMetaProlog(node.operand!)}`;
 
         case 'implies':
-            // P -> Q is equivalent to ¬P ∨ Q, but in Prolog we can represent as rule-like
+            // P -> Q is equivalent to ¬P ∨ Q
+            // In Prolog (P -> Q ; true) implements material implication P -> Q
             return `(${astToMetaProlog(node.left!)} -> ${astToMetaProlog(node.right!)}; true)`;
+
+        case 'iff':
+            // P <-> Q is (P -> Q) & (Q -> P)
+            const left = astToMetaProlog(node.left!);
+            const right = astToMetaProlog(node.right!);
+            return `((${left} -> ${right} ; true), (${right} -> ${left} ; true))`;
 
         case 'equals':
             return `${astToMetaProlog(node.left!)} = ${astToMetaProlog(node.right!)}`;
 
         case 'variable':
-            return node.name!.toUpperCase();
-
         case 'constant':
-            return node.name!.toLowerCase();
+        case 'function':
+            return termToProlog(node);
 
         case 'forall':
             // Universal quantification - in Prolog, typically handled by variables being universal in rules
