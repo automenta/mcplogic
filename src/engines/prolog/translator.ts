@@ -171,7 +171,7 @@ function termToProlog(node: ASTNode): string {
             return `${node.name!.toLowerCase()}(${args})`;
         // Helper for cases where we might have just a name string node (though AST should be stricter)
         default:
-             if (node.type as any === 'predicate') {
+             if (node.type === 'predicate') {
                 // Sometimes terms might be parsed as predicates in isolation
                  const args = node.args ? node.args.map(termToProlog).join(', ') : '';
                  const name = node.name!.toLowerCase();

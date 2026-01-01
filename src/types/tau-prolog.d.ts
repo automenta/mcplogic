@@ -13,6 +13,7 @@ declare module 'tau-prolog' {
         args?: Term[];
         indicator?: string;
         toJavaScript?(): unknown;
+        toString(): string;
     }
 
     /**
@@ -51,6 +52,14 @@ declare module 'tau-prolog' {
     }
 
     /**
+     * Prolog IO Stream
+     */
+    export interface Stream {
+        put: (char: string | number, encoding?: unknown) => void;
+        flush: () => void;
+    }
+
+    /**
      * Tau-Prolog session for executing Prolog programs
      */
     export interface Session {
@@ -73,6 +82,16 @@ declare module 'tau-prolog' {
          * Format an answer as a human-readable string
          */
         format_answer(answer: Answer): string;
+
+        /**
+         * Standard output stream
+         */
+        standard_output?: Stream;
+
+        /**
+         * Map of active streams
+         */
+        streams?: Record<string, Stream>;
     }
 
     /**
@@ -88,4 +107,3 @@ declare module 'tau-prolog' {
 
     export default pl;
 }
-

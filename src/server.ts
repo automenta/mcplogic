@@ -31,6 +31,14 @@ import * as EvolutionHandlers from './handlers/evolution.js';
 import { TOOLS } from './tools/definitions.js';
 import { createContainer, ServerContainer } from './container.js';
 
+// Define the progress notification parameters
+interface ProgressParams {
+    _meta?: {
+        progressToken?: string | number;
+    };
+    [key: string]: unknown;
+}
+
 type ToolHandler = (
     args: any,
     container: ServerContainer,
@@ -188,11 +196,12 @@ export function createServer(): Server {
     // Handle call_tool request
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: rawArgs } = request.params;
-        const args = rawArgs || {};
+        // Use a mutable copy of args
+        const args: Record<string, unknown> = rawArgs ? { ...rawArgs } : {};
 
         // Ensure default verbosity
         if (!('verbosity' in args)) {
-            (args as any).verbosity = 'standard';
+            args.verbosity = 'standard';
         }
 
         try {
@@ -202,7 +211,9 @@ export function createServer(): Server {
             }
 
             // Extract progress token if present
-            const progressToken = (request.params as any)._meta?.progressToken;
+            const paramsWithMeta = request.params as ProgressParams;
+            const progressToken = paramsWithMeta._meta?.progressToken;
+
             const onProgress = progressToken ? (progress: number | undefined, message: string) => {
                 server.notification({
                     method: 'notifications/progress',

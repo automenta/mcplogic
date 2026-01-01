@@ -40,16 +40,16 @@ export class TauPrologAdapter implements PrologAdapter {
 
     setStandardOutput(callback: (str: string) => void): void {
         const outputStream = {
-            put: (char: string | number, _encoding: unknown) => {
+            put: (char: string | number, _encoding?: unknown) => {
                 const str = typeof char === 'number' ? String.fromCharCode(char) : char;
                 callback(str);
             },
             flush: () => { }
         };
 
-        (this.session as any).standard_output = outputStream;
+        this.session.standard_output = outputStream;
 
-        const streams = (this.session as any).streams;
+        const streams = this.session.streams;
         if (streams) {
             ['standard_output', 'current_output', 'user_output'].forEach(alias => {
                 if (streams[alias]) {

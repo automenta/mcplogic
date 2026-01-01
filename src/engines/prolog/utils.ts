@@ -31,8 +31,8 @@ export function formatError(err: unknown): string {
         return `${term.id}(${term.args.map(termToString).join(', ')})`;
     }
 
-    if (typeof err === 'object' && 'toString' in err && typeof (err as any).toString === 'function') {
-        return (err as any).toString();
+    if (typeof err === 'object' && 'toString' in err && typeof (err as { toString: () => string }).toString === 'function') {
+        return (err as { toString: () => string }).toString();
     }
     return String(err);
 }
@@ -46,9 +46,9 @@ export function termToString(term: unknown): string {
     if (typeof term === 'number') return String(term);
 
     const t = term as Term;
-    // Tau-Prolog Term object has toString() but it might be missing in type def if custom
 
-    if (typeof (term as any).toString === 'function') return (term as any).toString();
+    // Check if it is a Term with toString method (augmented via type decl)
+    if (typeof t.toString === 'function') return t.toString();
     if (t.id) return t.id;
     return String(term);
 }
