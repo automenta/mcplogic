@@ -2,13 +2,13 @@
  * Tests for verbosity control
  */
 
-import { LogicEngine, createLogicEngine } from '../src/logicEngine.js';
+import { PrologEngine, createPrologEngine } from '../src/engines/prolog.js';
 
-describe('Verbosity Control', () => {
-    let engine: LogicEngine;
+describe('PrologEngine Verbosity', () => {
+    let engine: PrologEngine;
 
     beforeEach(() => {
-        engine = createLogicEngine();
+        engine = createPrologEngine(5000);
     });
 
     describe('prove with minimal verbosity', () => {
@@ -124,10 +124,10 @@ describe('Verbosity Control', () => {
 });
 
 describe('Response size comparison', () => {
-    let engine: LogicEngine;
+    let engine: PrologEngine;
 
     beforeEach(() => {
-        engine = createLogicEngine();
+        engine = createPrologEngine(5000);
     });
 
     test('minimal response is smaller than standard', async () => {

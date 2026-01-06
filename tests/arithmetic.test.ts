@@ -13,7 +13,7 @@ import {
     parseNumber,
 } from '../src/axioms/arithmetic';
 import { parse } from '../src/parser';
-import { LogicEngine } from '../src/logicEngine';
+import { PrologEngine } from '../src/engines/prolog';
 
 describe('Arithmetic Support', () => {
     describe('containsArithmetic', () => {
@@ -193,11 +193,11 @@ describe('Arithmetic Support', () => {
         });
     });
 
-    describe('LogicEngine with arithmetic', () => {
-        let engine: LogicEngine;
+    describe('PrologEngine with arithmetic', () => {
+        let engine: PrologEngine;
 
         beforeEach(() => {
-            engine = new LogicEngine(5000, 1000);
+            engine = new PrologEngine(5000, 1000);
         });
 
         // Note: Direct numeric evaluation tests require the Prolog engine

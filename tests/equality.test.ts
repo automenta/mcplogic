@@ -233,12 +233,12 @@ describe('Equality Axioms', () => {
         });
     });
 
-    describe('LogicEngine with equality', () => {
-        let engine: any;
+    describe('PrologEngine with equality', () => {
+        let engine: PrologEngine;
 
         beforeEach(async () => {
-            const { LogicEngine } = await import('../src/logicEngine');
-            engine = new LogicEngine(5000, 1000);
+            const { PrologEngine } = await import('../src/engines/prolog');
+            engine = new PrologEngine(5000, 1000);
         });
 
         it('should inject base equality axioms when enabled', async () => {

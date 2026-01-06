@@ -2,14 +2,14 @@
  * Integration tests for the MCP Logic prover functionality
  */
 
-import { LogicEngine, createLogicEngine } from '../src/logicEngine.js';
+import { PrologEngine, createPrologEngine } from '../src/engines/prolog.js';
 import { buildPrologProgram, folGoalToProlog, folToProlog } from '../src/translator.js';
 
-describe('LogicEngine', () => {
-    let engine: LogicEngine;
+describe('PrologEngine', () => {
+    let engine: PrologEngine;
 
     beforeEach(() => {
-        engine = createLogicEngine(5000);
+        engine = createPrologEngine(5000);
     });
 
     describe('prove', () => {
@@ -47,18 +47,6 @@ describe('LogicEngine', () => {
         });
     });
 
-    describe('checkSatisfiability', () => {
-        test('does not crash on valid premises', async () => {
-            const result = await engine.checkSatisfiability(['P(a)']);
-            // checkSatisfiability checks if program can be consulted
-            expect(typeof result).toBe('boolean');
-        });
-
-        test('returns true for empty premises', async () => {
-            const result = await engine.checkSatisfiability([]);
-            expect(result).toBe(true);
-        });
-    });
 });
 
 describe('Translator', () => {
