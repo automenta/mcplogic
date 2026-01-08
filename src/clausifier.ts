@@ -14,6 +14,7 @@
  */
 
 import { parse } from './parser.js';
+import type { ASTNode } from './types/ast.js';
 import { countNodes } from './utils/ast.js';
 import {
     Clause,
@@ -39,18 +40,18 @@ const DEFAULT_OPTIONS: Required<ClausifyOptions> = {
 };
 
 /**
- * Clausify a FOL formula string.
+ * Clausify a FOL formula string or AST.
  * 
- * @param formula - The FOL formula to clausify
+ * @param formula - The FOL formula to clausify (string or AST)
  * @param options - Clausification options
  * @returns ClausifyResult with clauses or error
  */
-export function clausify(formula: string, options: ClausifyOptions = {}): ClausifyResult {
+export function clausify(formula: string | ASTNode, options: ClausifyOptions = {}): ClausifyResult {
     const startTime = Date.now();
     const opts = { ...DEFAULT_OPTIONS, ...options };
 
     try {
-        const ast = parse(formula);
+        const ast = typeof formula === 'string' ? parse(formula) : formula;
         const originalSize = countNodes(ast);
 
         // Step 1-3: Convert to Negation Normal Form

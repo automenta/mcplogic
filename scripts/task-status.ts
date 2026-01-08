@@ -93,9 +93,10 @@ for (const line of lines) {
         inDoneWhen = false;
     }
 
-    if (line.trim().startsWith('#### Done When')) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('#### Done When') || trimmed.startsWith('#### Acceptance Criteria')) {
         inDoneWhen = true;
-    } else if (line.trim().startsWith('####')) {
+    } else if (trimmed.startsWith('####')) {
         inDoneWhen = false;
     }
 

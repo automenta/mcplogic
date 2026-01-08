@@ -3,15 +3,12 @@ import { TranslateRequest, TranslateResult } from '../types/llm.js';
 import { parse } from '../parser.js';
 import { InputRouter } from '../evolution/index.js';
 
-// Global router instance (should be injected)
-let inputRouter: InputRouter | null = null;
 const fallbackTranslator = new HeuristicTranslator();
 
-export function setInputRouter(router: InputRouter) {
-    inputRouter = router;
-}
-
-export async function translateTextHandler(args: TranslateRequest): Promise<TranslateResult> {
+export async function translateTextHandler(
+    args: TranslateRequest,
+    inputRouter?: InputRouter
+): Promise<TranslateResult> {
     const translator = inputRouter
         ? await inputRouter.getTranslator(args.text)
         : fallbackTranslator;
