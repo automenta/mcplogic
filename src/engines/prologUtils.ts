@@ -4,6 +4,8 @@
  * Low-level interactions with the Tau-Prolog session.
  */
 
+import pl from 'tau-prolog';
+
 export interface PrologTerm {
     id: string;
     args?: PrologTerm[];
@@ -15,17 +17,11 @@ export interface PrologAnswer {
     links: Record<string, PrologTerm>;
 }
 
-export interface PrologSession {
-    consult(program: string, callbacks: { success: () => void; error: (err: any) => void }): void;
-    query(goal: string, callbacks: { success: () => void; error: (err: any) => void }): void;
-    answer(callbacks: {
-        success: (ans: PrologAnswer) => void;
-        fail: () => void;
-        error: (err: any) => void;
-        limit: () => void
-    }): void;
-    format_answer(answer: PrologAnswer): string;
-}
+// In tau-prolog type definitions, session is a class, but we use it as type here
+export type Session = pl.type.Session;
+
+// Re-export type for compatibility
+export type PrologSession = Session;
 
 /**
  * Format Prolog error from Tau-Prolog object
@@ -33,10 +29,12 @@ export interface PrologSession {
 export function formatError(err: any): string {
     if (!err) return 'Unknown error';
     if (typeof err === 'string') return err;
-    if (err.args?.length > 0) {
-        return `${err.id || 'Error'}: ${err.args.map(termToString).join(', ')}`;
+    // Check if it's a Term object (id, args)
+    if (err.id && Array.isArray(err.args)) {
+        // Typically error(term, context)
+        return `${err.id}(${err.args.map(termToString).join(', ')})`;
     }
-    if (err.id) return err.id;
+    if (err.toString) return err.toString();
     return String(err);
 }
 
@@ -47,15 +45,16 @@ export function termToString(term: any): string {
     if (term === null || term === undefined) return '';
     if (typeof term === 'string') return term;
     if (typeof term === 'number') return String(term);
+    // Tau-Prolog Term object has toString()
+    if (term.toString) return term.toString();
     if (term.id) return term.id;
-    if (term.indicator) return `${term.id}/${term.indicator}`;
     return String(term);
 }
 
 /**
  * Consult a Prolog program
  */
-export function consult(session: PrologSession, program: string): Promise<{ success: boolean; error?: string }> {
+export function consult(session: Session, program: string): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
         session.consult(program, {
             success: () => resolve({ success: true }),
@@ -70,7 +69,7 @@ export function consult(session: PrologSession, program: string): Promise<{ succ
 /**
  * Run a Prolog query and collect answers
  */
-export function query(session: PrologSession, goal: string): Promise<{
+export function query(session: Session, goal: string): Promise<{
     found: boolean;
     bindings?: Record<string, string>[];
     error?: string;
@@ -91,7 +90,7 @@ export function query(session: PrologSession, goal: string): Promise<{
 /**
  * Collect all answers from a query
  */
-function collectAnswers(session: PrologSession): Promise<{
+function collectAnswers(session: Session): Promise<{
     found: boolean;
     bindings: Record<string, string>[];
     hitLimit?: boolean;
@@ -102,18 +101,20 @@ function collectAnswers(session: PrologSession): Promise<{
 
         const getNext = () => {
             session.answer({
-                success: (answer: PrologAnswer) => {
+                success: (answer: any) => { // Type as any because Tau-Prolog types are tricky
                     if (answer) {
                         bindings.push(extractBindings(answer));
                         getNext(); // Get next answer
                     } else {
+                        // Should not happen for success callback but safe fallback
                         resolve({ found: bindings.length > 0, bindings, hitLimit });
                     }
                 },
                 fail: () => {
                     resolve({ found: bindings.length > 0, bindings, hitLimit });
                 },
-                error: () => {
+                error: (err: any) => {
+                     // Normally we might want to report this, but here we treat it as end of answers
                     resolve({ found: bindings.length > 0, bindings, hitLimit });
                 },
                 limit: () => {
@@ -130,7 +131,7 @@ function collectAnswers(session: PrologSession): Promise<{
 /**
  * Extract variable bindings from Prolog answer
  */
-function extractBindings(answer: PrologAnswer): Record<string, string> {
+function extractBindings(answer: any): Record<string, string> {
     const bindings: Record<string, string> = {};
 
     if (answer && answer.links) {

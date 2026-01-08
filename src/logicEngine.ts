@@ -4,11 +4,6 @@
  * Provides async interface for proving and model finding using Tau-Prolog.
  */
 
-import pl from 'tau-prolog';
-import { PrologSession, consult, query } from './engines/prologUtils.js';
-
-type Session = PrologSession;
-
 import { buildPrologProgram, folGoalToProlog } from './translator.js';
 import { getArithmeticSetup } from './axioms/arithmetic.js';
 import { parse } from './parser.js';
@@ -25,6 +20,7 @@ import {
 import { buildProveResult } from './utils/response.js';
 import { ProveOptions } from './types/options.js';
 import { META_INTERPRETER, generateDynamicDirectives, parseTraceOutput } from './utils/trace.js';
+import { TauPrologAdapter } from './engines/prolog/adapter.js';
 
 // Re-export ProveOptions to ensure it's used correctly by consumers
 export type { ProveResult, ProveOptions };
@@ -33,7 +29,6 @@ export type { ProveResult, ProveOptions };
  * Logic Engine using Tau-Prolog
  */
 export class LogicEngine {
-    private session: Session;
     private inferenceLimit: number;
 
     /**
@@ -42,7 +37,6 @@ export class LogicEngine {
      */
     constructor(_timeout: number = 5000, inferenceLimit: number = 1000) {
         this.inferenceLimit = inferenceLimit;
-        this.session = pl.create(this.inferenceLimit);
     }
 
     /**
@@ -81,7 +75,7 @@ export class LogicEngine {
 
             // Use configured limit or default to constructor limit
             const limit = options?.maxInferences ?? this.inferenceLimit;
-            this.session = pl.create(limit);
+            const adapter = new TauPrologAdapter(limit);
 
             // Add directive to make unknown predicates fail instead of error
             // This enables closed-world assumption for tautology checking
@@ -95,29 +89,13 @@ export class LogicEngine {
 
                 prologProgram = dynamicDirectives + '\n' + META_INTERPRETER + '\n' + prologProgram;
 
-                // Replace output streams entirely to ensure capture
-                const outputStream = {
-                    put: (char: string | number, _encoding: any) => {
-                        const str = typeof char === 'number' ? String.fromCharCode(char) : char;
-                        traceState.buffer += str;
-                    },
-                    flush: () => { }
-                };
-
-                (this.session as any).standard_output = outputStream;
-
-                const streams = (this.session as any).streams;
-                if (streams) {
-                    ['standard_output', 'current_output', 'user_output'].forEach(alias => {
-                        if (streams[alias]) {
-                            streams[alias].put = outputStream.put;
-                        }
-                    });
-                }
+                adapter.setStandardOutput((str) => {
+                    traceState.buffer += str;
+                });
             }
 
             // Consult the program
-            const consultResult = await consult(this.session, prologProgram);
+            const consultResult = await adapter.consult(prologProgram);
 
             if (!consultResult.success) {
                 return buildProveResult({
@@ -138,7 +116,7 @@ export class LogicEngine {
             }
 
             // Run query
-            const queryResult = await query(this.session, queryGoal);
+            const queryResult = await adapter.query(queryGoal);
 
             if (options?.includeTrace) {
                 trace = parseTraceOutput(traceState.buffer);
@@ -302,9 +280,9 @@ export class LogicEngine {
     async checkSatisfiability(premises: string[]): Promise<boolean> {
         try {
             const program = buildPrologProgram(premises);
-            this.session = pl.create(this.inferenceLimit);
+            const adapter = new TauPrologAdapter(this.inferenceLimit);
 
-            const result = await consult(this.session, program);
+            const result = await adapter.consult(program);
             return result.success;
         } catch {
             return false;
@@ -323,10 +301,10 @@ export class LogicEngine {
 
         try {
             const program = definiteClauses.join('\n');
-            this.session = pl.create(this.inferenceLimit);
+            const adapter = new TauPrologAdapter(this.inferenceLimit);
 
             // 1. Consult definite clauses
-            const consultResult = await consult(this.session, program);
+            const consultResult = await adapter.consult(program);
             if (!consultResult.success) return false;
 
             // 2. Check each constraint
@@ -335,7 +313,7 @@ export class LogicEngine {
                 const goal = constraint.trim().substring(2, constraint.trim().length - 1) + ".";
                 if (goal === ".") continue; // Empty constraint?
 
-                const result = await query(this.session, goal);
+                const result = await adapter.query(goal);
                 if (result.found) {
                     // Contradiction derived!
                     return false;

@@ -8,6 +8,7 @@
 import { SATEngine, createSATEngine } from '../src/engines/sat';
 import { clausify } from '../src/clausifier';
 import { Clause } from '../src/types/clause';
+import { createConstant } from '../src/utils/ast';
 
 describe('SATEngine', () => {
     let engine: SATEngine;
@@ -73,7 +74,7 @@ describe('SATEngine', () => {
         it('should handle clauses with arguments', async () => {
             // man(socrates) is satisfiable
             const clauses: Clause[] = [
-                { literals: [{ predicate: 'man', args: ['socrates'], negated: false }] }
+                { literals: [{ predicate: 'man', args: [createConstant('socrates')], negated: false }] }
             ];
             const result = await engine.checkSat(clauses);
             expect(result.sat).toBe(true);

@@ -1,6 +1,5 @@
 import { ASTNode } from '../types/ast.js';
 import { Clause, ClausifyOptions, Literal } from '../types/clause.js';
-import { astToString } from './ast.js';
 import { distribute } from './transform.js';
 import { createClausificationError } from '../types/errors.js';
 
@@ -58,14 +57,14 @@ function nodeToLiteral(node: ASTNode): Literal {
         if (inner.type === 'predicate') {
             return {
                 predicate: inner.name!,
-                args: (inner.args || []).map(astToString),
+                args: inner.args || [],
                 negated: true,
             };
         } else if (inner.type === 'equals') {
             // ¬(a = b) represented as special predicate
             return {
                 predicate: '=',
-                args: [astToString(inner.left!), astToString(inner.right!)],
+                args: [inner.left!, inner.right!],
                 negated: true,
             };
         }
@@ -75,7 +74,7 @@ function nodeToLiteral(node: ASTNode): Literal {
     if (node.type === 'predicate') {
         return {
             predicate: node.name!,
-            args: (node.args || []).map(astToString),
+            args: node.args || [],
             negated: false,
         };
     }
@@ -83,7 +82,7 @@ function nodeToLiteral(node: ASTNode): Literal {
     if (node.type === 'equals') {
         return {
             predicate: '=',
-            args: [astToString(node.left!), astToString(node.right!)],
+            args: [node.left!, node.right!],
             negated: false,
         };
     }

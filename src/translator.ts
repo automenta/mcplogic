@@ -12,6 +12,7 @@ import {
 } from './types/errors.js';
 import { clausify } from './clausifier.js';
 import { Clause, Literal } from './types/clause.js';
+import { astToString } from './utils/ast.js';
 
 /**
  * Options for translation
@@ -92,8 +93,8 @@ export function clausesToProlog(clauses: Clause[], options?: TranslatorOptions):
  * Convert a literal to Prolog format.
  */
 function literalToProlog(lit: Literal, useNegation: boolean, options?: TranslatorOptions): string {
-    const formatArg = (arg: string): string => {
-        return formatPrologTerm(arg);
+    const formatArg = (arg: ASTNode): string => {
+        return termToProlog(arg);
     };
 
     let predicate = lit.predicate;
@@ -115,25 +116,7 @@ function literalToProlog(lit: Literal, useNegation: boolean, options?: Translato
 
 /**
  * Formats a term string (variable or constant) for Prolog.
- * Handles complex terms like f(x, g(y)) by parsing them first.
  */
-function formatPrologTerm(term: string): string {
-    // If it's a simple alphanumeric string, use fast path
-    if (/^[a-zA-Z0-9_]+$/.test(term)) {
-        return simpleFormatPrologTerm(term);
-    }
-
-    try {
-        // Parse the term string into AST
-        // We use the formula parser. A term "f(x)" looks like a predicate "f(x)" to the parser.
-        const ast = parse(term);
-        return astToPrologTermRecursive(ast);
-    } catch (e) {
-        // Fallback if parsing fails (shouldn't happen for valid terms)
-        return simpleFormatPrologTerm(term);
-    }
-}
-
 function simpleFormatPrologTerm(term: string): string {
     if (term.startsWith('_v')) {
         // It's a variable from Clausifier, ensure uppercase for Prolog
@@ -154,27 +137,6 @@ function simpleFormatPrologTerm(term: string): string {
     }
 }
 
-function astToPrologTermRecursive(node: ASTNode): string {
-    // Handle variables from Clausifier (which might be parsed as constants/predicates)
-    if (node.name && node.name.startsWith('_v')) {
-        return node.name.toUpperCase();
-    }
-
-    switch (node.type) {
-        case 'variable':
-            return node.name!.toUpperCase();
-        case 'constant':
-            return simpleFormatPrologTerm(node.name!);
-        case 'function':
-        case 'predicate': // Parser might return predicate for f(x)
-            const args = node.args!.map(astToPrologTermRecursive).join(', ');
-            const name = node.name!.toLowerCase(); // Functions are lowercase
-            return `${name}(${args})`;
-        default:
-            throw createEngineError(`Cannot convert ${node.type} to Prolog term`);
-    }
-}
-
 function predicateToProlog(node: ASTNode, options?: TranslatorOptions): string {
     if (node.type !== 'predicate') {
         throw createEngineError(`Expected predicate, got ${node.type} during translation`);
@@ -189,19 +151,32 @@ function predicateToProlog(node: ASTNode, options?: TranslatorOptions): string {
 }
 
 function termToProlog(node: ASTNode): string {
+    // Handle variables from Clausifier (which might come as constants/predicates if not fully typed in AST)
+    // But since we are working with AST nodes, we should rely on node structure.
+    // However, clausifier might rename variables to _v... which might be stored as name.
+
+    if (node.name && node.name.startsWith('_v')) {
+        return node.name.toUpperCase();
+    }
+
     switch (node.type) {
         case 'variable':
             // Explicit variable node: must be uppercase in Prolog
-            // Even if the name doesn't follow strict conventions, if the parser
-            // identified it as a variable, we treat it as such.
             return node.name!.toUpperCase();
         case 'constant':
             // Explicit constant node: must be lowercase in Prolog
-            return node.name!.toLowerCase();
+            return simpleFormatPrologTerm(node.name!);
         case 'function':
             const args = node.args!.map(termToProlog).join(', ');
             return `${node.name!.toLowerCase()}(${args})`;
+        // Helper for cases where we might have just a name string node (though AST should be stricter)
         default:
+             if (node.type as any === 'predicate') {
+                // Sometimes terms might be parsed as predicates in isolation
+                 const args = node.args ? node.args.map(termToProlog).join(', ') : '';
+                 const name = node.name!.toLowerCase();
+                 return args ? `${name}(${args})` : name;
+             }
             throw createEngineError(`Cannot convert ${node.type} to Prolog term`);
     }
 }
