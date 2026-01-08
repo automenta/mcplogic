@@ -5,7 +5,7 @@
  */
 
 import pl from 'tau-prolog';
-import { PrologSession, consult, query, PrologAnswer } from '../prologUtils.js';
+import { PrologSession, consult, query } from '../prologUtils.js';
 
 export interface PrologAdapter {
     consult(program: string): Promise<{ success: boolean; error?: string }>;
@@ -40,7 +40,7 @@ export class TauPrologAdapter implements PrologAdapter {
 
     setStandardOutput(callback: (str: string) => void): void {
         const outputStream = {
-            put: (char: string | number, _encoding: any) => {
+            put: (char: string | number, _encoding: unknown) => {
                 const str = typeof char === 'number' ? String.fromCharCode(char) : char;
                 callback(str);
             },

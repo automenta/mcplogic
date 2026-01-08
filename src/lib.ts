@@ -10,10 +10,10 @@
 export { createLogicEngine, LogicEngine } from './logicEngine.js';
 
 // Model Finder
-export { createModelFinder, ModelFinder } from './modelFinder.js';
+export { createModelFinder, ModelFinder } from './model/index.js';
 
 // Parser
-export { parse } from './parser.js';
+export { parse } from './parser/index.js';
 
 // Types and Interfaces
 export * from './types/index.js';

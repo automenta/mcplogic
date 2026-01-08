@@ -1,5 +1,5 @@
 import type { ASTNode } from '../types/index.js';
-import { cloneAST } from '../utils/ast.js';
+import { cloneAST } from '../utils/ast-modules/index.js';
 
 export interface GroundingOptions {
     domainSize: number;

@@ -4,10 +4,10 @@
  * Provides async interface for proving and model finding using Tau-Prolog.
  */
 
-import { buildPrologProgram, folGoalToProlog } from './translator.js';
+import { buildPrologProgram, folGoalToProlog } from './engines/prolog/translator.js';
 import { getArithmeticSetup } from './axioms/arithmetic.js';
-import { parse } from './parser.js';
-import { extractSignature } from './utils/ast.js';
+import { parse } from './parser/index.js';
+import { extractSignature } from './utils/ast-modules/index.js';
 import {
     generateMinimalEqualityAxioms,
     getEqualityBridge
@@ -32,10 +32,9 @@ export class LogicEngine {
     private inferenceLimit: number;
 
     /**
-     * @param _timeout Timeout in milliseconds (reserved for future use)
      * @param inferenceLimit Maximum inference steps before giving up (default: 1000)
      */
-    constructor(_timeout: number = 5000, inferenceLimit: number = 1000) {
+    constructor(inferenceLimit: number = 1000) {
         this.inferenceLimit = inferenceLimit;
     }
 
@@ -329,9 +328,9 @@ export class LogicEngine {
 
 /**
  * Create a new logic engine instance
- * @param timeout Timeout in milliseconds (reserved for future use)
+ * @param timeout Timeout in milliseconds (reserved for future use) - DEPRECATED/IGNORED
  * @param inferenceLimit Maximum inference steps (default: 1000)
  */
 export function createLogicEngine(timeout?: number, inferenceLimit?: number): LogicEngine {
-    return new LogicEngine(timeout, inferenceLimit);
+    return new LogicEngine(inferenceLimit);
 }

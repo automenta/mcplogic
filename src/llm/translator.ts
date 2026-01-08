@@ -1,5 +1,5 @@
 import { TranslationStrategy, TranslationResult } from '../types/llm.js';
-import { parse } from '../parser.js';
+import { parse } from '../parser/index.js';
 
 /**
  * A rule-based translator that handles standard English logical forms.

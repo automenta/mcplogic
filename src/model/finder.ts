@@ -4,9 +4,9 @@
  * Equivalent to Mace4 - finds finite models or counterexamples.
  */
 
-import { parse } from '../parser.js';
+import { parse } from '../parser/index.js';
 import { Model, ModelResult, ModelOptions, DEFAULTS } from '../types/index.js';
-import { extractSignature, getFreeVariables } from '../utils/ast.js';
+import { extractSignature, getFreeVariables } from '../utils/ast-modules/index.js';
 import { createGenericError } from '../types/errors.js';
 import { SATEngine } from '../engines/sat.js';
 import { findModelsSAT } from '../engines/model/sat.js';
