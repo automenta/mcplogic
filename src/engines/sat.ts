@@ -7,7 +7,7 @@
 
 import Logic from 'logic-solver';
 import { Clause, Literal } from '../types/clause.js';
-import { allMappings } from '../utils/enumerate.js';
+import { allMappings } from '../utils/math/enumerate.js';
 import { ProveResult, Verbosity } from '../types/index.js';
 import { buildProveResult } from '../utils/response.js';
 import { clausify, isHornFormula } from '../clausifier.js';

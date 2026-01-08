@@ -5,7 +5,7 @@
  * Extracted from ModelFinder.
  */
 
-import type { ASTNode, Model } from '../types/index.js';
+import type { ASTNode, Model } from '../../types/index.js';
 
 /**
  * Check if all formulas are satisfied in the model
@@ -32,7 +32,7 @@ export function evaluate(
 ): boolean {
     switch (node.type) {
         case 'predicate': {
-            const args = (node.args || []).map(a => evaluateTerm(a, model, assignment));
+            const args = (node.args || []).map((a: ASTNode) => evaluateTerm(a, model, assignment));
             const key = args.join(',');
             const extension = model.predicates.get(node.name!);
             return extension?.has(key) ?? false;
@@ -58,14 +58,14 @@ export function evaluate(
                 evaluate(node.right!, model, assignment);
 
         case 'forall':
-            return model.domain.every(d => {
+            return model.domain.every((d: number) => {
                 const newAssign = new Map(assignment);
                 newAssign.set(node.variable!, d);
                 return evaluate(node.body!, model, newAssign);
             });
 
         case 'exists':
-            return model.domain.some(d => {
+            return model.domain.some((d: number) => {
                 const newAssign = new Map(assignment);
                 newAssign.set(node.variable!, d);
                 return evaluate(node.body!, model, newAssign);
@@ -104,7 +104,7 @@ export function evaluateTerm(
         case 'constant':
             return model.constants.get(node.name!) ?? 0;
         case 'function': {
-            const args = (node.args || []).map(a => evaluateTerm(a, model, assignment));
+            const args = (node.args || []).map((a: ASTNode) => evaluateTerm(a, model, assignment));
             const table = model.functions.get(node.name!);
             return table?.get(args.join(',')) ?? 0;
         }

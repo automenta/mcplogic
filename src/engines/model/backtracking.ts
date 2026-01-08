@@ -1,7 +1,7 @@
 import { Model, ModelOptions, ASTNode } from '../../types/index.js';
-import { checkAllFormulas } from '../../utils/evaluation.js';
-import { symmetricMappings, allMappings, allFunctionTables, allTuples } from '../../utils/enumerate.js';
-import { areIsomorphic } from '../../utils/isomorphism.js';
+import { checkAllFormulas } from '../../model/utils/evaluation.js';
+import { symmetricMappings, allMappings, allFunctionTables, allTuples } from '../../utils/math/enumerate.js';
+import { areIsomorphic } from '../../model/utils/isomorphism.js';
 import { formatModelString } from '../../utils/response.js';
 
 /**
