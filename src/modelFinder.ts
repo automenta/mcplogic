@@ -5,10 +5,14 @@
  */
 
 import { parse } from './parser.js';
-import { Model, ModelResult } from './types/index.js';
+import { Model, ModelResult, ModelOptions, DEFAULTS } from './types/index.js';
 import type { ASTNode } from './types/index.js';
-import { extractSignature } from './utils/ast.js';
+import { extractSignature, astToString, getFreeVariables } from './utils/ast.js';
 import { createGenericError } from './types/errors.js';
+import { symmetricMappings, allMappings, allFunctionTables, allTuples } from './utils/enumerate.js';
+import { SATEngine } from './engines/sat.js';
+import { groundFormula } from './utils/grounding.js';
+import { clausify } from './clausifier.js';
 
 export type { Model, ModelResult };
 
@@ -18,6 +22,7 @@ export type { Model, ModelResult };
 export class ModelFinder {
     private timeout: number;
     private maxDomainSize: number;
+    private satEngine = new SATEngine();
 
     constructor(timeout: number = 5000, maxDomainSize: number = 10) {
         this.timeout = timeout;
@@ -29,43 +34,65 @@ export class ModelFinder {
      */
     async findModel(
         premises: string[],
-        domainSize?: number
+        options?: ModelOptions
     ): Promise<ModelResult> {
+        const opts = { ...DEFAULTS, ...options };
         const startTime = Date.now();
-        const startSize = domainSize || 2;
-        const endSize = domainSize || this.maxDomainSize;
+        const startSize = 1;
+        const endSize = opts.maxDomainSize ?? this.maxDomainSize;
 
         try {
             // Parse all premises
             const asts = premises.map(p => parse(p));
 
-            // Extract signature (predicates, constants)
-            const baseSignature = extractSignature(asts);
+            // Extract signature (predicates, constants, functions)
+            const signature = extractSignature(asts);
 
-            // Adapt signature for ModelFinder: functions are treated as predicates with arity + 1
-            const signature = {
-                predicates: new Map(baseSignature.predicates),
-                constants: baseSignature.constants,
-                variables: baseSignature.variables
-            };
+            // Treat free variables as constants (Skolemization for model finding)
+            // This allows users to write P(x) and find a model where P holds for some element named x
+            // without explicit quantification, following Mace4 convention.
+            const freeVars = new Set<string>();
+            asts.forEach(ast => {
+                const free = getFreeVariables(ast);
+                free.forEach(v => freeVars.add(v));
+            });
 
-            for (const [name, arity] of baseSignature.functions) {
-                signature.predicates.set(name, arity + 1);
-            }
+            freeVars.forEach(v => {
+                signature.constants.add(v);
+                signature.variables.delete(v);
+            });
 
             // Try increasing domain sizes
             for (let size = startSize; size <= endSize; size++) {
-                if (Date.now() - startTime > this.timeout) {
+                if (Date.now() - startTime > (opts.maxSeconds ?? 30) * 1000) {
                     return { success: false, result: 'timeout' };
                 }
 
-                const model = this.tryDomainSize(asts, signature, size);
-                if (model) {
+                const shouldUseSAT = opts.useSAT === true || (opts.useSAT === 'auto' && size > opts.satThreshold!);
+                const count = opts.count ?? 1;
+                const foundModels: Model[] = [];
+
+                if (shouldUseSAT) {
+                    // SAT currently only finds one model per size. 
+                    // TODO: Implement multiple model finding for SAT (requires blocking clauses)
+                    const model = await this.findModelSAT(premises, size, opts);
+                    if (model) foundModels.push(model);
+                } else {
+                    // Backtracking search
+                    const models = this.findModelsBacktracking(asts, signature, size, opts, count);
+                    foundModels.push(...models);
+                }
+
+                if (foundModels.length > 0) {
+                    // Filter isomorphic models if we found multiple across sizes (though we currently restart per size)
+                    // Note: findModelsBacktracking already handles isomorphism within a size if count > 1
+
                     return {
                         success: true,
                         result: 'model_found',
-                        model,
-                        interpretation: this.formatModel(model)
+                        model: foundModels[0], // Primary model for backward compatibility
+                        models: foundModels,
+                        interpretation: this.formatModel(foundModels[0])
                     };
                 }
             }
@@ -82,19 +109,76 @@ export class ModelFinder {
     }
 
     /**
+     * Find a model using SAT solver
+     */
+    private async findModelSAT(
+        premises: string[],
+        size: number,
+        opts: ModelOptions
+    ): Promise<Model | null> {
+        // 1. Ground all premises
+        const grounded = premises.map(p => {
+            const ast = parse(p);
+            return `(${astToString(groundFormula(ast, { domainSize: size }))})`;
+        }).join(' & ');
+
+        // 2. Clausify
+        const result = clausify(grounded);
+        if (!result.success || !result.clauses) return null;
+
+        // 3. SAT solve
+        const satResult = await this.satEngine.checkSat(result.clauses);
+        if (!satResult.sat) return null;
+
+        // 4. Decode
+        return this.decodeSATModel(satResult.model!, size);
+    }
+
+    /**
+     * Decode SAT model into Model structure
+     */
+    private decodeSATModel(satModel: Map<string, boolean>, size: number): Model {
+        const predicates = new Map<string, Set<string>>();
+
+        for (const [varName, val] of satModel) {
+            if (!val) continue;
+            const m = varName.match(/^(\w+)(?:\(([^)]*)\))?$/);
+            if (m) {
+                const [, pred, argsStr] = m;
+                // Constants like '0', '1' are also returned as true vars in some cases if they are propositions,
+                // but usually predicates look like p(0,1).
+                // We should be careful about internal vars generated by clausifier if any.
+                if (pred.startsWith('$')) continue; // Skip internal vars
+
+                if (!predicates.has(pred)) predicates.set(pred, new Set());
+                predicates.get(pred)!.add(argsStr || '');
+            }
+        }
+
+        return {
+            domainSize: size,
+            domain: Array.from({ length: size }, (_, i) => i),
+            predicates,
+            constants: new Map(), // Constants are folded into predicates or grounding
+            functions: new Map(), // Functions are flattened to predicates
+            interpretation: ''
+        };
+    }
+
+    /**
      * Find a counterexample (model where premises true but conclusion false)
      */
     async findCounterexample(
         premises: string[],
         conclusion: string,
-        domainSize?: number
+        options?: ModelOptions
     ): Promise<ModelResult> {
         // A counterexample is a model of premises ∧ ¬conclusion
         const negatedConclusion = `-(${conclusion.replace(/\.$/, '')})`;
 
         const result = await this.findModel(
             [...premises, negatedConclusion],
-            domainSize
+            options
         );
 
         if (result.success) {
@@ -105,135 +189,240 @@ export class ModelFinder {
     }
 
     /**
-     * Try to find a model of given domain size
+     * Try to find models of given domain size using backtracking
      */
-    private tryDomainSize(
+    private findModelsBacktracking(
         asts: ASTNode[],
         signature: {
             predicates: Map<string, number>;
+            functions: Map<string, number>;
             constants: Set<string>;
             variables: Set<string>;
         },
-        size: number
-    ): Model | null {
+        size: number,
+        options: ModelOptions,
+        count: number
+    ): Model[] {
+        console.log(`Searching models of size ${size}`);
         const domain = Array.from({ length: size }, (_, i) => i);
+        const useSymmetry = options.enableSymmetry !== false; // Default to true if not specified
+        const foundModels: Model[] = [];
 
         // Assign constants to domain elements
-        const constantAssignments = this.enumerateConstantAssignments(
+        const constantAssignments = this.enumerateConstants(
             Array.from(signature.constants),
-            domain
+            domain,
+            useSymmetry
         );
 
         for (const constants of constantAssignments) {
-            // Enumerate predicate interpretations
-            const predicateInterpretations = this.enumeratePredicateInterpretations(
-                signature.predicates,
+            // Enumerate function interpretations
+            const functionInterpretations = this.enumerateFunctions(
+                signature.functions,
                 domain
             );
 
-            for (const predicates of predicateInterpretations) {
-                const model: Model = {
-                    domainSize: size,
-                    domain,
-                    predicates,
-                    constants,
-                    functions: new Map(), // TODO: Implement function enumeration
-                    interpretation: ''
-                };
+            for (const functions of functionInterpretations) {
+                // Enumerate predicate interpretations
+                const predicateInterpretations = this.enumeratePredicates(
+                    signature.predicates,
+                    domain
+                );
 
-                if (this.checkAllFormulas(asts, model)) {
-                    model.interpretation = this.formatModel(model);
-                    return model;
+                for (const predicates of predicateInterpretations) {
+                    const model: Model = {
+                        domainSize: size,
+                        domain,
+                        predicates,
+                        constants,
+                        functions,
+                        interpretation: ''
+                    };
+
+                    if (this.checkAllFormulas(asts, model)) {
+                        // Check isomorphism against already found models
+                        let isIso = false;
+                        for (const existing of foundModels) {
+                            if (this.areIsomorphic(model, existing)) {
+                                isIso = true;
+                                break;
+                            }
+                        }
+
+                        if (!isIso) {
+                            model.interpretation = this.formatModel(model);
+                            foundModels.push(model);
+                            if (foundModels.length >= count) {
+                                return foundModels;
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        return null;
+        return foundModels;
+    }
+
+    /**
+     * Check if two models are isomorphic
+     */
+    private areIsomorphic(m1: Model, m2: Model): boolean {
+        if (m1.domainSize !== m2.domainSize) return false;
+
+        // Generate all permutations of the domain
+        const permutations = this.generatePermutations(m1.domain);
+
+        for (const p of permutations) {
+            if (this.isIsomorphism(m1, m2, p)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a specific permutation is an isomorphism
+     */
+    private isIsomorphism(m1: Model, m2: Model, mapping: Map<number, number>): boolean {
+        // Check constants
+        for (const [name, val1] of m1.constants) {
+            const val2 = m2.constants.get(name);
+            if (val2 === undefined || mapping.get(val1) !== val2) return false;
+        }
+
+        // Check predicates
+        for (const [name, ext1] of m1.predicates) {
+            const ext2 = m2.predicates.get(name);
+            if (!ext2) return false; // Should not happen if signatures match
+            if (ext1.size !== ext2.size) return false;
+
+            for (const tupleStr of ext1) {
+                const args = tupleStr === '' ? [] : tupleStr.split(',').map(Number);
+                const mappedArgs = args.map(a => mapping.get(a)!);
+                const mappedTupleStr = mappedArgs.join(',');
+                if (!ext2.has(mappedTupleStr)) return false;
+            }
+        }
+
+        // Check functions
+        for (const [name, table1] of m1.functions) {
+            const table2 = m2.functions.get(name);
+            if (!table2) return false;
+
+            for (const [argsStr, val1] of table1) {
+                const args = argsStr === '' ? [] : argsStr.split(',').map(Number);
+                const mappedArgs = args.map(a => mapping.get(a)!);
+                const mappedArgsStr = mappedArgs.join(',');
+
+                const val2 = table2.get(mappedArgsStr);
+                if (val2 === undefined || mapping.get(val1) !== val2) return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Generate all permutations of a domain
+     */
+    private *generatePermutations(domain: number[]): Generator<Map<number, number>> {
+        if (domain.length === 0) { yield new Map(); return; }
+
+        const permute = (arr: number[]): number[][] => {
+            if (arr.length === 0) return [[]];
+            const first = arr[0];
+            const rest = arr.slice(1);
+            const restPerms = permute(rest);
+            const all: number[][] = [];
+
+            for (const p of restPerms) {
+                for (let i = 0; i <= p.length; i++) {
+                    const newP = [...p.slice(0, i), first, ...p.slice(i)];
+                    all.push(newP);
+                }
+            }
+            return all;
+        };
+
+        const perms = permute(domain);
+        for (const p of perms) {
+            const map = new Map<number, number>();
+            for (let i = 0; i < domain.length; i++) {
+                map.set(domain[i], p[i]);
+            }
+            yield map;
+        }
     }
 
     /**
      * Enumerate all possible constant assignments
      */
-    private *enumerateConstantAssignments(
+    private *enumerateConstants(
         constants: string[],
-        domain: number[]
+        domain: number[],
+        useSymmetry: boolean
     ): Generator<Map<string, number>> {
-        if (constants.length === 0) {
-            yield new Map();
-            return;
-        }
-
-        const [first, ...rest] = constants;
-        for (const value of domain) {
-            for (const restAssignment of this.enumerateConstantAssignments(rest, domain)) {
-                const assignment = new Map(restAssignment);
-                assignment.set(first, value);
-                yield assignment;
-            }
+        if (useSymmetry) {
+            yield* symmetricMappings(constants, domain.length);
+        } else {
+            yield* allMappings(constants, domain);
         }
     }
 
     /**
      * Enumerate all possible predicate interpretations
      */
-    private *enumeratePredicateInterpretations(
+    private *enumeratePredicates(
         predicates: Map<string, number>,
         domain: number[]
     ): Generator<Map<string, Set<string>>> {
         const predList = Array.from(predicates.entries());
-        yield* this.enumeratePredicateHelper(predList, domain, new Map());
+        yield* this.enumPredsHelper(predList, domain, new Map());
     }
 
-    private *enumeratePredicateHelper(
-        predicates: Array<[string, number]>,
+    private *enumPredsHelper(
+        preds: [string, number][],
         domain: number[],
         current: Map<string, Set<string>>
     ): Generator<Map<string, Set<string>>> {
-        if (predicates.length === 0) {
-            yield new Map(current);
-            return;
-        }
+        if (preds.length === 0) { yield new Map(current); return; }
+        const [[name, arity], ...rest] = preds;
+        const tuples = [...allTuples(domain, arity)];
+        const numSubsets = 1 << tuples.length;
 
-        const [[name, arity], ...rest] = predicates;
-        const tuples = this.allTuples(domain, arity);
-        const subsets = this.allSubsets(tuples);
-
-        for (const subset of subsets) {
-            const next = new Map(current);
-            next.set(name, new Set(subset.map(t => t.join(','))));
-            yield* this.enumeratePredicateHelper(rest, domain, next);
+        for (let mask = 0; mask < numSubsets; mask++) {
+            const ext = new Set<string>();
+            for (let i = 0; i < tuples.length; i++) {
+                if (mask & (1 << i)) ext.add(tuples[i].join(','));
+            }
+            current.set(name, ext);
+            yield* this.enumPredsHelper(rest, domain, current);
         }
     }
 
     /**
-     * Generate all n-tuples from domain
+     * Enumerate all possible function interpretations
      */
-    private allTuples(domain: number[], n: number): number[][] {
-        if (n === 0) return [[]];
-        const result: number[][] = [];
-        const smaller = this.allTuples(domain, n - 1);
-        for (const tuple of smaller) {
-            for (const elem of domain) {
-                result.push([...tuple, elem]);
-            }
-        }
-        return result;
+    private *enumerateFunctions(
+        functions: Map<string, number>,
+        domain: number[]
+    ): Generator<Map<string, Map<string, number>>> {
+        const funcList = Array.from(functions.entries());
+        yield* this.enumFuncsHelper(funcList, domain, new Map());
     }
 
-    /**
-     * Generate all subsets of a set
-     */
-    private *allSubsets<T>(set: T[]): Generator<T[]> {
-        const n = set.length;
-        const total = 1 << n;
-        for (let mask = 0; mask < total; mask++) {
-            const subset: T[] = [];
-            for (let i = 0; i < n; i++) {
-                if (mask & (1 << i)) {
-                    subset.push(set[i]);
-                }
-            }
-            yield subset;
+    private *enumFuncsHelper(
+        funcs: [string, number][],
+        domain: number[],
+        current: Map<string, Map<string, number>>
+    ): Generator<Map<string, Map<string, number>>> {
+        if (funcs.length === 0) { yield new Map(current); return; }
+        const [[name, arity], ...rest] = funcs;
+        for (const table of allFunctionTables(arity, domain)) {
+            current.set(name, table);
+            yield* this.enumFuncsHelper(rest, domain, current);
         }
     }
 
@@ -322,7 +511,15 @@ export class ModelFinder {
     ): number {
         switch (node.type) {
             case 'variable':
-                return assignment.get(node.name!) ?? 0;
+                // Check assignment first (bound variables)
+                if (assignment.has(node.name!)) {
+                    return assignment.get(node.name!)!;
+                }
+                // Then check model constants (free variables treated as constants)
+                if (model.constants.has(node.name!)) {
+                    return model.constants.get(node.name!)!;
+                }
+                return 0;
             case 'constant':
                 return model.constants.get(node.name!) ?? 0;
             case 'function': {
@@ -347,6 +544,16 @@ export class ModelFinder {
             lines.push('Constants:');
             for (const [name, value] of model.constants) {
                 lines.push(`  ${name} = ${value}`);
+            }
+        }
+
+        if (model.functions.size > 0) {
+            lines.push('Functions:');
+            for (const [name, table] of model.functions) {
+                const entries = Array.from(table.entries())
+                    .map(([args, val]) => `(${args})->${val}`)
+                    .join(', ');
+                lines.push(`  ${name}: {${entries}}`);
             }
         }
 

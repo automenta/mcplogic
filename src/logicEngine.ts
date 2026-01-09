@@ -4,7 +4,8 @@
  * Provides async interface for proving and model finding using Tau-Prolog.
  */
 
-import pl, { Session } from 'tau-prolog';
+import pl from 'tau-prolog';
+type Session = any;
 
 import { buildPrologProgram, folGoalToProlog } from './translator.js';
 import { getArithmeticSetup } from './axioms/arithmetic.js';
@@ -23,6 +24,7 @@ import {
 } from './types/index.js';
 import { buildProveResult } from './utils/response.js';
 import { ProveOptions } from './types/options.js';
+import { META_INTERPRETER, generateDynamicDirectives, parseTraceOutput } from './utils/trace.js';
 
 // Re-export ProveOptions to ensure it's used correctly by consumers
 export type { ProveResult, ProveOptions };
@@ -60,6 +62,8 @@ export class LogicEngine {
         let prologProgram = '';
         let inferenceCount = 0;
         let hitInferenceLimit = false;
+        let trace: string[] | undefined;
+        const traceState = { buffer: '' };
 
         try {
             // Build program from premises
@@ -83,8 +87,38 @@ export class LogicEngine {
             // This enables closed-world assumption for tautology checking
             prologProgram = ':- set_prolog_flag(unknown, fail).\n' + prologProgram;
 
+            // Setup trace if requested
+            if (options?.includeTrace) {
+                const parsedPremises = premises.map(p => parse(p));
+                const signature = extractSignature(parsedPremises);
+                const dynamicDirectives = generateDynamicDirectives(signature);
+
+                prologProgram = dynamicDirectives + '\n' + META_INTERPRETER + '\n' + prologProgram;
+
+                // Replace output streams entirely to ensure capture
+                const outputStream = {
+                    put: (char: string | number, _encoding: any) => {
+                        const str = typeof char === 'number' ? String.fromCharCode(char) : char;
+                        traceState.buffer += str;
+                    },
+                    flush: () => { }
+                };
+
+                (this.session as any).standard_output = outputStream;
+
+                const streams = (this.session as any).streams;
+                if (streams) {
+                    ['standard_output', 'current_output', 'user_output'].forEach(alias => {
+                        if (streams[alias]) {
+                            streams[alias].put = outputStream.put;
+                        }
+                    });
+                }
+            }
+
             // Consult the program
             const consultResult = await this.consultProgram(prologProgram);
+
             if (!consultResult.success) {
                 return buildProveResult({
                     success: false,
@@ -96,10 +130,19 @@ export class LogicEngine {
             }
 
             // Build query from conclusion
-            const query = folGoalToProlog(conclusion);
+            let query = folGoalToProlog(conclusion);
+
+            if (options?.includeTrace) {
+                const queryTerm = query.endsWith('.') ? query.slice(0, -1) : query;
+                query = `trace_goal(${queryTerm}).`;
+            }
 
             // Run query
             const queryResult = await this.runQuery(query);
+
+            if (options?.includeTrace) {
+                trace = parseTraceOutput(traceState.buffer);
+            }
 
             if (queryResult.hitLimit) {
                 hitInferenceLimit = true;
@@ -119,6 +162,7 @@ export class LogicEngine {
                     prologProgram,
                     timeMs: Date.now() - startTime,
                     inferenceCount,
+                    inferenceSteps: trace,
                 }, verbosity);
             } else {
                 // If we hit the limit, use structured error
@@ -132,6 +176,7 @@ export class LogicEngine {
                         prologProgram,
                         timeMs: Date.now() - startTime,
                         inferenceCount: limit,
+                        inferenceSteps: trace,
                     }, verbosity);
                 }
 
@@ -143,6 +188,7 @@ export class LogicEngine {
                     prologProgram,
                     timeMs: Date.now() - startTime,
                     inferenceCount,
+                    inferenceSteps: trace,
                 }, verbosity);
             }
         } catch (e) {
@@ -154,6 +200,7 @@ export class LogicEngine {
                 prologProgram,
                 timeMs: Date.now() - startTime,
                 inferenceCount,
+                inferenceSteps: trace,
             }, verbosity);
         }
     }
@@ -176,7 +223,11 @@ export class LogicEngine {
             limits.push(maxInf);
         }
 
-        for (const limit of limits) {
+        for (const [index, limit] of limits.entries()) {
+            if (options?.onProgress) {
+                options.onProgress((index) / limits.length, `Trying inference limit: ${limit}`);
+            }
+
             if (Date.now() - start > maxSec * 1000) {
                 return buildProveResult({
                     success: false,
@@ -187,12 +238,26 @@ export class LogicEngine {
             }
 
             const result = await this.prove(premises, conclusion, { ...options, maxInferences: limit, strategy: undefined }); // prevent recursion
+            console.log(`Limit ${limit} result: ${result.result}, error: ${result.error}`);
+            if (result.result === 'error') {
+                console.log('Program:', result.prologProgram);
+            }
 
-            if (result.result === 'proved') return result;
+            if (result.result === 'proved') {
+                if (options?.onProgress) {
+                    options.onProgress(1.0, 'Proof found');
+                }
+                return result;
+            }
 
             // If it didn't hit limit (definite failure) or error, we can stop early
             const isLimitError = result.message?.includes('limit');
-            if (!isLimitError && result.result === 'failed') return result;
+            if (!isLimitError && result.result === 'failed') {
+                if (options?.onProgress) {
+                    options.onProgress(1.0, 'Disproved (definite failure)');
+                }
+                return result;
+            }
         }
 
         return buildProveResult({
@@ -216,19 +281,17 @@ export class LogicEngine {
      */
     private setupEquality(program: string, premises: string[], conclusion: string): string {
         try {
-            const bridge = getEqualityBridge();
-            // Always include base equality axioms (reflexivity, symmetry, transitivity)
-            const emptySignature = extractSignature([]);
-            const baseAxioms = generateEqualityAxioms(emptySignature, {
-                includeCongruence: false,
-                includeSubstitution: false
-            });
-
             // Add signature-specific axioms (congruence, substitution) only when = is used
             const parsedFormulas = [...premises, conclusion].map(p => parse(p));
-            const signatureAxioms = generateMinimalEqualityAxioms(parsedFormulas);
+            const equalityAxioms = generateMinimalEqualityAxioms(parsedFormulas);
 
-            const allAxioms = [...bridge, ...baseAxioms, ...signatureAxioms];
+            // Only add bridge if we have equality axioms
+            if (equalityAxioms.length === 0) {
+                return program;
+            }
+
+            const bridge = getEqualityBridge();
+            const allAxioms = [...bridge, ...equalityAxioms];
             return allAxioms.join('\n') + '\n' + program;
         } catch {
             // If parsing fails for equality extraction, continue without equality axioms

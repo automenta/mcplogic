@@ -24,3 +24,4 @@ coverage/
 # Environment
 .env
 .env.local
+benchmarks

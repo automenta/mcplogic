@@ -272,7 +272,7 @@ export class Parser {
                     const right = this.parseTerm();
                     return {
                         type: 'equals',
-                        left: { type: 'predicate', name, args },
+                        left: { type: 'function', name, args },
                         right
                     };
                 }

@@ -89,9 +89,14 @@ function literalToProlog(lit: Literal, useNegation: boolean): string {
         return formatPrologTerm(arg);
     };
 
+    let predicate = lit.predicate;
+    if (predicate === '=') {
+        predicate = 'eq_fact';
+    }
+
     const atom = lit.args.length > 0
-        ? `${lit.predicate}(${lit.args.map(formatArg).join(', ')})`
-        : lit.predicate;
+        ? `${predicate}(${lit.args.map(formatArg).join(', ')})`
+        : predicate;
 
     if (useNegation && lit.negated) {
         return `\\+ ${atom}`;
@@ -108,7 +113,28 @@ function literalToProlog(lit: Literal, useNegation: boolean): string {
  * - Free variables (single lowercase letter) -> Uppercase (implicit universal)
  * - Constants (lowercase or uppercase) -> Lowercase
  */
+/**
+ * Formats a term string (variable or constant) for Prolog.
+ * Handles complex terms like f(x, g(y)) by parsing them first.
+ */
 function formatPrologTerm(term: string): string {
+    // If it's a simple alphanumeric string, use fast path
+    if (/^[a-zA-Z0-9_]+$/.test(term)) {
+        return simpleFormatPrologTerm(term);
+    }
+
+    try {
+        // Parse the term string into AST
+        // We use the formula parser. A term "f(x)" looks like a predicate "f(x)" to the parser.
+        const ast = parse(term);
+        return astToPrologTermRecursive(ast);
+    } catch (e) {
+        // Fallback if parsing fails (shouldn't happen for valid terms)
+        return simpleFormatPrologTerm(term);
+    }
+}
+
+function simpleFormatPrologTerm(term: string): string {
     if (term.startsWith('_v')) {
         // It's a variable from Clausifier, ensure uppercase for Prolog
         return term.toUpperCase();
@@ -125,6 +151,27 @@ function formatPrologTerm(term: string): string {
         // Uppercase string or other: Constant
         // Example: Socrates -> socrates
         return term.toLowerCase();
+    }
+}
+
+function astToPrologTermRecursive(node: ASTNode): string {
+    // Handle variables from Clausifier (which might be parsed as constants/predicates)
+    if (node.name && node.name.startsWith('_v')) {
+        return node.name.toUpperCase();
+    }
+
+    switch (node.type) {
+        case 'variable':
+            return node.name!.toUpperCase();
+        case 'constant':
+            return simpleFormatPrologTerm(node.name!);
+        case 'function':
+        case 'predicate': // Parser might return predicate for f(x)
+            const args = node.args!.map(astToPrologTermRecursive).join(', ');
+            const name = node.name!.toLowerCase(); // Functions are lowercase
+            return `${name}(${args})`;
+        default:
+            throw createEngineError(`Cannot convert ${node.type} to Prolog term`);
     }
 }
 
@@ -149,7 +196,7 @@ function termToProlog(node: ASTNode): string {
             // identified it as a variable, we treat it as such.
             return node.name!.toUpperCase();
         case 'constant':
-             // Explicit constant node: must be lowercase in Prolog
+            // Explicit constant node: must be lowercase in Prolog
             return node.name!.toLowerCase();
         case 'function':
             const args = node.args!.map(termToProlog).join(', ');

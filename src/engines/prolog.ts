@@ -56,6 +56,7 @@ export class PrologEngine implements ReasoningEngine {
             strategy: options?.strategy,
             maxInferences: options?.maxInferences,
             maxSeconds: options?.maxSeconds,
+            includeTrace: options?.includeTrace,
         };
         return this.engine.prove(premises, conclusion, proveOptions);
     }

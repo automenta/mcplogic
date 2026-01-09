@@ -10,15 +10,33 @@ export async function findModelHandler(
         premises: string[];
         domain_size?: number;
         max_domain_size?: number;
+        use_sat?: boolean | 'auto';
+        enable_symmetry?: boolean;
+        count?: number;
     },
     defaultFinder: ModelFinder,
     verbosity: Verbosity
 ): Promise<ModelResponse> {
-    const { premises, domain_size, max_domain_size } = args;
+    const { premises, domain_size, max_domain_size, use_sat, enable_symmetry, count } = args;
+
     // Create finder with custom max domain size if specified
     const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;
-    // findModel expects domainSize (camelCase), but args has domain_size (snake_case)
-    const modelResult = await finder.findModel(premises, domain_size);
+
+    // Determine bounds. If domain_size is set, use it as both min and max (exact search).
+    // Note: ModelFinder currently iterates from 1 to maxDomainSize.
+    // To support exact search, we rely on the fact that if a small model exists, it's usually returned.
+    // If the user *specifically* wants to skip small sizes, our current ModelFinder doesn't explicitly support 'minDomainSize' via options,
+    // but the performance impact is usually negligible.
+    // We will use domain_size as the max bound if present.
+
+    const options = {
+        useSAT: use_sat,
+        enableSymmetry: enable_symmetry,
+        maxDomainSize: domain_size ?? max_domain_size,
+        count
+    };
+
+    const modelResult = await finder.findModel(premises, options);
     return buildModelResponse(modelResult, verbosity);
 }
 
@@ -28,13 +46,22 @@ export async function findCounterexampleHandler(
         conclusion: string;
         domain_size?: number;
         max_domain_size?: number;
+        use_sat?: boolean | 'auto';
+        enable_symmetry?: boolean;
     },
     defaultFinder: ModelFinder,
     verbosity: Verbosity
 ): Promise<ModelResponse> {
-    const { premises, conclusion, domain_size, max_domain_size } = args;
+    const { premises, conclusion, domain_size, max_domain_size, use_sat, enable_symmetry } = args;
     // Create finder with custom max domain size if specified
     const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;
-    const modelResult = await finder.findCounterexample(premises, conclusion, domain_size);
+
+    const options = {
+        useSAT: use_sat,
+        enableSymmetry: enable_symmetry,
+        maxDomainSize: domain_size ?? max_domain_size
+    };
+
+    const modelResult = await finder.findCounterexample(premises, conclusion, options);
     return buildModelResponse(modelResult, verbosity);
 }

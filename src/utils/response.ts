@@ -12,6 +12,7 @@ export interface BaseResultData {
     inferenceCount?: number;
     clauseCount?: number;
     varCount?: number;
+    inferenceSteps?: string[];
 }
 
 /**
@@ -36,6 +37,11 @@ export function buildProveResult(
     base.bindings = data.bindings;
     base.error = data.error;
     base.proof = data.proof;
+
+    // Include trace if present (regardless of verbosity if explicitly provided in data)
+    if (data.inferenceSteps) {
+        base.inferenceSteps = data.inferenceSteps;
+    }
 
     if (verbosity === 'detailed') {
         base.prologProgram = data.prologProgram;
