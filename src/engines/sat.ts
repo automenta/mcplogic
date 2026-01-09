@@ -5,11 +5,11 @@
  * Handles arbitrary propositional CNF formulas.
  */
 
-import Logic from 'logic-solver';
 import { Clause } from '../types/clause.js';
 import { ProveResult, Verbosity } from '../types/index.js';
 import { buildProveResult } from '../utils/response.js';
-import { clausify, isHornFormula } from '../clausifier.js';
+import { clausify } from '../clausifier.js';
+import { solveSat } from './satUtils.js';
 import {
     ReasoningEngine,
     EngineCapabilities,
@@ -35,90 +35,23 @@ export class SATEngine implements ReasoningEngine {
     };
 
     /**
-     * Convert a literal to a unique string key for the SAT solver.
-     */
-    private literalToKey(lit: { predicate: string; args: string[] }): string {
-        if (lit.args.length === 0) {
-            return lit.predicate;
-        }
-        return `${lit.predicate}(${lit.args.join(',')})`;
-    }
-
-    /**
      * Check satisfiability of clauses using the SAT solver.
      */
     async checkSat(clauses: Clause[]): Promise<SatResult> {
         const startTime = Date.now();
 
-        if (clauses.length === 0) {
+        try {
+            const result = solveSat(clauses);
+
             return {
-                sat: true,
-                model: new Map(),
+                sat: result.sat,
+                model: result.model,
                 statistics: {
                     timeMs: Date.now() - startTime,
-                    variables: 0,
-                    clauses: 0,
+                    variables: result.statistics.variables,
+                    clauses: result.statistics.clauses,
                 },
             };
-        }
-
-        try {
-            const solver = new Logic.Solver();
-            const variables = new Set<string>();
-
-            // Convert each clause to logic-solver format
-            for (const clause of clauses) {
-                if (clause.literals.length === 0) {
-                    // Empty clause = unsatisfiable
-                    return {
-                        sat: false,
-                        statistics: {
-                            timeMs: Date.now() - startTime,
-                            variables: variables.size,
-                            clauses: clauses.length,
-                        },
-                    };
-                }
-
-                const disjuncts = clause.literals.map(lit => {
-                    const key = this.literalToKey(lit);
-                    variables.add(key);
-                    return lit.negated ? Logic.not(key) : key;
-                });
-
-                // Add the clause as a disjunction
-                solver.require(Logic.or(...disjuncts));
-            }
-
-            // Solve
-            const solution = solver.solve();
-
-            if (solution) {
-                // Extract model
-                const model = new Map<string, boolean>();
-                for (const v of variables) {
-                    model.set(v, solution.getTrueVars().includes(v));
-                }
-
-                return {
-                    sat: true,
-                    model,
-                    statistics: {
-                        timeMs: Date.now() - startTime,
-                        variables: variables.size,
-                        clauses: clauses.length,
-                    },
-                };
-            } else {
-                return {
-                    sat: false,
-                    statistics: {
-                        timeMs: Date.now() - startTime,
-                        variables: variables.size,
-                        clauses: clauses.length,
-                    },
-                };
-            }
         } catch (e) {
             return {
                 sat: false,

@@ -22,6 +22,7 @@ import {
     createEngineError,
 } from './types/index.js';
 import { buildProveResult } from './utils/response.js';
+import { consultProgram, runPrologQuery } from './engines/prologUtils.js';
 
 export type { ProveResult };
 
@@ -84,7 +85,7 @@ export class LogicEngine {
             this.session = pl.create(this.inferenceLimit);
 
             // Consult the program
-            const consultResult = await this.consultProgram(prologProgram);
+            const consultResult = await consultProgram(this.session, prologProgram);
             if (!consultResult.success) {
                 return buildProveResult({
                     success: false,
@@ -99,7 +100,7 @@ export class LogicEngine {
             const query = folGoalToProlog(conclusion);
 
             // Run query
-            const queryResult = await this.runQuery(query);
+            const queryResult = await runPrologQuery(this.session, query);
 
             if (queryResult.hitLimit) {
                 hitInferenceLimit = true;
@@ -193,121 +194,6 @@ export class LogicEngine {
     }
 
     /**
-     * Consult a Prolog program
-     */
-    private consultProgram(program: string): Promise<{ success: boolean; error?: string }> {
-        return new Promise((resolve) => {
-            this.session.consult(program, {
-                success: () => resolve({ success: true }),
-                error: (err: any) => resolve({
-                    success: false,
-                    error: this.formatError(err)
-                })
-            });
-        });
-    }
-
-    /**
-     * Run a Prolog query and collect answers
-     */
-    private runQuery(query: string): Promise<{
-        found: boolean;
-        bindings?: Record<string, string>[];
-        error?: string;
-        hitLimit?: boolean;
-    }> {
-        return new Promise((resolve) => {
-            this.session.query(query, {
-                success: () => {
-                    this.collectAnswers().then(resolve);
-                },
-                error: (err: any) => {
-                    resolve({ found: false, error: this.formatError(err) });
-                }
-            });
-        });
-    }
-
-    /**
-     * Collect all answers from a query
-     */
-    private collectAnswers(): Promise<{
-        found: boolean;
-        bindings: Record<string, string>[];
-        hitLimit?: boolean;
-    }> {
-        return new Promise((resolve) => {
-            const bindings: Record<string, string>[] = [];
-            let hitLimit = false;
-
-            const getNext = () => {
-                this.session.answer({
-                    success: (answer: any) => {
-                        if (answer) {
-                            bindings.push(this.extractBindings(answer));
-                            getNext(); // Get next answer
-                        } else {
-                            resolve({ found: bindings.length > 0, bindings, hitLimit });
-                        }
-                    },
-                    fail: () => {
-                        resolve({ found: bindings.length > 0, bindings, hitLimit });
-                    },
-                    error: () => {
-                        resolve({ found: bindings.length > 0, bindings, hitLimit });
-                    },
-                    limit: () => {
-                        hitLimit = true;
-                        resolve({ found: bindings.length > 0, bindings, hitLimit });
-                    }
-                });
-            };
-
-            getNext();
-        });
-    }
-
-    /**
-     * Extract variable bindings from Prolog answer
-     */
-    private extractBindings(answer: any): Record<string, string> {
-        const bindings: Record<string, string> = {};
-
-        if (answer && answer.links) {
-            for (const [varName, value] of Object.entries(answer.links)) {
-                bindings[varName] = this.termToString(value);
-            }
-        }
-
-        return bindings;
-    }
-
-    /**
-     * Convert Prolog term to string
-     */
-    private termToString(term: any): string {
-        if (term === null || term === undefined) return '';
-        if (typeof term === 'string') return term;
-        if (typeof term === 'number') return String(term);
-        if (term.id) return term.id;
-        if (term.indicator) return `${term.id}/${term.indicator}`;
-        return String(term);
-    }
-
-    /**
-     * Format Prolog error
-     */
-    private formatError(err: any): string {
-        if (!err) return 'Unknown error';
-        if (typeof err === 'string') return err;
-        if (err.args?.length > 0) {
-            return `${err.id || 'Error'}: ${err.args.map(this.termToString).join(', ')}`;
-        }
-        if (err.id) return err.id;
-        return String(err);
-    }
-
-    /**
      * Check if premises are satisfiable (can find a model)
      */
     async checkSatisfiability(premises: string[]): Promise<boolean> {
@@ -315,7 +201,7 @@ export class LogicEngine {
             const program = buildPrologProgram(premises);
             this.session = pl.create(this.inferenceLimit);
 
-            const result = await this.consultProgram(program);
+            const result = await consultProgram(this.session, program);
             return result.success;
         } catch {
             return false;
