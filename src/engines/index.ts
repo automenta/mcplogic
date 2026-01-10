@@ -4,7 +4,7 @@
  * Re-exports all engine-related types and classes.
  */
 
-export {
+export type {
     ReasoningEngine,
     EngineCapabilities,
     EngineProveOptions,
@@ -23,7 +23,10 @@ export {
 
 export {
     EngineManager,
+    createEngineManager,
+} from './manager.js';
+
+export type {
     EngineSelection,
     ManagerProveOptions,
-    createEngineManager,
 } from './manager.js';

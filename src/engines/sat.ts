@@ -8,6 +8,7 @@
 import Logic from 'logic-solver';
 import { Clause } from '../types/clause.js';
 import { ProveResult, Verbosity } from '../types/index.js';
+import { buildProveResult } from '../responseUtils.js';
 import { clausify, isHornFormula } from '../clausifier.js';
 import {
     ReasoningEngine,
@@ -154,7 +155,7 @@ export class SATEngine implements ReasoningEngine {
             const clausifyResult = clausify(refutationFormula);
 
             if (!clausifyResult.success || !clausifyResult.clauses) {
-                return this.buildResult({
+                return buildProveResult({
                     success: false,
                     result: 'error',
                     error: clausifyResult.error?.message || 'Clausification failed',
@@ -167,7 +168,7 @@ export class SATEngine implements ReasoningEngine {
 
             if (!satResult.sat) {
                 // UNSAT means the conclusion follows from premises
-                return this.buildResult({
+                return buildProveResult({
                     success: true,
                     result: 'proved',
                     message: `Proved: ${conclusion} (via refutation)`,
@@ -182,7 +183,7 @@ export class SATEngine implements ReasoningEngine {
                 }, verbosity);
             } else {
                 // SAT means we found a countermodel
-                return this.buildResult({
+                return buildProveResult({
                     success: false,
                     result: 'failed',
                     message: `Cannot prove: ${conclusion}`,
@@ -194,52 +195,13 @@ export class SATEngine implements ReasoningEngine {
             }
         } catch (e) {
             const error = e instanceof Error ? e.message : String(e);
-            return this.buildResult({
+            return buildProveResult({
                 success: false,
                 result: 'error',
                 error,
                 timeMs: Date.now() - startTime,
             }, verbosity);
         }
-    }
-
-    /**
-     * Build result based on verbosity level.
-     */
-    private buildResult(
-        data: {
-            success: boolean;
-            result: 'proved' | 'failed' | 'error';
-            message?: string;
-            error?: string;
-            proof?: string[];
-            timeMs: number;
-            clauseCount?: number;
-            varCount?: number;
-        },
-        verbosity: Verbosity
-    ): ProveResult {
-        const base: ProveResult = {
-            success: data.success,
-            result: data.result,
-        };
-
-        if (verbosity === 'minimal') {
-            return base;
-        }
-
-        base.message = data.message;
-        base.error = data.error;
-        base.proof = data.proof;
-
-        if (verbosity === 'detailed') {
-            base.statistics = {
-                timeMs: data.timeMs,
-                inferences: data.clauseCount, // Use clauseCount as "inferences" equivalent
-            };
-        }
-
-        return base;
     }
 }
 

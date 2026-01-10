@@ -1,6 +1,5 @@
 import {
     Verbosity,
-    EngineSelection
 } from '../types/index.js';
 import { validateFormulas } from '../syntaxValidator.js';
 import { SessionManager } from '../sessionManager.js';

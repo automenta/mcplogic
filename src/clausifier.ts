@@ -14,6 +14,7 @@
  */
 
 import { parse, astToString } from './parser.js';
+import { countNodes } from './astUtils.js';
 import type { ASTNode } from './types/index.js';
 import {
     Literal,
@@ -92,7 +93,7 @@ export function clausify(formula: string, options: ClausifyOptions = {}): Clausi
 
         return {
             success: false,
-            error: createClausificationError(error.message),
+            error: createClausificationError(error.message).error,
             statistics: {
                 originalSize: 0,
                 clauseCount: 0,
@@ -101,23 +102,6 @@ export function clausify(formula: string, options: ClausifyOptions = {}): Clausi
             },
         };
     }
-}
-
-/**
- * Count AST nodes for statistics.
- */
-function countNodes(node: ASTNode): number {
-    let count = 1;
-    if (node.left) count += countNodes(node.left);
-    if (node.right) count += countNodes(node.right);
-    if (node.operand) count += countNodes(node.operand);
-    if (node.body) count += countNodes(node.body);
-    if (node.args) {
-        for (const arg of node.args) {
-            count += countNodes(arg);
-        }
-    }
-    return count;
 }
 
 /**
@@ -587,7 +571,7 @@ function nodeToLiteral(node: ASTNode): Literal {
                 negated: true,
             };
         }
-        throw new Error(`Cannot convert ${inner.type} to literal`);
+        throw createClausificationError(`Cannot convert ${inner.type} to literal`);
     }
 
     if (node.type === 'predicate') {
@@ -606,7 +590,7 @@ function nodeToLiteral(node: ASTNode): Literal {
         };
     }
 
-    throw new Error(`Cannot convert ${node.type} to literal`);
+    throw createClausificationError(`Cannot convert ${node.type} to literal`);
 }
 
 /**

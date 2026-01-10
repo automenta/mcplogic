@@ -6,7 +6,10 @@
 
 import { parse } from './parser.js';
 import type { ASTNode } from './types/index.js';
-import { createError, LogicException } from './types/errors.js';
+import {
+    createClausificationError,
+    createEngineError,
+} from './types/errors.js';
 import { clausify, clausesToProlog } from './clausifier.js';
 
 /**
@@ -26,7 +29,7 @@ export function folToProlog(formula: string): string[] {
 
     if (!result.success || !result.clauses) {
         // Should not happen unless parser fails, which clausify catches
-        throw new LogicException(createError('CLAUSIFICATION_ERROR', result.error?.message || 'Clausification failed'));
+        throw createClausificationError(result.error?.message || 'Clausification failed');
     }
 
     try {
@@ -35,17 +38,16 @@ export function folToProlog(formula: string): string[] {
         // Not Horn clauses (e.g. A | B).
         // The Prolog engine cannot natively reason with non-Horn clauses as premises.
         // We throw a specific error so the EngineManager can switch to SAT if needed.
-        throw new LogicException(createError(
-            'ENGINE_ERROR',
+        throw createEngineError(
             'Formula is not a Horn clause (contains disjunctions in positive positions). ' +
             'The Prolog engine only supports Horn clauses. Use the SAT engine for general FOL.'
-        ));
+        );
     }
 }
 
 function predicateToProlog(node: ASTNode): string {
     if (node.type !== 'predicate') {
-        throw new LogicException(createError('PARSE_ERROR', `Expected predicate, got ${node.type}`));
+        throw createEngineError(`Expected predicate, got ${node.type} during translation`);
     }
 
     if (!node.args || node.args.length === 0) {
@@ -68,7 +70,7 @@ function termToProlog(node: ASTNode): string {
             const args = node.args!.map(termToProlog).join(', ');
             return `${node.name!.toLowerCase()}(${args})`;
         default:
-            throw new LogicException(createError('PARSE_ERROR', `Cannot convert ${node.type} to Prolog term`));
+            throw createEngineError(`Cannot convert ${node.type} to Prolog term`);
     }
 }
 
@@ -138,11 +140,10 @@ export function folGoalToProlog(goal: string): string {
 
     // Check for universal quantifiers which Prolog cannot directly prove via goal query
     if (containsUniversal(ast)) {
-        throw new LogicException(createError(
-            'ENGINE_ERROR',
+        throw createEngineError(
             'Universal quantification (all/forall) in goals is not supported by the Prolog engine. ' +
             'Try using the SAT engine or refutation (negating the goal and checking for contradiction).'
-        ));
+        );
     }
 
     if (ast.type === 'predicate') {

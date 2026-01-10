@@ -21,6 +21,7 @@ import {
     createInferenceLimitError,
     createEngineError,
 } from './types/index.js';
+import { buildProveResult } from './responseUtils.js';
 
 export type { ProveResult };
 
@@ -43,7 +44,7 @@ export class LogicEngine {
     private inferenceLimit: number;
 
     /**
-     * @param timeout Timeout in milliseconds (reserved for future use)
+     * @param _timeout Timeout in milliseconds (reserved for future use)
      * @param inferenceLimit Maximum inference steps before giving up (default: 1000)
      */
     constructor(_timeout: number = 5000, inferenceLimit: number = 1000) {
@@ -71,31 +72,12 @@ export class LogicEngine {
 
             // Add arithmetic axioms if enabled
             if (options?.enableArithmetic) {
-                const arithmeticSetup = getArithmeticSetup();
-                prologProgram = arithmeticSetup + '\n' + prologProgram;
+                prologProgram = this.setupArithmetic(prologProgram);
             }
 
             // Add equality axioms if enabled
             if (options?.enableEquality) {
-                try {
-                    const bridge = getEqualityBridge();
-                    // Always include base equality axioms (reflexivity, symmetry, transitivity)
-                    const emptySignature = extractSignature([]);
-                    const baseAxioms = generateEqualityAxioms(emptySignature, {
-                        includeCongruence: false,
-                        includeSubstitution: false
-                    });
-
-                    // Add signature-specific axioms (congruence, substitution) only when = is used
-                    const parsedFormulas = [...premises, conclusion].map(p => parse(p));
-                    const signatureAxioms = generateMinimalEqualityAxioms(parsedFormulas);
-
-                    const allAxioms = [...bridge, ...baseAxioms, ...signatureAxioms];
-                    prologProgram = allAxioms.join('\n') + '\n' + prologProgram;
-                } catch {
-                    // If parsing fails for equality extraction, continue without equality axioms
-                    // The main validation will catch syntax errors
-                }
+                prologProgram = this.setupEquality(prologProgram, premises, conclusion);
             }
 
             // Create fresh session with configured inference limit
@@ -104,7 +86,7 @@ export class LogicEngine {
             // Consult the program
             const consultResult = await this.consultProgram(prologProgram);
             if (!consultResult.success) {
-                return this.buildResult({
+                return buildProveResult({
                     success: false,
                     result: 'error',
                     error: consultResult.error,
@@ -124,7 +106,7 @@ export class LogicEngine {
             }
 
             if (queryResult.found) {
-                return this.buildResult({
+                return buildProveResult({
                     success: true,
                     result: 'proved',
                     message: `Proved: ${conclusion}`,
@@ -142,7 +124,7 @@ export class LogicEngine {
                 // If we hit the limit, use structured error
                 if (hitInferenceLimit) {
                     const error = createInferenceLimitError(this.inferenceLimit, conclusion);
-                    return this.buildResult({
+                    return buildProveResult({
                         success: false,
                         result: 'failed',
                         message: error.message,
@@ -153,7 +135,7 @@ export class LogicEngine {
                     }, verbosity);
                 }
 
-                return this.buildResult({
+                return buildProveResult({
                     success: false,
                     result: 'failed',
                     message: 'No proof found',
@@ -165,7 +147,7 @@ export class LogicEngine {
             }
         } catch (e) {
             const error = e instanceof Error ? e : createEngineError(String(e));
-            return this.buildResult({
+            return buildProveResult({
                 success: false,
                 result: 'error',
                 error: error.message,
@@ -177,46 +159,37 @@ export class LogicEngine {
     }
 
     /**
-     * Build result based on verbosity
+     * Setup arithmetic axioms
      */
-    private buildResult(
-        data: {
-            success: boolean;
-            result: 'proved' | 'failed' | 'timeout' | 'error';
-            message?: string;
-            error?: string;
-            proof?: string[];
-            bindings?: Record<string, string>[];
-            prologProgram?: string;
-            timeMs: number;
-            inferenceCount?: number;
-        },
-        verbosity: Verbosity
-    ): ProveResult {
-        const base: ProveResult = {
-            success: data.success,
-            result: data.result,
-        };
+    private setupArithmetic(program: string): string {
+        const arithmeticSetup = getArithmeticSetup();
+        return arithmeticSetup + '\n' + program;
+    }
 
-        if (verbosity === 'minimal') {
-            return base;
+    /**
+     * Setup equality axioms
+     */
+    private setupEquality(program: string, premises: string[], conclusion: string): string {
+        try {
+            const bridge = getEqualityBridge();
+            // Always include base equality axioms (reflexivity, symmetry, transitivity)
+            const emptySignature = extractSignature([]);
+            const baseAxioms = generateEqualityAxioms(emptySignature, {
+                includeCongruence: false,
+                includeSubstitution: false
+            });
+
+            // Add signature-specific axioms (congruence, substitution) only when = is used
+            const parsedFormulas = [...premises, conclusion].map(p => parse(p));
+            const signatureAxioms = generateMinimalEqualityAxioms(parsedFormulas);
+
+            const allAxioms = [...bridge, ...baseAxioms, ...signatureAxioms];
+            return allAxioms.join('\n') + '\n' + program;
+        } catch {
+            // If parsing fails for equality extraction, continue without equality axioms
+            // The main validation will catch syntax errors
+            return program;
         }
-
-        // Standard includes message, bindings, error
-        base.message = data.message;
-        base.bindings = data.bindings;
-        base.error = data.error;
-        base.proof = data.proof;
-
-        if (verbosity === 'detailed') {
-            base.prologProgram = data.prologProgram;
-            base.statistics = {
-                timeMs: data.timeMs,
-                inferences: data.inferenceCount,
-            };
-        }
-
-        return base;
     }
 
     /**
