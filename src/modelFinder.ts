@@ -9,10 +9,12 @@ import { Model, ModelResult, ModelOptions, DEFAULTS } from './types/index.js';
 import type { ASTNode } from './types/index.js';
 import { extractSignature, astToString, getFreeVariables } from './utils/ast.js';
 import { createGenericError } from './types/errors.js';
+import { checkAllFormulas } from './utils/evaluation.js';
 import { symmetricMappings, allMappings, allFunctionTables, allTuples } from './utils/enumerate.js';
 import { SATEngine } from './engines/sat.js';
 import { groundFormula } from './utils/grounding.js';
 import { clausify } from './clausifier.js';
+import type { Literal } from './types/index.js';
 
 export type { Model, ModelResult };
 
@@ -52,15 +54,17 @@ export class ModelFinder {
             // This allows users to write P(x) and find a model where P holds for some element named x
             // without explicit quantification, following Mace4 convention.
             const freeVars = new Set<string>();
-            asts.forEach(ast => {
+            for (const ast of asts) {
                 const free = getFreeVariables(ast);
-                free.forEach(v => freeVars.add(v));
-            });
+                for (const v of free) {
+                    freeVars.add(v);
+                }
+            }
 
-            freeVars.forEach(v => {
+            for (const v of freeVars) {
                 signature.constants.add(v);
                 signature.variables.delete(v);
-            });
+            }
 
             // Try increasing domain sizes
             for (let size = startSize; size <= endSize; size++) {
@@ -73,10 +77,8 @@ export class ModelFinder {
                 const foundModels: Model[] = [];
 
                 if (shouldUseSAT) {
-                    // SAT currently only finds one model per size. 
-                    // TODO: Implement multiple model finding for SAT (requires blocking clauses)
-                    const model = await this.findModelSAT(premises, size, opts);
-                    if (model) foundModels.push(model);
+                    const models = await this.findModelsSAT(premises, size, opts);
+                    foundModels.push(...models);
                 } else {
                     // Backtracking search
                     const models = this.findModelsBacktracking(asts, signature, size, opts, count);
@@ -109,13 +111,13 @@ export class ModelFinder {
     }
 
     /**
-     * Find a model using SAT solver
+     * Find models using SAT solver
      */
-    private async findModelSAT(
+    private async findModelsSAT(
         premises: string[],
         size: number,
         opts: ModelOptions
-    ): Promise<Model | null> {
+    ): Promise<Model[]> {
         // 1. Ground all premises
         const grounded = premises.map(p => {
             const ast = parse(p);
@@ -124,14 +126,33 @@ export class ModelFinder {
 
         // 2. Clausify
         const result = clausify(grounded);
-        if (!result.success || !result.clauses) return null;
+        if (!result.success || !result.clauses) return [];
 
-        // 3. SAT solve
-        const satResult = await this.satEngine.checkSat(result.clauses);
-        if (!satResult.sat) return null;
+        const clauses = [...result.clauses];
+        const models: Model[] = [];
+        const count = opts.count ?? 1;
 
-        // 4. Decode
-        return this.decodeSATModel(satResult.model!, size);
+        // 3. Loop: Solve, Record, Block
+        while (models.length < count) {
+            const satResult = await this.satEngine.checkSat(clauses);
+            if (!satResult.sat) break;
+
+            const model = this.decodeSATModel(satResult.model!, size);
+            models.push(model);
+
+            // Add blocking clause (negation of current model)
+            const literals: Literal[] = [];
+            for (const [key, val] of satResult.model!) {
+                literals.push({
+                    predicate: key,
+                    args: [],
+                    negated: val // If val=true, NOT key. If val=false, key.
+                });
+            }
+            clauses.push({ literals });
+        }
+
+        return models;
     }
 
     /**
@@ -238,7 +259,7 @@ export class ModelFinder {
                         interpretation: ''
                     };
 
-                    if (this.checkAllFormulas(asts, model)) {
+                    if (checkAllFormulas(asts, model)) {
                         // Check isomorphism against already found models
                         let isIso = false;
                         for (const existing of foundModels) {
@@ -268,6 +289,10 @@ export class ModelFinder {
      */
     private areIsomorphic(m1: Model, m2: Model): boolean {
         if (m1.domainSize !== m2.domainSize) return false;
+
+        // Safety check: Don't attempt isomorphism check for large domains
+        // n=9 -> 362,880 permutations, which is too slow for interactive use
+        if (m1.domainSize > 8) return false;
 
         // Generate all permutations of the domain
         const permutations = this.generatePermutations(m1.domain);
@@ -425,111 +450,6 @@ export class ModelFinder {
         }
     }
 
-    /**
-     * Check if all formulas are satisfied in the model
-     */
-    private checkAllFormulas(
-        asts: ASTNode[],
-        model: Model
-    ): boolean {
-        for (const ast of asts) {
-            if (!this.evaluate(ast, model, new Map())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Evaluate a formula in a model under an assignment
-     */
-    private evaluate(
-        node: ASTNode,
-        model: Model,
-        assignment: Map<string, number>
-    ): boolean {
-        switch (node.type) {
-            case 'predicate': {
-                const args = (node.args || []).map(a => this.evaluateTerm(a, model, assignment));
-                const key = args.join(',');
-                const extension = model.predicates.get(node.name!);
-                return extension?.has(key) ?? false;
-            }
-
-            case 'and':
-                return this.evaluate(node.left!, model, assignment) &&
-                    this.evaluate(node.right!, model, assignment);
-
-            case 'or':
-                return this.evaluate(node.left!, model, assignment) ||
-                    this.evaluate(node.right!, model, assignment);
-
-            case 'not':
-                return !this.evaluate(node.operand!, model, assignment);
-
-            case 'implies':
-                return !this.evaluate(node.left!, model, assignment) ||
-                    this.evaluate(node.right!, model, assignment);
-
-            case 'iff':
-                return this.evaluate(node.left!, model, assignment) ===
-                    this.evaluate(node.right!, model, assignment);
-
-            case 'forall':
-                return model.domain.every(d => {
-                    const newAssign = new Map(assignment);
-                    newAssign.set(node.variable!, d);
-                    return this.evaluate(node.body!, model, newAssign);
-                });
-
-            case 'exists':
-                return model.domain.some(d => {
-                    const newAssign = new Map(assignment);
-                    newAssign.set(node.variable!, d);
-                    return this.evaluate(node.body!, model, newAssign);
-                });
-
-            case 'equals': {
-                const left = this.evaluateTerm(node.left!, model, assignment);
-                const right = this.evaluateTerm(node.right!, model, assignment);
-                return left === right;
-            }
-
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Evaluate a term to a domain element
-     */
-    private evaluateTerm(
-        node: ASTNode,
-        model: Model,
-        assignment: Map<string, number>
-    ): number {
-        switch (node.type) {
-            case 'variable':
-                // Check assignment first (bound variables)
-                if (assignment.has(node.name!)) {
-                    return assignment.get(node.name!)!;
-                }
-                // Then check model constants (free variables treated as constants)
-                if (model.constants.has(node.name!)) {
-                    return model.constants.get(node.name!)!;
-                }
-                return 0;
-            case 'constant':
-                return model.constants.get(node.name!) ?? 0;
-            case 'function': {
-                const args = (node.args || []).map(a => this.evaluateTerm(a, model, assignment));
-                const table = model.functions.get(node.name!);
-                return table?.get(args.join(',')) ?? 0;
-            }
-            default:
-                return 0;
-        }
-    }
 
     /**
      * Format model as human-readable string

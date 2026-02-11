@@ -58,6 +58,7 @@ export class Optimizer {
     async run(initialStrategies: EvolutionStrategy[], onProgress?: (msg: string) => void) {
         let population = [...initialStrategies];
         const evalCases = this.loadEvaluationCases();
+        const caseLookup = new Map(evalCases.map(c => [c.id, c]));
 
         if (evalCases.length === 0) {
             if (onProgress) onProgress("No evaluation cases found. Evolution cannot proceed.");
@@ -92,7 +93,7 @@ export class Optimizer {
                 const parent = elites[Math.floor(Math.random() * elites.length)];
 
                 // Mutate
-                const child = await this.evolver.mutateStrategy(parent);
+                const child = await this.evolver.mutateStrategy(parent, caseLookup);
                 newPopulation.push(child);
             }
 

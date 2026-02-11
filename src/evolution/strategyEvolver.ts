@@ -1,4 +1,4 @@
-import type { EvolutionStrategy, EvaluationResult } from '../types/evolution.js';
+import type { EvolutionStrategy, EvaluationResult, EvaluationCase } from '../types/evolution.js';
 import type { LLMProvider } from '../types/llm.js';
 import type { IPerformanceDatabase } from './storage.js';
 import { randomUUID } from 'crypto';
@@ -18,7 +18,10 @@ export class StrategyEvolver {
     /**
      * Mutates a strategy by critiquing its prompt based on failing examples.
      */
-    async mutateStrategy(strategy: EvolutionStrategy): Promise<EvolutionStrategy> {
+    async mutateStrategy(
+        strategy: EvolutionStrategy,
+        caseLookup: Map<string, EvaluationCase>
+    ): Promise<EvolutionStrategy> {
         // 1. Fetch failing results for this strategy
         const results = await this.db.getResults(strategy.id);
         const failures = results.filter(r => !r.success);
@@ -42,7 +45,7 @@ export class StrategyEvolver {
         const examplesToAnalyze = failures.slice(0, 3);
 
         // 3. Construct the Critique Prompt
-        const critiquePrompt = this.constructCritiquePrompt(strategy.promptTemplate, examplesToAnalyze);
+        const critiquePrompt = this.constructCritiquePrompt(strategy.promptTemplate, examplesToAnalyze, caseLookup);
 
         // 4. Call LLM to generate new prompt
         const response = await this.llm.complete([
@@ -69,7 +72,11 @@ export class StrategyEvolver {
         return newStrategy;
     }
 
-    private constructCritiquePrompt(currentPrompt: string, failures: EvaluationResult[]): string {
+    private constructCritiquePrompt(
+        currentPrompt: string,
+        failures: EvaluationResult[],
+        caseLookup: Map<string, EvaluationCase>
+    ): string {
         let prompt = `You are an expert AI system optimizer.
 Your task is to improve a prompt template used for translating natural language to First-Order Logic (FOL).
 
@@ -83,11 +90,11 @@ Here are some examples where this prompt failed:
 `;
 
         failures.forEach((f, i) => {
-            // TODO: In the future, we should fetch the original input from the database or EvaluationCase
-            // so we can show the model WHAT it was trying to translate.
-            // Currently EvaluationResult doesn't store the input text, only the caseId.
+            const testCase = caseLookup.get(f.caseId);
+            const inputContext = testCase ? `Input: "${testCase.input}"\n` : `(Input unavailable for case ${f.caseId})\n`;
+
             prompt += `Failure #${i + 1} (Case ID: ${f.caseId}):
-Output: ${f.rawOutput}
+${inputContext}Output: ${f.rawOutput}
 (Note: This output was incorrect or invalid.)
 `;
         });

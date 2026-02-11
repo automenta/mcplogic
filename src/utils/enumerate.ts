@@ -19,10 +19,10 @@ export function* allTuples(domain: number[], arity: number): Generator<number[]>
 /**
  * Generate all mappings from keys to domain values.
  */
-export function* allMappings<K>(
+export function* allMappings<K, V>(
     keys: K[],
-    domain: number[]
-): Generator<Map<K, number>> {
+    domain: V[]
+): Generator<Map<K, V>> {
     if (keys.length === 0) { yield new Map(); return; }
     const [first, ...rest] = keys;
     for (const v of domain) {
