@@ -16,53 +16,30 @@ describe('Isomorphism Filtering', () => {
 
         expect(result.success).toBe(true);
         expect(result.models).toBeDefined();
-        expect(result.models!.length).toBeGreaterThan(1);
+        // Expect at least 3 models (P(a) true, P(b) true, both true)
+        expect(result.models!.length).toBeGreaterThanOrEqual(3);
 
         // Verify models are distinct
         const models = result.models!;
         for (let i = 0; i < models.length; i++) {
             for (let j = i + 1; j < models.length; j++) {
-                // We can't easily access private areIsomorphic, but we can check properties
-                // or trust that the finder did its job if count > 1 and we got distinct interpretations
                 expect(models[i].interpretation).not.toBe(models[j].interpretation);
             }
         }
-
-        console.log(`Found ${models.length} models for P(a) | P(b)`);
-        models.forEach((m, i) => {
-            console.log(`Model ${i + 1}:\n${m.interpretation}`);
-        });
     });
 
-    test('should not return isomorphic duplicates', async () => {
-        // Simple case: P(a). Domain size 2.
-        // Models:
-        // 1. a=0, P={0}
-        // 2. a=1, P={1} -> Isomorphic to 1
-        // 3. a=0, P={0,1}
-        // 4. a=1, P={0,1} -> Isomorphic to 3
-
+    test('returns multiple non-isomorphic models', async () => {
+        const finder = createModelFinder();
+        // P(a) | Q(a) in size 1 has 3 models: {P,Q}, {P}, {Q}
         const result = await finder.findModel(
-            ['P(a)'],
-            { count: 10, maxDomainSize: 2, enableSymmetry: false } // Disable symmetry breaking to rely on our iso check
+            ['P(a) | Q(a)'],
+            { count: 5, maxDomainSize: 1 }
         );
+        expect(result.models?.length).toBeGreaterThanOrEqual(3);
 
-        expect(result.success).toBe(true);
-        const models = result.models!;
-
-        // Should find limited number of non-isomorphic models
-        // For domain size 1:
-        // 1. a=0, P={0}
-        // 2. a=0, P={} -> contradiction
-
-        // For domain size 2:
-        // 1. a=0, P={0}
-        // 2. a=0, P={0,1}
-        // ...
-
-        console.log(`Found ${models.length} models for P(a)`);
-        models.forEach((m, i) => {
-            console.log(`Model ${i + 1}:\n${m.interpretation}`);
-        });
+        // Verify non-isomorphism indirectly
+        if (result.models && result.models.length >= 2) {
+             expect(result.models[0].interpretation).not.toEqual(result.models[1].interpretation);
+        }
     });
 });

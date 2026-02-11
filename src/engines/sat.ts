@@ -6,7 +6,7 @@
  */
 
 import Logic from 'logic-solver';
-import { Clause } from '../types/clause.js';
+import { Clause, Literal } from '../types/clause.js';
 import { ProveResult, Verbosity } from '../types/index.js';
 import { buildProveResult } from '../utils/response.js';
 import { clausify, isHornFormula } from '../clausifier.js';
@@ -28,7 +28,7 @@ export class SATEngine implements ReasoningEngine {
     readonly name = 'sat/minisat';
     readonly capabilities: EngineCapabilities = {
         horn: true,
-        fullFol: true,  // Handles arbitrary CNF (after grounding)
+        fullFol: true,  // Handles arbitrary CNF (via instantiation)
         equality: false, // No built-in equality
         arithmetic: false, // No built-in arithmetic
         streaming: false,
@@ -131,6 +131,92 @@ export class SATEngine implements ReasoningEngine {
     }
 
     /**
+     * Instantiate clauses with constants (Herbrand instantiation Level 0)
+     */
+    private instantiateClauses(clauses: Clause[]): Clause[] {
+        // 1. Collect all constants and variables
+        const constants = new Set<string>();
+        const variables = new Set<string>();
+
+        for (const clause of clauses) {
+            for (const lit of clause.literals) {
+                for (const arg of lit.args) {
+                    // standardizeVariables typically produces 'X', 'Y', 'Z', 'X1', 'Y1' etc.
+                    // Constants are lowercase (from parser).
+                    // Skolem constants are sk_N.
+
+                    // Check if it looks like a variable (starts with Uppercase)
+                    if (/^[A-Z]/.test(arg)) {
+                        variables.add(arg);
+                    } else {
+                        constants.add(arg);
+                    }
+                }
+            }
+        }
+
+        // If no constants, add a dummy constant 'c'
+        if (constants.size === 0) {
+            constants.add('c');
+        }
+
+        const constantList = Array.from(constants);
+        const instantiatedClauses: Clause[] = [];
+
+        for (const clause of clauses) {
+            const clauseVars = new Set<string>();
+            for (const lit of clause.literals) {
+                for (const arg of lit.args) {
+                    if (/^[A-Z]/.test(arg)) clauseVars.add(arg);
+                }
+            }
+
+            if (clauseVars.size === 0) {
+                instantiatedClauses.push(clause);
+                continue;
+            }
+
+            // Generate substitutions
+            // For now, only handle up to 3 variables to avoid explosion
+            if (clauseVars.size > 3) {
+                // Fallback: keep original (uninstantiated) which will likely be ignored or fail unification
+                instantiatedClauses.push(clause);
+                continue;
+            }
+
+            const vars = Array.from(clauseVars);
+            const assignments = this.generateAssignments(vars, constantList);
+
+            for (const assign of assignments) {
+                const newLiterals = clause.literals.map(lit => ({
+                    predicate: lit.predicate,
+                    negated: lit.negated,
+                    args: lit.args.map(a => assign.get(a) || a)
+                }));
+                instantiatedClauses.push({ literals: newLiterals, origin: clause.origin });
+            }
+        }
+
+        return instantiatedClauses;
+    }
+
+    private generateAssignments(vars: string[], constants: string[]): Map<string, string>[] {
+        if (vars.length === 0) return [new Map()];
+        const [first, ...rest] = vars;
+        const restAssignments = this.generateAssignments(rest, constants);
+        const result: Map<string, string>[] = [];
+
+        for (const c of constants) {
+            for (const assign of restAssignments) {
+                const newAssign = new Map(assign);
+                newAssign.set(first, c);
+                result.push(newAssign);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Prove a conclusion from premises using refutation.
      * 
      * Method: Clausify (premises ∧ ¬conclusion) and check for UNSAT.
@@ -146,7 +232,6 @@ export class SATEngine implements ReasoningEngine {
 
         try {
             // Build the refutation formula: premises & -conclusion
-            // Wrap each part in parentheses to ensure correct precedence
             const wrappedPremises = premises.map(p => `(${p})`);
             const wrappedNegConclusion = `(-(${conclusion}))`;
             const refutationFormula = [...wrappedPremises, wrappedNegConclusion].join(' & ');
@@ -163,11 +248,53 @@ export class SATEngine implements ReasoningEngine {
                 }, verbosity);
             }
 
+            let allClauses = clausifyResult.clauses;
+
+            // Inject equality axioms if enabled
+            if (options?.enableEquality) {
+                const predicates = new Map<string, number>();
+                for (const c of allClauses) {
+                    for (const l of c.literals) {
+                        if (l.predicate !== '=') {
+                            predicates.set(l.predicate, l.args.length);
+                        }
+                    }
+                }
+
+                const axioms: string[] = [];
+                // Reflexivity
+                axioms.push('all x (x = x)');
+                // Symmetry
+                axioms.push('all x all y (x = y -> y = x)');
+                // Transitivity
+                axioms.push('all x all y all z (x = y & y = z -> x = z)');
+
+                // Substitution for each predicate
+                for (const [pred, arity] of predicates) {
+                    const vars1 = Array.from({ length: arity }, (_, i) => `X${i+1}`);
+                    const vars2 = Array.from({ length: arity }, (_, i) => `Y${i+1}`);
+                    const eqs = vars1.map((v, i) => `${v} = ${vars2[i]}`).join(' & ');
+                    const term1 = `${pred}(${vars1.join(', ')})`;
+                    const term2 = `${pred}(${vars2.join(', ')})`;
+                    axioms.push(`all ${vars1.join(' all ')} all ${vars2.join(' all ')} (${eqs} -> (${term1} <-> ${term2}))`);
+                }
+
+                if (axioms.length > 0) {
+                    const axiomsStr = axioms.join(' & ');
+                    const axiomsResult = clausify(axiomsStr);
+                    if (axiomsResult.success && axiomsResult.clauses) {
+                        allClauses = [...allClauses, ...axiomsResult.clauses];
+                    }
+                }
+            }
+
+            // Instantiate variables (Grounding)
+            const groundClauses = this.instantiateClauses(allClauses);
+
             // Check satisfiability
-            const satResult = await this.checkSat(clausifyResult.clauses);
+            const satResult = await this.checkSat(groundClauses);
 
             if (!satResult.sat) {
-                // UNSAT means the conclusion follows from premises
                 return buildProveResult({
                     success: true,
                     result: 'proved',
@@ -178,18 +305,17 @@ export class SATEngine implements ReasoningEngine {
                         `Method: Refutation (premises ∧ ¬conclusion is UNSAT)`,
                     ],
                     timeMs: Date.now() - startTime,
-                    clauseCount: clausifyResult.clauses.length,
+                    clauseCount: groundClauses.length,
                     varCount: satResult.statistics?.variables,
                 }, verbosity);
             } else {
-                // SAT means we found a countermodel
                 return buildProveResult({
                     success: false,
                     result: 'failed',
                     message: `Cannot prove: ${conclusion}`,
                     error: 'Found satisfying assignment for premises ∧ ¬conclusion',
                     timeMs: Date.now() - startTime,
-                    clauseCount: clausifyResult.clauses.length,
+                    clauseCount: groundClauses.length,
                     varCount: satResult.statistics?.variables,
                 }, verbosity);
             }

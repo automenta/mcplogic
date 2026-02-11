@@ -6,6 +6,7 @@ import { parse, astToString } from '../src/parser.js';
 import { validateFormulas } from '../src/syntaxValidator.js';
 import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../src/axioms/categorical.js';
 import { ModelFinder } from '../src/modelFinder.js';
+import { FORMULAS, createTestModelFinder, expectModelFound } from './fixtures.js';
 
 describe('Parser', () => {
     test('parses simple predicate', () => {
@@ -96,33 +97,27 @@ describe('CategoricalHelpers', () => {
 });
 
 describe('ModelFinder', () => {
-    const finder = new ModelFinder(5000, 4);
+    const finder = createTestModelFinder({ maxDomainSize: 4 });
 
     test('finds model for simple predicate', async () => {
-        // We pass { maxDomainSize: 2 } in options to force checking up to size 2.
-        // The second argument `domainSize` in the old findModel is removed/changed in the new signature.
-        // Wait, the signature changed from `findModel(premises, domainSize)` to `findModel(premises, options)`.
-        // I need to update the test to use the new signature.
         const result = await finder.findModel(['P(a)'], { maxDomainSize: 2 });
         expect(result.result).toBe('model_found');
-        expect(result.model).toBeDefined();
-        // It might find a model of size 1 if P(a) is satisfiable in size 1 (which it is).
-        // So checking for exactly size 2 is wrong if it iterates from 1.
+        expectModelFound(result);
         expect(result.model!.domainSize).toBeGreaterThanOrEqual(1);
     });
 
     test('finds counterexample', async () => {
-        // Need domain size >= 2 to have distinct elements for a and b
-        // The findCounterexample signature also changed?
-        // async findCounterexample(premises: string[], conclusion: string, options?: ModelOptions)
         const result = await finder.findCounterexample(['P(a)'], 'P(b)', { maxDomainSize: 3 });
-        // The model finder should find a model where P(a) is true but P(b) is false
-        // This requires a and b to be different elements
         if (result.result === 'model_found') {
             expect(result.interpretation).toContain('Counterexample');
         } else {
-            // If no model found in small domains, that's acceptable
             expect(['no_model', 'timeout']).toContain(result.result);
         }
+    });
+
+    test('finds model for shared fixture', async () => {
+        const result = await finder.findModel(FORMULAS.existential.premises, { maxDomainSize: 1 });
+        expectModelFound(result);
+        expect(result.model!.domainSize).toBe(FORMULAS.existential.expectedModel.domainSize);
     });
 });

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Browser Compatibility Check</title>
+</head>
+<body>
+    <h1>MCP Logic Browser Check</h1>
+    <pre id="output">Running checks...</pre>
+
+    <script>
+        // Shim EVERYTHING
+        window.tau_file_system = {};
+        window.tau_user_input = (prompt, callback) => { callback(''); };
+        window.tau_user_output = (str) => { console.log(str); };
+        window.tau_user_error = (str) => { console.error(str); };
+        window.tau_warning = (str) => { console.warn(str); };
+
+        window.nodejs_file_system = {};
+        window.nodejs_user_input = () => {};
+        window.nodejs_user_output = () => {};
+        window.nodejs_user_error = () => {};
+        window.nodejs_warning = () => {};
+
+        window.global = window;
+        window.process = {
+            env: {},
+            type: 'renderer',
+            version: 'v14.0.0',
+            argv: ['node', 'browser'],
+            binding: () => ({})
+        };
+
+        window.require = (moduleName) => {
+            console.log('require shim called for', moduleName);
+            if (moduleName === 'fs') return {
+                existsSync: () => false,
+                readFileSync: () => '',
+                readFile: (path, encoding, cb) => {
+                    if (typeof encoding === 'function') cb = encoding;
+                    if (cb) cb(null, '');
+                },
+                open: () => {},
+                stat: () => {},
+                // Add commonly used fs methods just in case
+                lstat: () => {},
+                readdir: () => {},
+            };
+            if (moduleName === 'path') return {
+                join: (...args) => args.join('/'),
+                resolve: (...args) => args.join('/'),
+                dirname: (p) => p,
+                basename: (p) => p,
+                extname: (p) => '.pl'
+            };
+            return {};
+        };
+    </script>
+
+    <script type="module">
+        const output = document.getElementById('output');
+        const log = (msg) => { output.textContent += '\n' + msg; };
+
+        try {
+            const plModule = await import('https://cdn.jsdelivr.net/npm/tau-prolog@0.3.4/modules/core.js');
+            let pl = plModule.default || plModule;
+
+            if ((!pl || !pl.create) && window.pl) {
+                pl = window.pl;
+            }
+
+            if (pl && pl.create) {
+                log('✓ tau-prolog loads');
+                const session = pl.create();
+                session.consult('parent(tom, bob).');
+                session.query('parent(tom, X).');
+                session.answer((answer) => {
+                    log('✓ tau-prolog query works: ' + pl.format_answer(answer));
+                });
+            } else {
+                 throw new Error('Could not find pl entry point. Keys: ' + Object.keys(plModule));
+            }
+        } catch (e) {
+            log('✗ tau-prolog failed: ' + e.message);
+            console.error(e);
+        }
+
+        try {
+            const Logic = await import('https://esm.sh/logic-solver@2.0.1');
+            log('✓ logic-solver loads');
+            const solver = new Logic.default.Solver();
+            solver.require(Logic.default.or('A', 'B'));
+            solver.forbid('A');
+            const solution = solver.solve();
+            log('✓ logic-solver works: B=' + solution.getTrueVars().includes('B'));
+        } catch (e) {
+            log('✗ logic-solver failed: ' + e.message);
+        }
+
+        setTimeout(() => {
+             log('\n=== Spike Complete ===');
+        }, 500);
+    </script>
+</body>
+</html>
