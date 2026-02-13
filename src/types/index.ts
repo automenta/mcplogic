@@ -110,3 +110,11 @@ export type {
     ReasoningResult,
     ReasonOptions
 } from './agent.js';
+
+// Re-export Evolution types
+export type {
+    TranslationStrategy,
+    EvaluationResult,
+    EvaluationCase,
+    EvolutionConfig
+} from './evolution.js';
