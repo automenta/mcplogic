@@ -45,7 +45,7 @@ export class Optimizer {
                         cases.push(data);
                     }
                 } catch (e) {
-                    console.error(`Failed to load eval case ${file}:`, e);
+                    // Ignore malformed case files
                 }
             }
         }

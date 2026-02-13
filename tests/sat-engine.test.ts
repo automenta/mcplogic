@@ -6,7 +6,7 @@
  */
 
 import { SATEngine, createSATEngine } from '../src/engines/sat';
-import { clausify } from '../src/logic/clausifier';
+import { clausify } from '../src/logic/index';
 import { Clause } from '../src/types/clause';
 import { createConstant } from '../src/ast/index';
 

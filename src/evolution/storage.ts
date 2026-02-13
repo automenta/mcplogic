@@ -32,7 +32,7 @@ export class JsonPerformanceDatabase implements IPerformanceDatabase {
                 const content = fs.readFileSync(this.filePath, 'utf-8');
                 this.data = JSON.parse(content);
             } catch (e) {
-                console.error('Failed to load performance database:', e);
+                // Silently fail on load error and reset data
                 this.data = [];
             }
         }
@@ -42,7 +42,7 @@ export class JsonPerformanceDatabase implements IPerformanceDatabase {
         try {
             fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
         } catch (e) {
-            console.error('Failed to save performance database:', e);
+            // Silently fail on save error
         }
     }
 

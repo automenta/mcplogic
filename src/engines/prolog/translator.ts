@@ -10,7 +10,7 @@ import {
     createClausificationError,
     createEngineError,
 } from '../../types/errors.js';
-import { clausify } from '../../logic/clausifier.js';
+import { clausify } from '../../logic/index.js';
 import { Clause, Literal } from '../../types/clause.js';
 import { astToString } from '../../ast/index.js';
 

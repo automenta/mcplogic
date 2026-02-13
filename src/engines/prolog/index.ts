@@ -8,7 +8,7 @@
 import { LogicEngine, ProveOptions } from './engine.js';
 import { ProveResult } from '../../types/index.js';
 import { Clause } from '../../types/clause.js';
-import { isHornFormula } from '../../logic/clausifier.js';
+import { isHornFormula } from '../../logic/index.js';
 import { clausesToProlog } from './translator.js';
 import {
     ReasoningEngine,
