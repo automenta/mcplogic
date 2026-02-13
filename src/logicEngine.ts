@@ -5,7 +5,9 @@
  */
 
 import pl from 'tau-prolog';
-type Session = any;
+import { PrologSession, consult, query } from './engines/prologUtils.js';
+
+type Session = PrologSession;
 
 import { buildPrologProgram, folGoalToProlog } from './translator.js';
 import { getArithmeticSetup } from './axioms/arithmetic.js';
@@ -23,7 +25,6 @@ import {
 import { buildProveResult } from './utils/response.js';
 import { ProveOptions } from './types/options.js';
 import { META_INTERPRETER, generateDynamicDirectives, parseTraceOutput } from './utils/trace.js';
-import { consult, query } from './engines/prologUtils.js';
 
 // Re-export ProveOptions to ensure it's used correctly by consumers
 export type { ProveResult, ProveOptions };
