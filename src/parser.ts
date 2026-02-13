@@ -5,6 +5,11 @@
  * Supports: all, exists, ->, <->, &, |, -, =, predicates, functions, variables
  */
 
+import { createParseError } from './types/errors.js';
+import type { ASTNode, ASTNodeType } from './types/index.js';
+
+export type { ASTNode, ASTNodeType };
+
 // Token types
 export type TokenType =
     | 'QUANTIFIER'    // all, exists
@@ -29,10 +34,6 @@ export interface Token {
     value: string;
     position: number;
 }
-
-import type { ASTNode, ASTNodeType } from './types/index.js';
-
-export type { ASTNode, ASTNodeType };
 
 /**
  * Tokenizer for FOL formulas
@@ -93,7 +94,7 @@ export class Tokenizer {
                 continue;
             }
 
-            throw new Error(`Unexpected character '${char}' at position ${this.pos}`);
+            throw createParseError(`Unexpected character '${char}'`, this.input, this.pos);
         }
 
         this.tokens.push({ type: 'EOF', value: '', position: this.pos });
@@ -139,15 +140,17 @@ export class Parser {
     private tokens: Token[];
     private pos: number = 0;
     private boundVariables: Set<string> = new Set();
+    private originalInput: string; // Kept for error reporting context if needed (not strictly used by createParseError currently but good practice)
 
-    constructor(tokens: Token[]) {
+    constructor(tokens: Token[], originalInput: string = '') {
         this.tokens = tokens;
+        this.originalInput = originalInput;
     }
 
     parse(): ASTNode {
         const result = this.parseFormula();
         if (this.current().type !== 'EOF' && this.current().type !== 'DOT') {
-            throw new Error(`Unexpected token '${this.current().value}' at position ${this.current().position}`);
+            throw createParseError(`Unexpected token '${this.current().value}'`, this.originalInput, this.current().position);
         }
         return result;
     }
@@ -166,7 +169,7 @@ export class Parser {
 
     private expect(type: TokenType): Token {
         if (this.current().type !== type) {
-            throw new Error(`Expected ${type} but got ${this.current().type} at position ${this.current().position}`);
+            throw createParseError(`Expected ${type} but got ${this.current().type}`, this.originalInput, this.current().position);
         }
         return this.advance();
     }
@@ -302,7 +305,7 @@ export class Parser {
             return { type: 'predicate', name, args: [] };
         }
 
-        throw new Error(`Unexpected token '${this.current().value}' at position ${this.current().position}`);
+        throw createParseError(`Unexpected token '${this.current().value}'`, this.originalInput, this.current().position);
     }
 
     private parseTermList(): ASTNode[] {
@@ -322,7 +325,7 @@ export class Parser {
 
     private parseTerm(): ASTNode {
         if (this.current().type !== 'VARIABLE') {
-            throw new Error(`Expected term but got ${this.current().type} at position ${this.current().position}`);
+            throw createParseError(`Expected term but got ${this.current().type}`, this.originalInput, this.current().position);
         }
 
         const name = this.advance().value;
@@ -361,7 +364,8 @@ export class Parser {
 export function parse(input: string): ASTNode {
     const tokenizer = new Tokenizer(input);
     const tokens = tokenizer.tokenize();
-    const parser = new Parser(tokens);
+    // Pass input to parser for better error reporting context (if needed)
+    const parser = new Parser(tokens, input);
     return parser.parse();
 }
 
@@ -397,6 +401,6 @@ export function astToString(node: ASTNode): string {
         case 'constant':
             return node.name!;
         default:
-            throw new Error(`Unknown node type: ${node.type}`);
+            throw createParseError(`Unknown node type: ${node.type}`, '', 0);
     }
 }

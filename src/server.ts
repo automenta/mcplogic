@@ -28,6 +28,7 @@ import {
     LogicException,
     serializeLogicError,
     Verbosity,
+    createError,
 } from './types/index.js';
 import { createEngineManager, EngineSelection } from './engines/manager.js';
 import * as Handlers from './handlers/index.js';
@@ -495,7 +496,7 @@ If found, proves the conclusion doesn't logically follow.`,
         const content = getResourceContent(uri);
 
         if (content === null) {
-            throw new Error(`Resource not found: ${uri}`);
+            throw createError('PARSE_ERROR', `Resource not found: ${uri}`);
         }
 
         return {
@@ -528,7 +529,7 @@ If found, proves the conclusion doesn't logically follow.`,
         const result = getPrompt(name, promptArgs || {});
 
         if (result === null) {
-            throw new Error(`Prompt not found: ${name}`);
+             throw createError('PARSE_ERROR', `Prompt not found: ${name}`);
         }
 
         // Return in MCP format: description + messages array
@@ -602,7 +603,7 @@ If found, proves the conclusion doesn't logically follow.`,
                     break;
 
                 default:
-                    throw new Error(`Unknown tool: ${name}`);
+                    throw createError('PARSE_ERROR', `Unknown tool: ${name}`);
             }
 
             return {

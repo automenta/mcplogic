@@ -10,7 +10,10 @@
  */
 
 import type { ASTNode } from './types/index.js';
-import { extractSignature, FormulaSignature } from './astUtils.js';
+import { extractSignature, FormulaSignature, containsEquality } from './astUtils.js';
+
+// Re-export for convenience
+export { containsEquality };
 
 /**
  * Options for equality axiom generation.
@@ -111,9 +114,6 @@ function generatePredicateSubstitution(pred: string, arity: number): string {
     const substituted = `${pred}(${ys.join(', ')})`;
     return `${substituted} :- ${equalities}, ${original}.`;
 }
-
-export { containsEquality } from './astUtils.js';
-import { containsEquality } from './astUtils.js';
 
 /**
  * Generate a minimal set of equality axioms for a specific use case.
