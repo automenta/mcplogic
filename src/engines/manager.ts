@@ -13,8 +13,8 @@ import {
     EngineProveOptions,
     SatResult
 } from './interface.js';
-import { PrologEngine, createPrologEngine } from './prolog.js';
-import { SATEngine, createSATEngine } from './sat.js';
+import { PrologEngine, createPrologEngine } from './prolog/index.js';
+import { SATEngine, createSATEngine } from './sat/index.js';
 
 /**
  * Engine selection mode

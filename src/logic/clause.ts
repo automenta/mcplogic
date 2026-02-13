@@ -6,7 +6,7 @@
  */
 
 import { Clause, Literal, SkolemEnv, DIMACSResult, ClausifyOptions, ClausifyResult } from '../types/clause.js';
-import { astToString } from '../utils/ast-modules/index.js';
+import { astToString } from '../ast/index.js';
 import { ASTNode } from '../types/ast.js';
 
 export type {

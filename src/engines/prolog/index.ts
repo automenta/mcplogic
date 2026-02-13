@@ -5,17 +5,19 @@
  * Provides the Tau-Prolog backend for Horn clause reasoning.
  */
 
-import { LogicEngine, ProveOptions } from '../logicEngine.js';
-import { ProveResult } from '../types/index.js';
-import { Clause } from '../types/clause.js';
-import { isHornFormula } from '../logic/clausifier.js';
-import { clausesToProlog } from './prolog/translator.js';
+import { LogicEngine, ProveOptions } from './engine.js';
+import { ProveResult } from '../../types/index.js';
+import { Clause } from '../../types/clause.js';
+import { isHornFormula } from '../../logic/clausifier.js';
+import { clausesToProlog } from './translator.js';
 import {
     ReasoningEngine,
     EngineCapabilities,
     EngineProveOptions,
     SatResult
-} from './interface.js';
+} from '../interface.js';
+
+export { LogicEngine, createLogicEngine } from './engine.js';
 
 /**
  * Prolog-based reasoning engine using Tau-Prolog.

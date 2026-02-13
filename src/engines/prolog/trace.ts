@@ -4,7 +4,7 @@
  * Provides meta-interpreter for generating proof traces in Prolog.
  */
 
-import { FormulaSignature } from '../../utils/ast-modules/index.js';
+import { FormulaSignature } from '../../ast/index.js';
 
 /**
  * Meta-interpreter for tracing Prolog execution.

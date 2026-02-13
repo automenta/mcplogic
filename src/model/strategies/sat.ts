@@ -1,9 +1,9 @@
 import { Model, ModelOptions, Literal } from '../../types/index.js';
 import { parse } from '../../parser/index.js';
-import { astToString } from '../../utils/ast-modules/index.js';
+import { astToString } from '../../ast/index.js';
 import { clausify } from '../../logic/clausifier.js';
 import { groundFormula } from '../../logic/grounding.js';
-import { SATEngine } from '../sat.js';
+import { SATEngine } from '../../engines/sat/index.js';
 
 /**
  * Find models using SAT solver

@@ -3,7 +3,7 @@
  */
 
 import { parse } from '../src/parser/index.js';
-import { astToString } from '../src/utils/ast-modules/index.js';
+import { astToString } from '../src/ast/index.js';
 import { validateFormulas } from '../src/validation/syntax.js';
 import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../src/axioms/categorical.js';
 import { ModelFinder } from '../src/model/index.js';

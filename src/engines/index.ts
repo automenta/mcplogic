@@ -14,12 +14,12 @@ export type {
 export {
     PrologEngine,
     createPrologEngine,
-} from './prolog.js';
+} from './prolog/index.js';
 
 export {
     SATEngine,
     createSATEngine,
-} from './sat.js';
+} from './sat/index.js';
 
 export {
     EngineManager,

@@ -1,4 +1,4 @@
-import type { ASTNode } from '../../types/index.js';
+import type { ASTNode } from '../types/index.js';
 import { traverse } from './visitor.js';
 
 /**

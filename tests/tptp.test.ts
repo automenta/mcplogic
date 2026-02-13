@@ -1,7 +1,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { createLogicEngine } from '../src/logicEngine.js';
+import { createLogicEngine } from '../src/engines/prolog/engine.js';
 
 const BENCHMARK_DIR = path.join(process.cwd(), 'benchmarks/tptp');
 

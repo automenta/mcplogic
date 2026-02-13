@@ -10,7 +10,7 @@
  */
 
 import type { ASTNode } from '../types/index.js';
-import { extractSignature, FormulaSignature } from '../utils/ast-modules/index.js';
+import { extractSignature, FormulaSignature } from '../ast/index.js';
 
 /**
  * Options for equality axiom generation.
@@ -114,8 +114,8 @@ function generatePredicateSubstitution(pred: string, arity: number, maxDepth: nu
     return `${substituted} :- ${equalities}, ${original}.`;
 }
 
-export { containsEquality } from '../utils/ast-modules/index.js';
-import { containsEquality } from '../utils/ast-modules/index.js';
+export { containsEquality } from '../ast/index.js';
+import { containsEquality } from '../ast/index.js';
 
 export function generateMinimalEqualityAxioms(
     formulas: ASTNode[],
