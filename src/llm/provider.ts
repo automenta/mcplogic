@@ -1,6 +1,25 @@
 import type { LLMProvider, LLMMessage, LLMResponse } from '../types/llm.js';
 import { createGenericError } from '../types/errors.js';
 
+interface LLMApiUsage {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+}
+
+interface LLMApiChoice {
+    message?: {
+        content?: string;
+    };
+}
+
+interface LLMApiResponse {
+    choices?: LLMApiChoice[];
+    message?: {
+        content?: string;
+    };
+    usage?: LLMApiUsage;
+}
+
 /**
  * A basic LLM provider that uses environment variables to call OpenAI/Anthropic/Ollama.
  * For this implementation, we will use a simple fetch-based approach for OpenAI/Ollama compatibility.
@@ -70,7 +89,7 @@ export class StandardLLMProvider implements LLMProvider {
                 throw new Error(`LLM API error (${response.status}): ${text}`);
             }
 
-            const data = await response.json() as any;
+            const data = await response.json() as LLMApiResponse;
 
             // Standardize response extraction
             const content = data.choices?.[0]?.message?.content || data.message?.content || '';

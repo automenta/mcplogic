@@ -31,69 +31,77 @@ import * as EvolutionHandlers from './handlers/evolution.js';
 import { TOOLS } from './tools/definitions.js';
 import { createContainer, ServerContainer } from './container.js';
 
+// Define the progress notification parameters
+interface ProgressParams {
+    _meta?: {
+        progressToken?: string | number;
+    };
+    [key: string]: unknown;
+}
+
 type ToolHandler = (
-    args: any,
+    args: Record<string, any>,
     container: ServerContainer,
     options?: { onProgress?: (p: number | undefined, m: string) => void }
-) => Promise<any> | any;
+) => Promise<unknown> | unknown;
 
 const toolHandlers: Record<string, ToolHandler> = {
     // ==================== CORE REASONING TOOLS ====================
     'prove': (args, c, opts) =>
-        Handlers.proveHandler(args, c.engineManager, args.verbosity, opts?.onProgress),
+        Handlers.proveHandler(args as any, c.engineManager, args.verbosity, opts?.onProgress),
 
     'check-well-formed': (args) =>
-        Handlers.checkWellFormedHandler(args),
+        Handlers.checkWellFormedHandler(args as any),
 
     'find-model': (args, c) =>
-        Handlers.findModelHandler(args, c.modelFinder, args.verbosity),
+        Handlers.findModelHandler(args as any, c.modelFinder, args.verbosity),
 
     'find-counterexample': (args, c) =>
-        Handlers.findCounterexampleHandler(args, c.modelFinder, args.verbosity),
+        Handlers.findCounterexampleHandler(args as any, c.modelFinder, args.verbosity),
 
     'verify-commutativity': (args, c) =>
-        Handlers.verifyCommutativityHandler(args, c.categoricalHelpers),
+        Handlers.verifyCommutativityHandler(args as any, c.categoricalHelpers),
 
     'get-category-axioms': (args, c) =>
-        Handlers.getCategoryAxiomsHandler(args, c.categoricalHelpers),
+        Handlers.getCategoryAxiomsHandler(args as any, c.categoricalHelpers),
 
     'translate-text': (args, c) =>
-        LLMHandlers.translateTextHandler(args, c.inputRouter),
+        LLMHandlers.translateTextHandler(args as any, c.inputRouter),
 
     'agent-reason': (args) =>
-        AgentHandlers.reasonHandler(args),
+        AgentHandlers.reasonHandler(args as any),
 
     // ==================== EVOLUTION TOOLS ====================
     'evolution-start': (args, c) =>
-        EvolutionHandlers.startEvolutionHandler(args, c.optimizer, c),
+        EvolutionHandlers.startEvolutionHandler(args as any, c.optimizer, c),
 
     'evolution-list-strategies': (args, c) =>
-        EvolutionHandlers.listStrategiesHandler(args, c.strategies),
+        EvolutionHandlers.listStrategiesHandler(args as any, c.strategies),
 
     'evolution-generate-cases': (args, c) =>
-        EvolutionHandlers.generateCasesHandler(args, c.curriculumGenerator),
+        EvolutionHandlers.generateCasesHandler(args as any, c.curriculumGenerator),
 
     // ==================== SESSION MANAGEMENT TOOLS ====================
     'create-session': (args, c) =>
-        Handlers.createSessionHandler(args, c.sessionManager),
+        Handlers.createSessionHandler(args as any, c.sessionManager),
 
     'assert-premise': (args, c) =>
-        Handlers.assertPremiseHandler(args, c.sessionManager),
+        Handlers.assertPremiseHandler(args as any, c.sessionManager),
 
     'query-session': (args, c) =>
-        Handlers.querySessionHandler(args, c.sessionManager, c.engineManager, args.verbosity),
+        Handlers.querySessionHandler(args as any, c.sessionManager, c.engineManager, args.verbosity),
 
     'retract-premise': (args, c) =>
-        Handlers.retractPremiseHandler(args, c.sessionManager),
+        Handlers.retractPremiseHandler(args as any, c.sessionManager),
 
     'list-premises': (args, c) =>
-        Handlers.listPremisesHandler(args, c.sessionManager, args.verbosity),
+        Handlers.listPremisesHandler(args as any, c.sessionManager, args.verbosity),
 
     'clear-session': (args, c) =>
-        Handlers.clearSessionHandler(args, c.sessionManager),
+        Handlers.clearSessionHandler(args as any, c.sessionManager),
 
     'delete-session': (args, c) =>
-        Handlers.deleteSessionHandler(args, c.sessionManager),
+        Handlers.deleteSessionHandler(args as any, c.sessionManager),
 };
 
 /**
@@ -188,11 +196,12 @@ export function createServer(): Server {
     // Handle call_tool request
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: rawArgs } = request.params;
-        const args = rawArgs || {};
+        // Use a mutable copy of args
+        const args: Record<string, unknown> = rawArgs ? { ...rawArgs } : {};
 
         // Ensure default verbosity
         if (!('verbosity' in args)) {
-            (args as any).verbosity = 'standard';
+            args.verbosity = 'standard';
         }
 
         try {
@@ -202,7 +211,9 @@ export function createServer(): Server {
             }
 
             // Extract progress token if present
-            const progressToken = (request.params as any)._meta?.progressToken;
+            const paramsWithMeta = request.params as ProgressParams;
+            const progressToken = paramsWithMeta._meta?.progressToken;
+
             const onProgress = progressToken ? (progress: number | undefined, message: string) => {
                 server.notification({
                     method: 'notifications/progress',

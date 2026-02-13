@@ -33,6 +33,6 @@ export function astToString(node: ASTNode): string {
         case 'constant':
             return node.name!;
         default:
-            throw createGenericError('PARSE_ERROR', `Unknown node type: ${(node as any).type}`);
+            throw createGenericError('PARSE_ERROR', `Unknown node type: ${JSON.stringify(node)}`);
     }
 }

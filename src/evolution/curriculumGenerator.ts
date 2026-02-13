@@ -5,6 +5,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 
+interface RawEvaluationCase {
+    input: string;
+    expected: string[];
+    type?: string;
+}
+
 /**
  * Generates new evaluation cases to improve test coverage.
  */
@@ -65,11 +71,11 @@ export class CurriculumGenerator {
                 return [];
             }
 
-            return rawCases.map((c: any) => ({
+            return rawCases.map((c: RawEvaluationCase) => ({
                 id: randomUUID(),
                 input: c.input,
                 expected: c.expected,
-                type: c.type || 'premise'
+                type: (c.type === 'goal' ? 'goal' : 'premise') as 'premise' | 'goal'
             }));
         } catch (e) {
             // Silently fail on parse error

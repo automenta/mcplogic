@@ -1,28 +1,37 @@
 /**
  * MCP Logic Playground App
  */
-import { createLogicEngine, createModelFinder } from '/dist-browser/lib.js';
+import { createLogicEngine, createModelFinder } from '../lib.js';
+import type { LogicEngine } from '../engines/prolog/engine.js';
+import type { ModelFinder } from '../model/index.js';
+
+// Define global types for external libraries loaded via script tags
+declare global {
+    interface Window {
+        pipeline: any;
+    }
+}
 
 // DOM Elements
-const inputEditor = document.getElementById('input-editor');
-const outputLog = document.getElementById('output-log');
-const btnProve = document.getElementById('btn-prove');
-const btnModel = document.getElementById('btn-model');
-const btnExample = document.getElementById('btn-example');
-const btnAskAi = document.getElementById('btn-ask-ai');
-const modalAi = document.getElementById('ai-modal');
-const btnAiCancel = document.getElementById('btn-ai-cancel');
-const btnAiConvert = document.getElementById('btn-ai-convert');
-const inputAi = document.getElementById('ai-input');
-const statusAi = document.getElementById('ai-status');
+const inputEditor = document.getElementById('input-editor') as HTMLTextAreaElement;
+const outputLog = document.getElementById('output-log') as HTMLDivElement;
+const btnProve = document.getElementById('btn-prove') as HTMLButtonElement;
+const btnModel = document.getElementById('btn-model') as HTMLButtonElement;
+const btnExample = document.getElementById('btn-example') as HTMLButtonElement;
+const btnAskAi = document.getElementById('btn-ask-ai') as HTMLButtonElement;
+const modalAi = document.getElementById('ai-modal') as HTMLDivElement;
+const btnAiCancel = document.getElementById('btn-ai-cancel') as HTMLButtonElement;
+const btnAiConvert = document.getElementById('btn-ai-convert') as HTMLButtonElement;
+const inputAi = document.getElementById('ai-input') as HTMLTextAreaElement;
+const statusAi = document.getElementById('ai-status') as HTMLDivElement;
 
 // State
-let engine = createLogicEngine();
-let modelFinder = createModelFinder();
-let pipeline = null;
+const engine: LogicEngine = createLogicEngine();
+const modelFinder: ModelFinder = createModelFinder();
+let pipeline: any = null;
 
 // Logging
-function log(msg, type = 'info') {
+function log(msg: string, type: 'info' | 'success' | 'error' | 'model' = 'info') {
     const el = document.createElement('div');
     el.className = `log-entry log-${type}`;
     el.textContent = msg;
@@ -35,7 +44,7 @@ function clearLog() {
 }
 
 // Logic Helpers
-function getFormulas() {
+function getFormulas(): string[] {
     const text = inputEditor.value;
     return text.split('\n')
         .map(l => l.trim())
@@ -64,7 +73,7 @@ btnProve.addEventListener('click', async () => {
         });
         const elapsed = (performance.now() - start).toFixed(1);
 
-        if (result.success && result.result === 'proved') {
+        if (result.result === 'proved') {
             log(`✓ PROVED (${elapsed}ms)`, 'success');
             if (result.inferenceSteps) {
                 // log('Trace:\n' + result.inferenceSteps.join('\n'));
@@ -74,7 +83,8 @@ btnProve.addEventListener('click', async () => {
         }
         console.log(result);
     } catch (e) {
-        log(`Error: ${e.message}`, 'error');
+        const msg = e instanceof Error ? e.message : String(e);
+        log(`Error: ${msg}`, 'error');
         console.error(e);
     }
 });
@@ -96,13 +106,19 @@ btnModel.addEventListener('click', async () => {
 
         if (result.success) {
             log(`✓ MODEL FOUND (${elapsed}ms)`, 'success');
-            log(result.interpretation, 'model');
+            // Assuming result.interpretation exists or we should format the model
+            // The Model type usually has a `toString` or we format it.
+            // But checking the codebase, ModelResponse has `model` property.
+            if (result.model) {
+                 log(JSON.stringify(result.model, null, 2), 'model');
+            }
         } else {
             log(`✗ NO MODEL (${elapsed}ms): ${result.message || result.error}`, 'error');
         }
         console.log(result);
     } catch (e) {
-        log(`Error: ${e.message}`, 'error');
+        const msg = e instanceof Error ? e.message : String(e);
+        log(`Error: ${msg}`, 'error');
         console.error(e);
     }
 });
@@ -172,7 +188,8 @@ btnAiConvert.addEventListener('click', async () => {
         statusAi.textContent = '';
     } catch (e) {
         console.error(e);
-        statusAi.textContent = 'Error: ' + e.message;
+        const msg = e instanceof Error ? e.message : String(e);
+        statusAi.textContent = 'Error: ' + msg;
     } finally {
         btnAiConvert.disabled = false;
     }
