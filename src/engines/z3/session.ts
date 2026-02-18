@@ -103,4 +103,10 @@ export class Z3Session implements EngineSession {
             }, verbosity);
         }
     }
+
+    async close(): Promise<void> {
+        if (this.solver && typeof this.solver.delete === 'function') {
+            this.solver.delete();
+        }
+    }
 }

@@ -52,12 +52,13 @@ export class Z3Engine implements ReasoningEngine {
         const startTime = Date.now();
         const verbosity = options?.verbosity || 'standard';
         const timeoutMs = (options?.maxSeconds || 10) * 1000;
+        let solver: any = null;
 
         try {
             if (!this.ctx) await this.init();
 
             // Create a solver
-            const solver = new this.ctx.Solver();
+            solver = new this.ctx.Solver();
 
             // Configure solver parameters (timeout)
             // Z3 params are set via solver.set() or global config?
@@ -162,6 +163,10 @@ export class Z3Engine implements ReasoningEngine {
                 error: `Z3 Error: ${error}`,
                 timeMs: Date.now() - startTime,
             }, verbosity);
+        } finally {
+            if (solver && typeof solver.delete === 'function') {
+                solver.delete();
+            }
         }
     }
 
@@ -173,10 +178,11 @@ export class Z3Engine implements ReasoningEngine {
         // I'll implement a basic version.
 
         const startTime = Date.now();
+        let solver: any = null;
         try {
             if (!this.ctx) await this.init();
 
-            const solver = new this.ctx.Solver();
+            solver = new this.ctx.Solver();
             // TODO: Convert clauses to Z3
             // This requires mapping logic-solver Clause objects to Z3 AST.
             // Skipping for now as the main goal is 'prove'.
@@ -189,6 +195,10 @@ export class Z3Engine implements ReasoningEngine {
                 sat: false,
                 statistics: { timeMs: Date.now() - startTime }
             };
+        } finally {
+            if (solver && typeof solver.delete === 'function') {
+                solver.delete();
+            }
         }
     }
 }
