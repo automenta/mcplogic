@@ -3,118 +3,109 @@
  */
 
 // Re-export error types
-export * from './errors.js';
+export {
+    LogicException,
+    createParseError,
+    createInferenceLimitError,
+    createNoModelError,
+    createSessionNotFoundError,
+    createSessionLimitError,
+    createEngineError,
+    createUnsatisfiableError,
+    createTimeoutError,
+    createInvalidDomainError,
+    createClausificationError,
+    serializeLogicError,
+    createError,
+    createGenericError,
+} from './errors.js';
+
+export type {
+    LogicErrorCode,
+    ErrorSpan,
+    LogicError,
+} from './errors.js';
 
 // Re-export clause types for CNF
-export * from './clause.js';
+export type {
+    Literal,
+    Clause,
+    ClausifyOptions,
+    ClausifyResult,
+    SkolemEnv,
+    DIMACSResult,
+} from './clause.js';
 
-/**
- * Verbosity level for responses
- */
-export type Verbosity = 'minimal' | 'standard' | 'detailed';
+// Re-export AST types
+export type {
+    ASTNodeType,
+    ASTNode,
+} from './ast.js';
 
-/**
- * Minimal response - just success/failure and result type
- */
-export interface MinimalProveResponse {
-    success: boolean;
-    result: 'proved' | 'failed' | 'timeout' | 'error';
-}
+// Re-export parser types
+export type {
+    TokenType,
+    Token,
+} from './parser.js';
 
-/**
- * Standard response - includes message and bindings
- */
-export interface StandardProveResponse extends MinimalProveResponse {
-    message: string;
-    bindings?: Record<string, string>[];
-}
+// Re-export response types
+export type {
+    Verbosity,
+    Model,
+    ModelResult,
+    ProveResult,
+    MinimalProveResponse,
+    StandardProveResponse,
+    DetailedProveResponse,
+    ProveResponse,
+    MinimalModelResponse,
+    StandardModelResponse,
+    DetailedModelResponse,
+    ModelResponse,
+} from './responses.js';
 
-/**
- * Detailed response - includes debug info
- */
-export interface DetailedProveResponse extends StandardProveResponse {
-    prologProgram: string;
-    inferenceSteps?: string[];
-    statistics: {
-        inferences?: number;
-        timeMs: number;
-    };
-}
+// Re-export options
+export {
+    DEFAULTS
+} from './options.js';
 
-/**
- * Result of a proof operation (legacy format, extended for verbosity)
- */
-export interface ProveResult {
-    success: boolean;
-    result: 'proved' | 'failed' | 'timeout' | 'error';
-    message?: string;
-    proof?: string[];
-    bindings?: Record<string, string>[];
-    error?: string;
-    // Detailed mode fields
-    prologProgram?: string;
-    inferenceSteps?: string[];
-    statistics?: {
-        inferences?: number;
-        timeMs: number;
-    };
-}
+export type {
+    HighPowerOptions,
+    ReasoningOptions,
+    ProveOptions,
+    ModelOptions
+} from './options.js';
 
-/**
- * Minimal model response
- */
-export interface MinimalModelResponse {
-    success: boolean;
-    result: 'model_found' | 'no_model' | 'timeout' | 'error';
-    model?: {
-        predicates: Record<string, string[]>;
-    };
-}
+// Re-export LLM types
+export type {
+    TranslateRequest,
+    TranslateResult,
+    LLMMessage,
+    LLMResponse,
+    LLMProvider,
+    TranslationStrategy,
+    TranslationResult,
+} from './llm.js';
 
-/**
- * Standard model response
- */
-export interface StandardModelResponse extends MinimalModelResponse {
-    message: string;
-    interpretation?: string;
-}
+// Re-export Ontology types
+export type {
+    Ontology,
+    OntologyConfig,
+} from './ontology.js';
 
-/**
- * Detailed model response
- */
-export interface DetailedModelResponse extends StandardModelResponse {
-    statistics: {
-        domainSize: number;
-        searchedSizes: number[];
-        timeMs: number;
-    };
-}
+// Re-export Agent types
+export type {
+    AgentActionType,
+    AgentAction,
+    ReasoningStep,
+    ReasoningResult,
+    ReasonOptions
+} from './agent.js';
 
-/**
- * A finite model with domain, predicates, and constant interpretations
- */
-export interface Model {
-    domainSize: number;
-    domain: number[];
-    predicates: Map<string, Set<string>>;
-    constants: Map<string, number>;
-    interpretation: string;
-}
-
-/**
- * Result of a model-finding operation
- */
-export interface ModelResult {
-    success: boolean;
-    result: 'model_found' | 'no_model' | 'timeout' | 'error';
-    model?: Model;
-    interpretation?: string;
-    error?: string;
-    message?: string;
-    // Detailed mode fields
-    statistics?: {
-        domainSize?: number;
-        searchedSizes?: number[];
-        timeMs: number;
-    };
-}
+// Re-export Evolution types
+export type {
+    EvolutionStrategy,
+    EvaluationResult,
+    EvaluationCase,
+    EvolutionConfig
+} from './evolution.js';

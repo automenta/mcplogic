@@ -1,1422 +1,1016 @@
-# MCPLogic — Development Roadmap
+# MCP Logic Development Plan
 
-> **Vision:** Universal "logic nervous system"—a blazing-fast, extensible, protocol-native reasoning hub bridging symbolic precision with neural intuition.
-
-> **Architecture:** Plugin-based engine federation with swappable backends (Prolog → SAT → ASP → neural-guided).
+A **comprehensive, mindlessly-executable** roadmap from the current FOL engine to a full neurosymbolic reasoning platform.
 
 ---
 
-## Quick Reference
+## 🏗️ Phase 0: Preparatory Work (Do First)
 
-| Phase | Focus | Key Deliverables | Status |
-|-------|-------|------------------|--------|
-| **1** | Core Fortification | Structured errors, verbosity, sessions | ✅ Complete |
-| **2** | Expressiveness | CNF, equality, arithmetic, MCP integration | ✅ Complete |
-| **3** | MCP Excellence | Resources, prompts, streaming | ✅ Core Complete |
-| **4** | Engine Federation | SAT backend, engine abstraction | ✅ SAT Complete |
-| **5** | MCP Integration | Engine parameter, DIMACS export, server upgrade | ✅ Complete |
-| **6** | Advanced Engines | SMT, ASP, neural-guided search | 🟣 Research |
-| **7** | Frontier Logic | HOL, modal, probabilistic, distributed | 🟣 Vision |
+**Purpose:** Reduce friction, de-risk unknowns, and automate repetitive tasks. This phase makes all subsequent phases faster and more reliable.
 
+### 0.1 Create Shared Test Fixtures 🧪
 
----
+**Effort:** 30 min | **Impact:** Force multiplier for all testing
 
-## Phase 1: Core Fortification ✅
+Create reusable test data that every test file can import.
 
-*Completed 2024-12-05 · Prerequisites: None*
+#### Implementation
 
-### Phase 1 Summary
-
-**Deliverables Shipped:**
-
-| Feature | Files | Tests |
-|---------|-------|-------|
-| Structured Errors | `src/types/errors.ts` | `tests/errors.test.ts` |
-| Verbosity Control | `src/types/index.ts`, `server.ts`, `logicEngine.ts` | `tests/verbosity.test.ts` |
-| Session Management | `src/sessionManager.ts`, `server.ts` | `tests/session.test.ts` |
-
-**New MCP Tools:** `create-session`, `assert-premise`, `query-session`, `retract-premise`, `list-premises`, `clear-session`, `delete-session`
-
-**Test Coverage:** 99 tests passing, 80%+ line coverage
-
-**Implementation Notes:**
-- All 13 tools now support `verbosity` parameter (`minimal` | `standard` | `detailed`)
-- Sessions auto-expire with TTL (default: 30 min), max 1000 concurrent
-- Structured errors include `code`, `span`, `suggestion`, `context` fields
-
----
-
-### 1.1 Structured Error Responses
-
-**Goal:** Machine-readable errors with spans, suggestions, and codes.
-
-**Files:** `src/types/errors.ts` (new), `src/logicEngine.ts`, `src/modelFinder.ts`, `src/parser.ts`
-
-**Tasks:**
-- [x] Define `LogicErrorCode` enum and `LogicError` interface
-- [x] Propagate parser position info to error objects
-- [x] Add syntax suggestion engine (common mistakes → fixes)
-- [x] Update all `throw` sites to use structured errors
-- [x] Add error serialization for MCP responses
-
+Create `tests/fixtures.ts`:
 ```typescript
-// src/types/errors.ts
-export type LogicErrorCode = 
-  | 'PARSE_ERROR'           // Syntax errors in formula
-  | 'INFERENCE_LIMIT'       // Hit max inference steps
-  | 'UNSATISFIABLE'         // Contradiction detected
-  | 'TIMEOUT'               // Operation exceeded time limit
-  | 'NO_MODEL'              // Model finder exhausted search
-  | 'INVALID_DOMAIN'        // Model finder domain constraint
-  | 'ENGINE_ERROR';         // Internal Prolog error
+/**
+ * Shared test fixtures for consistent, DRY testing.
+ */
 
-export interface LogicError {
-  code: LogicErrorCode;
-  message: string;
-  span?: { start: number; end: number; line?: number; col?: number };
-  suggestion?: string;
-  context?: string;          // The problematic formula/term
-  details?: Record<string, unknown>;
+// === Common Formulas ===
+export const FORMULAS = {
+    // Simple
+    mortalSocrates: {
+        premises: ['all x (man(x) -> mortal(x))', 'man(socrates)'],
+        conclusion: 'mortal(socrates)',
+        expected: { found: true }
+    },
+    // Horn clause
+    hornTransitive: {
+        premises: ['p(a)', 'all x (p(x) -> q(x))', 'all x (q(x) -> r(x))'],
+        conclusion: 'r(a)',
+        expected: { found: true }
+    },
+    // Non-Horn (needs SAT)
+    nonHornDisjunction: {
+        premises: ['P(a) | Q(a)', '-P(a)'],
+        conclusion: 'Q(a)',
+        expected: { found: true }
+    },
+    // Equality-heavy
+    equalityChain: {
+        premises: ['a = b', 'b = c', 'c = d'],
+        conclusion: 'a = d',
+        expected: { found: true }
+    },
+    // Unsatisfiable
+    contradiction: {
+        premises: ['P(a)', '-P(a)'],
+        conclusion: 'Q(a)',
+        expected: { found: false }
+    },
+    // Model-finding
+    existential: {
+        premises: ['exists x P(x)'],
+        expectedModel: { domainSize: 1 }
+    },
+} as const;
+
+// === Factory Functions ===
+export function createTestEngine(options?: { 
+    timeout?: number; 
+    inferenceLimit?: number;
+    highPower?: boolean;
+}) {
+    const { timeout = 5000, inferenceLimit = 1000, highPower = false } = options ?? {};
+    const limit = highPower ? 100000 : inferenceLimit;
+    return createLogicEngine(timeout, limit);
 }
 
-export class LogicException extends Error {
-  constructor(public readonly error: LogicError) {
-    super(error.message);
-  }
+export function createTestModelFinder(options?: { 
+    maxDomainSize?: number;
+    highPower?: boolean;
+}) {
+    const { maxDomainSize = 10, highPower = false } = options ?? {};
+    const size = highPower ? 25 : maxDomainSize;
+    return createModelFinder(30000, size);
+}
+
+// === Assertion Helpers ===
+export function expectProved(result: ProveResult) {
+    expect(result.found).toBe(true);
+}
+
+export function expectNotProved(result: ProveResult) {
+    expect(result.found).toBe(false);
+}
+
+export function expectModelFound(result: ModelResult) {
+    expect(result.success).toBe(true);
+    expect(result.model).toBeDefined();
 }
 ```
 
-**Suggestions Engine (Low-Effort Win):**
-| Pattern | Suggestion |
-|---------|------------|
-| Missing `)` | "Unbalanced parentheses - missing closing ')'" |
-| `All` vs `all` | "Use lowercase 'all' for universal quantifier" |
-| `P(x) ->` at EOL | "Incomplete implication - missing consequent" |
-| `x = Y` mixed case | "Variables should be consistently cased" |
-
-**Concerns:**
-- Breaking change → add `format_version: 2` to responses
-- Ensure backwards compatibility via `legacy_errors?: boolean` param
+#### Done When
+- [x] `tests/fixtures.ts` exists
+- [x] At least 3 existing tests refactored to use fixtures
+- [x] `npm test` passes
 
 ---
 
-### 1.2 Verbosity Control
+### 0.2 Create Development Scripts 🔧
 
-**Goal:** Token-efficient responses for LLM chains; detailed traces for debugging.
+**Effort:** 30 min | **Impact:** Automates common tasks
 
-**Files:** `src/server.ts`, `src/logicEngine.ts`, `src/types/index.ts`
+Add npm scripts that reduce manual ceremony.
 
-**Tasks:**
-- [x] Add `verbosity` to all tool input schemas
-- [x] Implement response builder with verbosity filtering
-- [x] Capture inference trace when `detailed` requested
-- [x] Store generated Prolog for debugging
+#### Implementation
 
-```typescript
-type Verbosity = 'minimal' | 'standard' | 'detailed';
-
-// Response shapes per verbosity:
-interface MinimalResponse {
-  success: boolean;
-  result: 'proved' | 'failed' | 'model_found' | 'no_model';
-  model?: { predicates: Record<string, string[]> };  // If model_found
-}
-
-interface StandardResponse extends MinimalResponse {
-  message: string;
-  bindings?: Record<string, string>[];
-  interpretation?: string;
-}
-
-interface DetailedResponse extends StandardResponse {
-  prologProgram: string;        // Generated Prolog code
-  inferenceSteps: string[];     // Step-by-step trace
-  statistics: {
-    inferences: number;
-    timeMs: number;
-    domainSize?: number;
-  };
-  ast?: ASTNode;                // Parsed AST for debugging
-}
-```
-
-**Token Savings Estimate:**
-| Verbosity | Typical Response Size |
-|-----------|----------------------|
-| `minimal` | ~50-100 tokens |
-| `standard` | ~150-300 tokens |
-| `detailed` | ~500-1000+ tokens |
-
----
-
-### 1.3 Session-Based Reasoning
-
-**Goal:** Incremental KB construction with persistent sessions and TTL.
-
-**Files:** `src/sessionManager.ts` (new), `src/server.ts`
-
-**New MCP Tools:**
-| Tool | Description | Complexity |
-|------|-------------|------------|
-| `create-session` | Create new session, returns ID | Low |
-| `assert-premise` | Add formula to session KB | Low |
-| `query-session` | Query accumulated KB | Low |
-| `retract-premise` | Remove specific premise | Medium |
-| `list-premises` | Enumerate current KB | Low |
-| `clear-session` | Reset session KB | Low |
-| `delete-session` | Destroy session | Low |
-
-```typescript
-// src/sessionManager.ts
-import { randomUUID } from 'crypto';
-import { LogicEngine } from './logicEngine.js';
-
-export interface Session {
-  id: string;
-  premises: string[];          // Original FOL formulas
-  prologProgram: string;       // Compiled Prolog
-  createdAt: number;
-  lastAccessedAt: number;
-  ttlMs: number;               // Default: 30 minutes
-}
-
-export class SessionManager {
-  private sessions = new Map<string, Session>();
-  private gcIntervalMs = 60_000;  // Run GC every minute
-  private defaultTtlMs = 30 * 60 * 1000;  // 30 minutes
-
-  constructor() {
-    setInterval(() => this.gc(), this.gcIntervalMs);
-  }
-
-  create(ttlMs?: number): Session {
-    const session: Session = {
-      id: randomUUID(),
-      premises: [],
-      prologProgram: '',
-      createdAt: Date.now(),
-      lastAccessedAt: Date.now(),
-      ttlMs: ttlMs ?? this.defaultTtlMs,
-    };
-    this.sessions.set(session.id, session);
-    return session;
-  }
-
-  get(id: string): Session | undefined {
-    const session = this.sessions.get(id);
-    if (session) session.lastAccessedAt = Date.now();
-    return session;
-  }
-
-  private gc(): void {
-    const now = Date.now();
-    for (const [id, session] of this.sessions) {
-      if (now - session.lastAccessedAt > session.ttlMs) {
-        this.sessions.delete(id);
-      }
+Update `package.json` scripts:
+```json
+{
+    "scripts": {
+        "build": "tsc",
+        "build:watch": "tsc --watch",
+        "build:browser": "tsc -p tsconfig.browser.json",
+        "start": "node dist/index.js",
+        "dev": "tsx src/index.ts",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "test:watch": "npm test -- --watch",
+        "test:coverage": "npm test -- --coverage",
+        "lint": "tsc --noEmit",
+        "clean": "rm -rf dist",
+        "rebuild": "npm run clean && npm run build",
+        "check": "npm run lint && npm test",
+        "todo": "grep -rn 'TODO\\|FIXME\\|HACK' src/ --include='*.ts'",
+        "benchmark:tptp": "tsx benchmarks/run-tptp.ts"
     }
-  }
-
-  // Memory protection
-  get count(): number { return this.sessions.size; }
-  static readonly MAX_SESSIONS = 1000;
 }
 ```
 
-**Concerns & Mitigations:**
-| Concern | Mitigation |
-|---------|------------|
-| Memory exhaustion | MAX_SESSIONS limit (1000) + aggressive GC |
-| Session hijacking | UUIDs are cryptographically random |
-| Lost sessions | TTL warning in responses; client should persist IDs |
-| MCP has no sessions | Pass `session_id` explicitly in all tools |
-
-### 1.4 Phase 1 Integration & Testing 🧪
-
-**Integration Points:**
-- **Server:** Wrap `server.setRequestHandler(CallToolRequestSchema)` in `src/server.ts` with a global error handler that catches `LogicException` and formats it as a structured MCP error.
-- **LogicEngine:** Update `prove()` to accept `verbosity` and return `DetailedResponse` when requested.
-- **SessionManager:** Instantiate singleton in `createServer()` and inject into new session tools.
-
-**Test Plan:**
-- [x] `tests/errors.test.ts`: Verify all error codes (syntax, timeout, limit) return correct structure.
-- [x] `tests/session.test.ts`: Test create, add, query, retract, expiry flow.
-- [x] `tests/verbosity.test.ts`: Compare `minimal` vs `detailed` output sizes.
-
-**Definition of Done (Phase 1):**
-- [x] All 6 existing tools support `verbosity` parameter
-- [x] New session tools (`create-session`, etc.) are registered in `server.ts`
-- [x] `LogicError` is used consistently across `parser`, `logicEngine`, `modelFinder`
-- [x] `npm test` passes with new test suites
-- [x] `README.md` updated with new tool documentation
+#### Done When
+- [x] All scripts added to `package.json`
+- [x] `npm run check` runs lint + tests in one command
+- [x] `npm run todo` lists all TODOs in codebase
 
 ---
 
-## Phase 2: Expressiveness Expansion ✅
+### 0.3 Create Type Stubs for Future Features 📐
 
-*Completed 2024-12-05 · Prerequisites: Phase 1 (✅ Complete)*
+**Effort:** 30 min | **Impact:** Enables parallel development
 
-> **Key Insight:** Phase 2 focuses on making the logic engine more powerful without changing the MCP interface. All new features integrate seamlessly with existing tools via `enable_arithmetic` and `enable_equality` parameters.
+Create interface definitions for features we'll build, so code can be written against stable contracts.
 
-### Phase 2 Progress Summary
+#### Implementation
 
-| Feature | Status | Files | Tests |
-|---------|--------|-------|-------|
-| CNF Clausification | ✅ Complete | `clausifier.ts`, `types/clause.ts` | 32 |
-| Equality Reasoning | ✅ Complete | `equalityAxioms.ts`, `logicEngine.ts` | 28 |
-| Arithmetic Support | ✅ Complete | `arithmetic.ts`, `logicEngine.ts` | 30 |
-| MCP Integration | ✅ Complete | `server.ts` | — |
-| Model Finder++ | ⏸️ Deferred | — | — |
-| Typed/Sorted FOL | ⏸️ Deferred | — | — |
-
-**Implementation Insights (2024-12-05):**
-- Clausifier works as standalone module — no translator integration needed for core functionality
-- Equality axioms use iteration guards (`X \\== Y`) to prevent infinite loops
-- Arithmetic support via Prolog axiom predicates (`lt/2`, `plus/3`) rather than parser extensions
-- MCP `prove` tool now has `enable_arithmetic` and `enable_equality` boolean parameters
-- Parser treats single lowercase letters as variables; use multi-char names for constants
-- Total: 90 new tests added (189 total passing)
-
-### 2.1 CNF Clausification
-
-**Goal:** Handle arbitrary FOL beyond Horn clauses.
-
-**Files:** 
-- `src/clausifier.ts` (new) — Core transformation algorithms
-- `src/translator.ts` — Integrate clausifier into translation pipeline
-- `src/types/clause.ts` (new) — Clause and literal types
-
-**Architecture Decision:** Keep clausifier separate from translator for testability. The translator can optionally invoke clausifier when formulas aren't Horn.
-
-**Tasks:**
-- [x] Create `src/types/clause.ts` with `Literal`, `Clause`, `CNFFormula` types
-- [x] Implement NNF conversion (eliminate →, ↔, push ¬)
-- [x] Implement variable standardization (unique names per quantifier scope)
-- [x] Implement Skolemization with fresh function symbol generation
-- [x] Implement CNF distribution (| over &) with blowup tracking
-- [x] Add `clausify` utility function with options
-- [ ] Integrate with `prove` tool via `clausify?: boolean` parameter (deferred)
-- [x] Add `tests/clausifier.test.ts` with edge cases (32 tests)
-
-**Algorithm (Textbook):**
-```
-clausify(φ) =
-  1. φ₁ = eliminate_biconditional(φ)     // A ↔ B → (A → B) & (B → A)
-  2. φ₂ = eliminate_implication(φ₁)      // A → B → ¬A | B  
-  3. φ₃ = push_negation_inward(φ₂)       // De Morgan, double negation
-  4. φ₄ = standardize_variables(φ₃)      // Unique var names per quantifier
-  5. φ₅ = skolemize(φ₄)                  // ∃x → f_sk(free_vars)
-  6. φ₆ = drop_universals(φ₅)            // All remaining vars implicitly ∀
-  7. φ₇ = distribute_or_over_and(φ₆)     // CNF form
-  8. return extract_clauses(φ₇)          // List of disjunctive clauses
-```
-
-**Blowup Protection:**
+Create `src/types/future.ts`:
 ```typescript
-// src/types/clause.ts
-export interface Literal {
-  predicate: string;
-  args: string[];      // Variable or constant names
-  negated: boolean;
+/**
+ * Type definitions for planned features.
+ * These define the API contracts before implementation.
+ */
+
+// === High-Power Mode (Phase 1.1) ===
+export interface HighPowerOptions {
+    highPower?: boolean;
 }
 
-export interface Clause {
-  literals: Literal[];
-  origin?: string;     // Source formula for debugging
+// === NL Translation (Phase 3.1) ===
+export interface TranslateRequest {
+    text: string;
+    validate?: boolean;
 }
 
-export interface ClausifyOptions {
-  maxClauses?: number;       // Default: 10000
-  maxClauseSize?: number;    // Default: 50 literals
-  timeout?: number;          // Default: 5000ms
+export interface TranslateResult {
+    success: boolean;
+    premises: string[];
+    conclusion?: string;
+    raw?: string;
+    errors?: string[];
 }
 
-export interface ClausifyResult {
-  success: boolean;
-  clauses?: Clause[];
-  skolemFunctions?: Map<string, number>;  // name → arity
-  error?: LogicError;                     // If blowup or timeout
-  statistics: {
-    originalSize: number;   // AST nodes in input
-    clauseCount: number;
-    maxClauseSize: number;
-    timeMs: number;
-  };
+// === Ontology (Phase 4.1) ===
+export interface Ontology {
+    types: Set<string>;
+    relationships: Set<string>;
+    constraints: Set<string>;
+    synonyms: Map<string, string>;
+}
+
+export interface OntologyConfig {
+    types?: string[];
+    relationships?: string[];
+    constraints?: string[];
+    synonyms?: Record<string, string>;
+}
+
+// === Agentic Reasoning (Phase 4.2) ===
+export type AgentActionType = 'assert' | 'query' | 'conclude';
+
+export interface AgentAction {
+    type: AgentActionType;
+    content: string;
+    explanation?: string;
+}
+
+export interface ReasoningStep {
+    action: AgentAction;
+    result?: unknown;
+    timestamp?: number;
+}
+
+export interface ReasoningResult {
+    answer: string;
+    steps: ReasoningStep[];
+    confidence: number;
+}
+
+export interface ReasonOptions {
+    maxSteps?: number;
+    timeout?: number;
+    verbose?: boolean;
 }
 ```
 
-**References:**
-- [Clausification Algorithm](https://en.wikipedia.org/wiki/Conjunctive_normal_form#Conversion_into_CNF)
-- [Handbook of Automated Reasoning, Ch 2](https://www.sciencedirect.com/science/article/pii/B9780444508133500042)
+#### Done When
+- [x] `src/types/future.ts` exists
+- [x] Exported from `src/types/index.ts`
+- [x] No TypeScript errors
 
 ---
 
-### 2.2 Equality Reasoning
+### 0.4 Spike: Browser Compatibility Check 🌐
 
-**Goal:** First-class equality with auto-generated axioms.
+**Effort:** 1 hour | **Impact:** De-risks Phase 2.2
 
-**Files:** 
-- `src/equalityAxioms.ts` (new) — Axiom generation
-- `src/translator.ts` — Detect equality and inject axioms
-- `src/parser.ts` — Already handles `=` in AST
+Before committing to browser build, verify core dependencies work in browser.
 
-**Architecture Decision:** Generate equality axioms lazily on first use. Cache generated axioms per session to avoid regeneration.
+#### Implementation
 
-**Tasks:**
-- [x] Create `src/equalityAxioms.ts` with axiom generator
-- [x] Detect equality usage in AST during translation (`containsEquality()`)
-- [x] Extract function signatures from formulas for congruence axioms (`extractSignature()`)
-- [x] Auto-inject axioms via `generateMinimalEqualityAxioms()`
-- [ ] Add `equality_axioms?: boolean` parameter to `prove` (default: true)
-- [x] Add iteration guards to equality rules (`X \\== Y` pattern)
-- [x] Add tests for reflexivity, symmetry, transitivity, congruence (24 tests)
+Create `spikes/browser-check.html`:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Browser Compatibility Check</title>
+</head>
+<body>
+    <h1>MCP Logic Browser Check</h1>
+    <pre id="output">Running checks...</pre>
+    <script type="module">
+        const output = document.getElementById('output');
+        const log = (msg) => { output.textContent += '\n' + msg; };
+        
+        try {
+            // Check tau-prolog
+            const pl = await import('https://esm.sh/tau-prolog@0.3.4');
+            log('✓ tau-prolog loads');
+            
+            const session = pl.default.create();
+            session.consult('parent(tom, bob).');
+            session.query('parent(tom, X).');
+            session.answer((answer) => {
+                log('✓ tau-prolog query works: ' + pl.default.format_answer(answer));
+            });
+        } catch (e) {
+            log('✗ tau-prolog failed: ' + e.message);
+        }
+        
+        try {
+            // Check logic-solver
+            const Logic = await import('https://esm.sh/logic-solver@2.0.1');
+            log('✓ logic-solver loads');
+            
+            const solver = new Logic.default.Solver();
+            solver.require(Logic.default.or('A', 'B'));
+            solver.forbid('A');
+            const solution = solver.solve();
+            log('✓ logic-solver works: B=' + solution.getTrueVars().includes('B'));
+        } catch (e) {
+            log('✗ logic-solver failed: ' + e.message);
+        }
+        
+        log('\n=== Spike Complete ===');
+    </script>
+</body>
+</html>
+```
 
-**Implementation Note:** The iteration-counting approach in the original design was replaced with simpler Prolog inequality guards (`X \\== Y`) which are more idiomatic and equally effective at preventing infinite loops.
+#### Verification
+```bash
+npx serve spikes/
+# Open http://localhost:3000/browser-check.html
+# Both checks should show ✓
+```
 
+#### Done When
+- [x] `spikes/browser-check.html` exists
+- [x] Both tau-prolog and logic-solver load in browser
+- [x] Document any issues in `spikes/NOTES.md`
+
+---
+
+### 0.5 Create Task Tracking Automation 📋
+
+**Effort:** 15 min | **Impact:** Reduces manual tracking
+
+Create a script that extracts task status from this file.
+
+#### Implementation
+
+Create `scripts/task-status.ts`:
 ```typescript
-// src/equalityAxioms.ts
-export interface EqualityAxiomsOptions {
-  maxIterations?: number;  // Prevent infinite loops (default: 100)
-  includeCongruence?: boolean;  // For functions (default: true)
-}
+#!/usr/bin/env tsx
+/**
+ * Extract task status from TODO.md
+ * Usage: npm run tasks
+ */
+import { readFileSync } from 'fs';
 
-export function generateEqualityAxioms(
-  signature: {
-    functions: Map<string, number>;  // name → arity
-    predicates: Map<string, number>; // name → arity
-  },
-  options: EqualityAxiomsOptions = {}
-): string[] {
-  const maxIter = options.maxIterations ?? 100;
-  const axioms: string[] = [];
-  
-  // Core equality axioms with iteration guards
-  axioms.push(
-    'eq(X, X).',                                    // Reflexivity
-    `eq(X, Y) :- eq_iter(X, Y, ${maxIter}).`,       // Guarded symmetry entry
-    'eq_iter(X, Y, _) :- X = Y.',                   // Base case
-    'eq_iter(X, Y, N) :- N > 0, eq(Y, X, N1), N1 is N - 1.',  // Symmetry
-  );
-  
-  // Congruence axioms for functions
-  if (options.includeCongruence !== false) {
-    for (const [fn, arity] of signature.functions) {
-      axioms.push(generateCongruenceAxiom(fn, arity));
+const content = readFileSync('TODO.md', 'utf-8');
+const lines = content.split('\n');
+
+const tasks: { phase: string; name: string; done: boolean }[] = [];
+let currentPhase = '';
+
+for (const line of lines) {
+    // Match phase headers like "## 🎯 Phase 1:"
+    const phaseMatch = line.match(/^##\s+.*Phase\s+(\d+(?:\.\d+)?)/i);
+    if (phaseMatch) {
+        currentPhase = `Phase ${phaseMatch[1]}`;
     }
-    // Predicate congruence (substitution)
-    for (const [pred, arity] of signature.predicates) {
-      if (pred !== 'eq') {
-        axioms.push(generatePredicateCongruence(pred, arity));
-      }
+    
+    // Match task headers like "### 1.1 High-Power Mode"
+    const taskMatch = line.match(/^###\s+(\d+\.\d+)\s+(.+?)(?:\s+[⚡🔄🖥️📊📦🌐🎮🗣️🎲🗂️🤖🧬])?$/);
+    if (taskMatch && currentPhase) {
+        const name = `${taskMatch[1]} ${taskMatch[2].trim()}`;
+        // Check if there's a [x] in the following lines (done when section)
+        tasks.push({ phase: currentPhase, name, done: false });
     }
-  }
-  
-  return axioms;
+    
+    // Check for completed "Done When" checkboxes
+    if (line.includes('[x]') && tasks.length > 0) {
+        // Mark previous task as having progress
+    }
 }
 
-function generateCongruenceAxiom(fn: string, arity: number): string {
-  const xs = Array.from({ length: arity }, (_, i) => `X${i + 1}`);
-  const ys = Array.from({ length: arity }, (_, i) => `Y${i + 1}`);
-  const eqs = xs.map((x, i) => `eq(${x}, ${ys[i]})`).join(', ');
-  return `eq(${fn}(${xs.join(',')}), ${fn}(${ys.join(',')})) :- ${eqs}.`;
+console.log('\n📋 Task Status\n');
+console.log('| Phase | Task | Status |');
+console.log('|-------|------|--------|');
+for (const t of tasks) {
+    console.log(`| ${t.phase} | ${t.name} | ${t.done ? '✅' : '⬜'} |`);
+}
+console.log(`\nTotal: ${tasks.length} tasks`);
+```
+
+Add to `package.json`:
+```json
+"scripts": {
+    "tasks": "tsx scripts/task-status.ts"
 }
 ```
 
-**Performance Concern:** Symmetry/transitivity can cause infinite loops.
-**Mitigations:**
-1. Iteration counter in recursive rules
-2. Use Tau-Prolog's inference limit (already in place)
-3. Consider tabling if Tau-Prolog supports it
+---
+
+## 📊 Feature Matrix: Current → Target
+
+| Feature | README Status | MCR Vision | TODO Phase | Depends On |
+|---------|---------------|------------|------------|------------|
+| **Core FOL Reasoning** | ✅ Done | ✅ | — | — |
+| **Model Finding (SAT)** | ✅ Done | ✅ | — | — |
+| **Session Management** | ✅ Done | ✅ | — | — |
+| **Proof Traces** | ✅ Done | ✅ | — | — |
+| **Streaming Progress** | ✅ Done | ✅ | — | — |
+| **High-Power Mode** | ☐ Planned | ✅ | Phase 1.1 | 0.1 |
+| **Isomorphism Filtering** | ☐ Planned | — | Phase 1.2 | — |
+| **CLI Tool** | ☐ Planned | ✅ | Phase 1.3 | — |
+| **TPTP Benchmarks** | ☐ Planned | — | Phase 1.4 | 0.2 |
+| **Library Export (NPM)** | ☐ Planned | ✅ | Phase 2.1 | 0.3 |
+| **Browser/WASM** | ☐ Planned | ✅ | Phase 2.2 | 0.4, 2.1 |
+| **Web Playground + LLM** | — | ✅ | Phase 2.3 | 2.2 |
+| **NL→FOL Translation** | ☐ Planned | ✅ | Phase 3.1 | 0.3 |
+| **Heuristic Strategy** | ☐ Planned | ✅ | Phase 3.2 | — |
+| **Ontology Support** | — | ✅ | Phase 4.1 | 0.3 |
+| **Agentic Reasoning** | — | ✅ | Phase 4.2 | 3.1, 4.1 |
+| **Evolution Engine** | — | ✅ | Phase 5 | 4.2 |
 
 ---
 
-### 2.3 Model Finder Enhancements
+## 🔀 Dependency Graph
 
-**Goal:** Faster, smarter model finding.
+```mermaid
+graph LR
+    subgraph "Phase 0: Prep"
+        P0_1[0.1 Test Fixtures]
+        P0_2[0.2 Dev Scripts]
+        P0_3[0.3 Type Stubs]
+        P0_4[0.4 Browser Spike]
+    end
+    
+    subgraph "Phase 1: Quick Wins"
+        P1_1[1.1 High-Power]
+        P1_2[1.2 Isomorphism]
+        P1_3[1.3 CLI]
+        P1_4[1.4 TPTP]
+    end
+    
+    subgraph "Phase 2: Ecosystem"
+        P2_1[2.1 Library Export]
+        P2_2[2.2 Browser/WASM]
+        P2_3[2.3 Playground+LLM]
+    end
+    
+    subgraph "Phase 3: AI"
+        P3_1[3.1 NL Translation]
+        P3_2[3.2 Heuristics]
+    end
+    
+    subgraph "Phase 4: Neurosymbolic"
+        P4_1[4.1 Ontology]
+        P4_2[4.2 Agentic]
+    end
+    
+    subgraph "Phase 5"
+        P5[5.1 Evolution]
+    end
+    
+    P0_1 --> P1_1
+    P0_2 --> P1_4
+    P0_3 --> P2_1
+    P0_3 --> P3_1
+    P0_3 --> P4_1
+    P0_4 --> P2_2
+    
+    P2_1 --> P2_2
+    P2_2 --> P2_3
+    
+    P3_1 --> P4_2
+    P4_1 --> P4_2
+    P4_2 --> P5
+```
 
-**Files:** `src/modelFinder.ts`
+### Parallelization Opportunities
 
-**Tasks:**
-- [ ] **Symmetry breaking**: Canonical ordering for isomorphic models
-- [ ] **Early termination**: Fail fast on unsatisfiable subformulas
-- [ ] **Partial models**: Return best-effort on timeout
-- [ ] **Function symbols**: Interpret functions as total mappings
-- [ ] **Incremental search**: Resume from checkpoint on retry
+Tasks that can run **in parallel** (no dependencies between them):
 
-**Symmetry Breaking (Lex-Leader):**
+| Track A | Track B | Track C |
+|---------|---------|---------|
+| 0.1 Test Fixtures | 0.2 Dev Scripts | 0.4 Browser Spike |
+| 1.1 High-Power | 1.2 Isomorphism | 0.3 Type Stubs |
+| 1.3 CLI | 1.4 TPTP | 2.1 Library Export |
+| 3.2 Heuristics | 3.1 NL Translation | — |
+
+---
+
+## ✅ Completed Foundation
+
+| Feature | Key Files | Notes |
+|---------|-----------|-------|
+| First-Order Logic Engine | `src/logicEngine.ts` | Tau-Prolog based |
+| Multi-Engine Federation | `src/engines/manager.ts`, `sat.ts` | Auto-selects Prolog vs SAT |
+| Arithmetic & Equality | `src/axioms/arithmetic.ts` | `lt`, `gt`, `plus`, `times`, etc. |
+| Extended Axiom Library | `src/resources/`, `src/axioms/` | Category, ring, lattice, Peano, ZFC |
+| Session Management | `src/sessionManager.ts` | Incremental KB with TTL |
+| Proof Traces | `src/utils/trace.ts` | Meta-interpreter based |
+| SAT-Backed Models | `src/modelFinder.ts` | Domain 25+ with symmetry breaking |
+| Symmetry Breaking | `src/utils/symmetry.ts` | Lex-leader |
+| 265+ Unit Tests | `tests/` | 80%+ coverage |
+
+---
+
+## 🎯 Phase 1: Quick Wins (1-2 hours each)
+
+### 1.1 High-Power Mode Flag ⚡
+
+**Effort:** ~1 hour | **Impact:** High | **Risk:** None | **Depends:** 0.1
+
+Add a single boolean flag that unlocks extended limits.
+
+#### Acceptance Criteria
+- [x] `highPower: true` increases inference limit to 100,000
+- [x] `highPower: true` increases timeout to 300s
+- [x] Default behavior unchanged when `highPower` not specified
+- [x] Works for both `prove` and `find-model` tools
+- [x] Unit test verifies high-power limits applied
+
+#### Implementation
+
+1. **Update defaults** in `src/types/options.ts` (line 31):
 ```typescript
-// For domain {0, 1, 2} with constants a, b:
-// Force a ≤ b to avoid symmetric models {a=0,b=1} ≈ {a=1,b=0}
-function* enumerateWithSymmetryBreaking(
-  constants: string[],
-  domainSize: number
-): Generator<Map<string, number>> {
-  // Only yield assignments where c_i ≤ c_{i+1}
-  // Reduces search space by up to n! for n constants
-}
+export const DEFAULTS = {
+    maxSeconds: 30,
+    maxInferences: 5000,
+    maxDomainSize: 25,
+    satThreshold: 8,
+    highPowerMaxSeconds: 300,
+    highPowerMaxInferences: 100000,
+} as const;
 ```
 
-**Performance Targets:**
-| Domain Size | Current | Target |
-|-------------|---------|--------|
-| ≤5 | <100ms | <50ms |
-| 6-8 | <1s | <500ms |
-| 9-10 | <10s | <5s |
-| >10 | N/A | Via SAT (Phase 4) |
-
----
-
-### 2.4 Typed/Sorted FOL
-
-**Goal:** Domain-constraining type annotations.
-
-**Files:** `src/parser.ts`, `src/types/ast.ts`, `src/modelFinder.ts`, `src/syntaxValidator.ts`
-
-**Syntax:**
-```
-all x:Person (mortal(x))
-exists y:Nat (successor(y) = z)
-type Color = {red, green, blue}
-```
-
-**Tasks:**
-- [ ] Extend tokenizer to recognize `:Type`
-- [ ] Add `typeAnnotation?: string` to variable AST nodes
-- [ ] Type inference for untyped variables (from predicate signatures)
-- [ ] Built-in types: `Nat`, `Int`, `Bool`
-- [ ] User-defined finite types via `type Name = {v1, v2, ...}`
-- [ ] Model finder: restrict search to typed domains
-
-**Implementation Strategy (Low Effort):**
+2. **Add parameter to args type** in `src/handlers/core.ts` (line 12):
 ```typescript
-// Don't modify parser heavily - use post-processing
-function inferTypes(ast: ASTNode, typeHints: Map<string, string>): TypedAST {
-  // Walk AST, annotate variables with inferred types
-  // Type hints come from: explicit annotations, predicate signatures, context
-}
+export async function proveHandler(
+    args: {
+        premises: string[];
+        conclusion: string;
+        inference_limit?: number;
+        highPower?: boolean;  // NEW
+        // ...rest unchanged
+    },
 ```
 
----
-
-### 2.5 Arithmetic Support 🆕
-
-**Goal:** Basic arithmetic via Tau-Prolog's built-in module.
-
-**Files:** `src/logicEngine.ts`
-
-**Tasks:**
-- [x] Create `src/arithmetic.ts` with Prolog axiom predicates
-- [x] Comparison predicates: `lt/2`, `gt/2`, `lte/2`, `gte/2`
-- [x] Arithmetic predicates: `plus/3`, `minus/3`, `times/3`, `divide/3`, `mod/3`
-- [x] Helper predicates: `succ/2`, `pred/2`, `abs/2`, `sign/2`, `min/3`, `max/3`
-- [x] Add `enableArithmetic?: boolean` to `ProveOptions`
-- [x] Add `tests/arithmetic.test.ts` (30 tests)
-- [ ] Extend parser to support numeric literals (e.g., `gt(x, 0)`) — requires tokenizer update
-
-**Implementation Note:** Arithmetic is implemented via Prolog axiom predicates rather than parser extensions. This approach:
-- Works immediately with existing FOL formulas using symbolic names
-- Avoids parser complexity for numeric literal handling
-- Defers full numeric support to when parser extensions are needed for typed FOL
-
-**References:**
-- [Tau-Prolog Modules](https://tau-prolog.org/documentation#modules)
-- Tau-Prolog has `lists`, `random`, `statistics`, `format`, `dom`, `js` modules
-
----
-
-## Phase 3: MCP Protocol Excellence ✅
-
-*Completed 2024-12-06 · Prerequisites: None (parallel with Phase 1-2)*
-
-### Phase 3 Summary
-
-**Deliverables Shipped:**
-
-| Feature | Files | Tests |
-|---------|-------|-------|
-| MCP Resources | `src/resources/axioms.ts`, `server.ts` | 12 |
-| MCP Prompts | `src/prompts/templates.ts`, `server.ts` | 11 |
-
-**New MCP Capabilities:** `resources` (7 axiom libraries), `prompts` (5 reasoning templates)
-
-**Test Coverage:** 212 tests passing
-
-### 3.1 MCP Resources
-
-**Goal:** Browsable axiom libraries and formula templates.
-
-**Files:** `src/resources/` (new), `src/server.ts`
-
-**Tasks:**
-- [x] Implement `resources/list` handler (MCP SDK)
-- [x] Implement `resources/read` handler (MCP SDK)
-- [x] Create axiom resources in `src/resources/axioms.ts`
-
-**Resource URIs:**
-| URI | Description | Source |
-|-----|-------------|--------|
-| `logic://axioms/category` | Category theory axioms | Existing `categoricalHelpers.ts` |
-| `logic://axioms/group` | Group theory (identity, inverse, assoc) | Existing `groupAxioms()` |
-| `logic://axioms/monoid` | Monoid axioms | Existing `monoidAxioms()` |
-| `logic://axioms/peano` | Peano arithmetic | New |
-| `logic://axioms/set-zfc` | ZFC set theory basics | New |
-| `logic://axioms/propositional` | Tautologies & inference rules | New |
-| `logic://templates/syllogism` | Classic syllogism patterns | New |
-
+3. **Apply high-power logic** in `src/handlers/core.ts` (after line 26):
 ```typescript
-// MCP resource handler
-server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-  resources: [
-    { uri: 'logic://axioms/category', name: 'Category Theory', mimeType: 'text/plain' },
-    // ...
-  ]
-}));
+// Apply high-power mode
+const inferenceLimit = args.highPower 
+    ? DEFAULTS.highPowerMaxInferences 
+    : (args.inference_limit ?? DEFAULTS.maxInferences);
+```
 
-server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-  const content = await loadResource(request.params.uri);
-  return { contents: [{ uri: request.params.uri, text: content }] };
+4. **Add to tool schema** in `src/server.ts` (after line 124):
+```typescript
+highPower: {
+    type: 'boolean',
+    description: 'Enable extended limits (300s timeout, 100k inferences). Use for complex proofs.',
+},
+```
+
+5. **Add test** in `tests/prover.test.ts`:
+```typescript
+test('highPower mode increases inference limit', async () => {
+    // This test doesn't need to prove anything hard,
+    // just verify the limit is applied
+    const engine = createTestEngine({ highPower: true });
+    expect(engine['inferenceLimit']).toBe(100000);
 });
 ```
 
----
+6. **Update README.md** line 50: `[ ]` → `[x]`
 
-### 3.2 MCP Prompts
-
-**Goal:** Pre-built reasoning patterns as prompt templates.
-
-**Files:** `src/prompts/` (new), `src/server.ts`
-
-**Prompts:**
-| Name | Purpose | Arguments |
-|------|---------|-----------|
-| `prove-by-contradiction` | Setup for indirect proof | `statement` |
-| `verify-equivalence` | Prove A↔B via A→B ∧ B→A | `formula_a`, `formula_b` |
-| `formalize` | Guide NL→FOL translation | `natural_language`, `domain_hint?` |
-| `diagnose-unsat` | Find minimal unsat subset | `premises[]` |
-| `explain-proof` | Human-readable proof explanation | `premises[]`, `conclusion` |
-
-```typescript
-// Example prompt template
-const proveByContradiction = {
-  name: 'prove-by-contradiction',
-  description: 'Set up an indirect proof by assuming the negation',
-  arguments: [
-    { name: 'statement', description: 'The statement to prove', required: true }
-  ],
-  template: `To prove "{statement}" by contradiction:
-1. Assume the negation: -({statement})
-2. Add this to your premises
-3. Derive a contradiction (prove "false" or "P & -P")
-4. Conclude the original statement holds
-
-Suggested tool call:
-{
-  "name": "prove",
-  "arguments": {
-    "premises": ["your_axioms...", "-({statement})"],
-    "conclusion": "false"
-  }
-}`
-};
-```
+#### Done When
+- [x] `npm test` passes
+- [x] All acceptance criteria checked
+- [x] README.md updated
 
 ---
 
-### 3.3 Streaming Progress
+### 1.2 Isomorphism Filtering 🔄
 
-**Goal:** Real-time progress for long-running operations.
+**Effort:** ~30 min | **Impact:** Medium | **Risk:** None
 
-**Files:** `src/server.ts`, `src/modelFinder.ts`, `src/logicEngine.ts`
+Already implemented! Just verify and document.
 
-**MCP Progress Protocol:**
+#### Acceptance Criteria
+- [x] `count: N` parameter returns up to N non-isomorphic models
+- [x] Models returned are verified non-isomorphic
+- [x] Default `count: 1` behavior unchanged
+
+#### Implementation
+
+1. **Verify existing code** in `src/modelFinder.ts`:
+   - `areIsomorphic()` at line 267 ✅
+   - `findModelsBacktracking()` accepts `count` ✅
+
+2. **Add/verify test** in `tests/isomorphism.test.ts`:
 ```typescript
-// MCP SDK supports progress notifications via tokens
-interface ProgressNotification {
-  method: 'notifications/progress';
-  params: {
-    progressToken: string | number;
-    progress: number;      // 0.0 - 1.0
-    total?: number;
-    message?: string;
-  };
-}
-```
-
-**Tasks:**
-- [ ] Add progress callback to `ModelFinder.findModel()`
-- [ ] Add progress callback to `LogicEngine.prove()` (inference step count)
-- [ ] Expose via MCP progress tokens when client supports it
-- [ ] Fallback: include `progress` in final response if not streaming
-
-**Implementation (ModelFinder):**
-```typescript
-async findModel(
-  premises: string[],
-  options: {
-    maxDomainSize?: number;
-    onProgress?: (current: number, max: number, message: string) => void;
-  }
-): Promise<ModelResult> {
-  for (let size = 2; size <= maxSize; size++) {
-    options.onProgress?.(size, maxSize, `Searching domain size ${size}...`);
-    // ... search logic
-  }
-}
-```
-
-**References:**
-- [MCP Progress Notifications](https://modelcontextprotocol.io/docs/concepts/utilities#progress)
-- MCP supports Streamable HTTP transport for long-lived connections
-
----
-
-### 3.4 Response Optimization
-
-**Goal:** Minimize payload size for token-constrained LLM callers.
-
-**Tasks:**
-- [ ] `omit_echoed_input?: boolean` — Don't echo premises in response
-- [ ] `compact_model?: boolean` — Terse model format
-- [ ] `proof_summary?: boolean` — One-line summary only
-
-**Compact Model Format:**
-```typescript
-// Standard format (verbose)
-{ predicates: { "man": ["socrates"], "mortal": ["socrates"] } }
-
-// Compact format (terse)
-{ "man(socrates)": true, "mortal(socrates)": true }
-```
-
----
-
-## Phase 4: Engine Federation 🟢
-
-*Started: 2024-12-06 · Prerequisites: Phase 2 clausification (✅ Complete)*
-
-### Phase 4 Progress Summary
-
-| Feature | Status | Files | Tests |
-|---------|--------|-------|-------|
-| Engine Interface | ✅ Complete | `src/engines/interface.ts` | — |
-| Prolog Adapter | ✅ Complete | `src/engines/prolog.ts` | — |
-| SAT Backend | ✅ Complete | `src/engines/sat.ts` | 18 |
-| Engine Manager | ✅ Complete | `src/engines/manager.ts` | 18 |
-| MCP Integration | ⏸️ Optional | — | — |
-| ASP Backend | 🔵 Planned | — | — |
-| Neural-Guided | 🔵 Planned | — | — |
-
-**Test Coverage:** 248 tests passing (212 + 36 new)
-
-### 4.1 SAT/SMT Backend ✅
-
-**Goal:** Scalable model finding and satisfiability via industrial SAT solver.
-
-**Files:** `src/engines/` (new directory), `src/clausifier.ts` (ready)
-
-**Package:** [`logic-solver`](https://www.npmjs.com/package/logic-solver) (MiniSat compiled to JS via Emscripten)
-
-> **Implementation Notes:**
-> - Engine abstraction layer in `src/engines/interface.ts`
-> - `PrologEngine` adapter wraps existing `LogicEngine`
-> - `SATEngine` uses refutation-based proving (premises ∧ ¬conclusion → UNSAT)
-> - `EngineManager` provides automatic engine selection (Horn→Prolog, non-Horn→SAT)
-> - All formulas wrapped in parentheses for correct precedence
-
-**Tasks:**
-- [x] Define `ReasoningEngine` interface for backend abstraction
-- [x] Implement `PrologEngine` adapter wrapping existing `LogicEngine`
-- [x] Implement `SATEngine` adapter using `logic-solver`
-- [x] Automatic engine selection based on formula structure
-- [x] Hybrid mode: Prolog for Horn, SAT for general
-- [ ] Add `clausesToDIMACS(clauses: Clause[]): string` to `clausifier.ts` (optional)
-- [ ] Add `engine` parameter to MCP `prove` tool (optional)
-
-```typescript
-// src/engines/interface.ts
-export interface ReasoningEngine {
-  readonly name: string;
-  readonly capabilities: {
-    horn: boolean;           // Handles Horn clauses
-    fullFol: boolean;        // Handles arbitrary FOL
-    equality: boolean;       // Has equality reasoning
-    arithmetic: boolean;     // Has arithmetic
-    findModel: boolean;      // Can find models
-    streaming: boolean;      // Supports progress
-  };
-  
-  prove(premises: string[], conclusion: string, options?: ProveOptions): Promise<ProveResult>;
-  findModel(premises: string[], options?: ModelOptions): Promise<ModelResult>;
-  checkSat(clauses: Clause[]): Promise<SatResult>;  // Direct CNF input
-}
-
-// src/engines/sat.ts
-import Logic from 'logic-solver';
-
-export class SATEngine implements ReasoningEngine {
-  readonly name = 'sat/minisat';
-  readonly capabilities = { horn: true, fullFol: true, equality: false, arithmetic: false, findModel: true, streaming: false };
-  
-  async checkSat(clauses: Clause[]): Promise<SatResult> {
-    const solver = new Logic.Solver();
-    // Convert clauses to logic-solver format
-    for (const clause of clauses) {
-      solver.require(Logic.or(...clause.literals.map(l => 
-        l.negated ? Logic.not(l.atom) : l.atom
-      )));
+test('returns multiple non-isomorphic models', async () => {
+    const finder = createModelFinder();
+    const result = await finder.findModel(
+        ['exists x P(x)', 'exists y Q(y)'],
+        { count: 3 }
+    );
+    expect(result.models?.length).toBeGreaterThanOrEqual(2);
+    
+    // Verify non-isomorphism
+    if (result.models && result.models.length >= 2) {
+        expect(finder.areIsomorphic(result.models[0], result.models[1])).toBe(false);
     }
-    const solution = solver.solve();
-    return solution ? { sat: true, model: solution.getMap() } : { sat: false };
-  }
-}
+});
 ```
 
-**Performance Comparison:**
-| Engine | Domain 5 | Domain 10 | Domain 20 | Domain 100 |
-|--------|----------|-----------|-----------|------------|
-| Brute-force | 50ms | 5s | N/A | N/A |
-| SAT (logic-solver) | 10ms | 100ms | 1s | 10s |
+3. **Update README.md** line 22: `[ ]` → `[x]`
 
-**References:**
-- [logic-solver npm](https://www.npmjs.com/package/logic-solver) — MiniSat in JS
-- [MiniSat](http://minisat.se/) — Industrial SAT solver
-- DIMACS CNF format for SAT solver interchange
+#### Done When
+- [x] Test passes
+- [x] README.md updated
 
 ---
 
-## Phase 5: MCP Integration ✅
+### 1.3 CLI Tool 🖥️
 
-*Completed 2024-12-06 · Prerequisites: Phase 4 (✅ Complete)*
+**Effort:** ~2 hours | **Impact:** Medium | **Risk:** None
 
-### Phase 5 Summary
+Create standalone CLI for testing without MCP client.
 
-**Deliverables Shipped:**
+#### Acceptance Criteria
+- [x] `mcplogic prove <file>` proves last line from preceding premises
+- [x] `mcplogic model <file>` finds model for all lines
+- [x] `mcplogic validate <file>` checks syntax, returns exit code 1 on error
+- [x] `mcplogic repl` starts interactive session
+- [x] `mcplogic --help` shows usage
 
-| Feature | Files | Tests |
-|---------|-------|-------|
-| Engine Parameter | `src/server.ts` | existing |
-| DIMACS Export | `src/clausifier.ts`, `src/types/clause.ts` | 5 |
-| Engine Info Resource | `src/resources/axioms.ts` | 1 |
+#### Implementation
 
-**Implementation Notes:**
-- `prove` tool now accepts `engine?: 'prolog' | 'sat' | 'auto'` parameter
-- Response includes `engineUsed` field for standard/detailed verbosity
-- `clausesToDIMACS()` converts CNF clauses to DIMACS format for external SAT solvers
-- `logic://engines` resource returns JSON with engine capabilities
-
-**Test Coverage:** 254 tests passing (248 + 6 new)
-
-### Phase 5 Overview
-
-**Goal:** Expose engine federation to MCP clients and add DIMACS export.
-
-| Feature | Priority | Effort | Status |
-|---------|----------|--------|--------|
-| Engine parameter in `prove` tool | High | 1 day | ✅ Complete |
-| DIMACS export | Medium | 1 day | ✅ Complete |
-| Engine info resource | Low | 0.5 day | ✅ Complete |
-
----
-
-### 5.1 Engine Parameter for MCP Tools
-
-**Goal:** Allow clients to select reasoning engine via MCP tool parameters.
-
-**Files:** `src/server.ts`
-
-**Tasks:**
-- [ ] Add `engine?: 'prolog' | 'sat' | 'auto'` to `prove` tool schema
-- [ ] Wire through to `EngineManager.prove()`
-- [ ] Add `engineUsed` to response for transparency
-- [ ] Update `find-model` tool with engine option (optional)
-
+Create `src/cli.ts`:
 ```typescript
-// Updated prove tool schema
-inputSchema: {
-  premises: { type: 'array', items: { type: 'string' } },
-  conclusion: { type: 'string' },
-  engine: { 
-    type: 'string', 
-    enum: ['prolog', 'sat', 'auto'],
-    default: 'auto',
-    description: 'Reasoning engine: prolog (Horn), sat (general), auto (select based on formula)'
-  },
-  verbosity: { type: 'string', enum: ['minimal', 'standard', 'detailed'] }
+#!/usr/bin/env node
+import { readFileSync } from 'fs';
+import * as readline from 'readline';
+import { createLogicEngine } from './logicEngine.js';
+import { createModelFinder } from './modelFinder.js';
+import { parse } from './parser.js';
+import { DEFAULTS } from './types/index.js';
+
+const VERSION = '1.0.0';
+const HELP = `
+MCP Logic CLI v${VERSION}
+
+Usage:
+  mcplogic prove <file.p>     Prove last line from preceding premises
+  mcplogic model <file.p>     Find model satisfying all lines
+  mcplogic validate <file.p>  Check syntax of all lines
+  mcplogic repl               Interactive mode
+
+Options:
+  --high-power, -H   Enable extended limits (300s, 100k inferences)
+  --help, -h         Show this help
+  --version, -v      Show version
+
+Examples:
+  mcplogic prove problem.p
+  mcplogic model --high-power theory.p
+  mcplogic repl
+`;
+
+const args = process.argv.slice(2);
+const highPower = args.includes('--high-power') || args.includes('-H');
+const command = args.find(a => !a.startsWith('-'));
+const file = args.find(a => !a.startsWith('-') && a !== command);
+
+async function main() {
+    if (args.includes('--help') || args.includes('-h') || !command) {
+        console.log(HELP);
+        return;
+    }
+    
+    if (args.includes('--version') || args.includes('-v')) {
+        console.log(VERSION);
+        return;
+    }
+
+    if (command === 'repl') {
+        return runRepl(highPower);
+    }
+
+    if (!file) {
+        console.error('Error: file argument required');
+        process.exit(1);
+    }
+
+    const content = readFileSync(file, 'utf-8');
+    const lines = content.split('\n')
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith('#') && !l.startsWith('%'));
+
+    const limit = highPower ? DEFAULTS.highPowerMaxInferences : DEFAULTS.maxInferences;
+    const timeout = highPower ? DEFAULTS.highPowerMaxSeconds * 1000 : DEFAULTS.maxSeconds * 1000;
+
+    switch (command) {
+        case 'prove': {
+            const premises = lines.slice(0, -1);
+            const conclusion = lines[lines.length - 1];
+            console.log(`Proving: ${conclusion}`);
+            console.log(`From ${premises.length} premises...`);
+            
+            const engine = createLogicEngine(timeout, limit);
+            const start = Date.now();
+            const result = await engine.prove(premises, conclusion, { includeTrace: true });
+            const elapsed = Date.now() - start;
+            
+            console.log(result.found ? '✓ PROVED' : '✗ NOT PROVED');
+            console.log(`Time: ${elapsed}ms`);
+            if (result.trace) console.log('\nTrace:\n' + result.trace);
+            process.exit(result.found ? 0 : 1);
+            break;
+        }
+        case 'model': {
+            console.log(`Finding model for ${lines.length} formulas...`);
+            const finder = createModelFinder(timeout, highPower ? 25 : 10);
+            const start = Date.now();
+            const result = await finder.findModel(lines);
+            const elapsed = Date.now() - start;
+            
+            console.log(result.success ? '✓ MODEL FOUND' : '✗ NO MODEL');
+            console.log(`Time: ${elapsed}ms`);
+            if (result.model) console.log('\n' + JSON.stringify(result.model, null, 2));
+            process.exit(result.success ? 0 : 1);
+            break;
+        }
+        case 'validate': {
+            let allValid = true;
+            for (const stmt of lines) {
+                try {
+                    parse(stmt);
+                    console.log(`✓ ${stmt}`);
+                } catch (e) {
+                    console.log(`✗ ${stmt}`);
+                    console.log(`  Error: ${(e as Error).message}`);
+                    allValid = false;
+                }
+            }
+            process.exit(allValid ? 0 : 1);
+            break;
+        }
+        default:
+            console.error(`Unknown command: ${command}`);
+            console.log(HELP);
+            process.exit(1);
+    }
 }
+
+async function runRepl(highPower: boolean) {
+    const limit = highPower ? DEFAULTS.highPowerMaxInferences : 5000;
+    const engine = createLogicEngine(30000, limit);
+    const premises: string[] = [];
+    
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        prompt: 'mcplogic> '
+    });
+    
+    console.log(`MCP Logic REPL v${VERSION}${highPower ? ' [HIGH-POWER]' : ''}`);
+    console.log('Commands: .assert <formula>, .prove <goal>, .list, .clear, .quit\n');
+    rl.prompt();
+    
+    rl.on('line', async (line) => {
+        const trimmed = line.trim();
+        
+        if (trimmed.startsWith('.assert ')) {
+            const formula = trimmed.slice(8).trim();
+            try {
+                parse(formula);
+                premises.push(formula);
+                console.log(`✓ Asserted (${premises.length} total)`);
+            } catch (e) {
+                console.log(`✗ ${(e as Error).message}`);
+            }
+        } else if (trimmed.startsWith('.prove ')) {
+            const goal = trimmed.slice(7).trim();
+            try {
+                parse(goal);
+                const result = await engine.prove(premises, goal, { includeTrace: true });
+                console.log(result.found ? '✓ Proved' : '✗ Not proved');
+                if (result.trace) console.log(result.trace);
+            } catch (e) {
+                console.log(`✗ ${(e as Error).message}`);
+            }
+        } else if (trimmed === '.list') {
+            if (premises.length === 0) {
+                console.log('(no premises)');
+            } else {
+                premises.forEach((p, i) => console.log(`${i + 1}. ${p}`));
+            }
+        } else if (trimmed === '.clear') {
+            premises.length = 0;
+            console.log('Cleared.');
+        } else if (trimmed === '.quit' || trimmed === '.exit' || trimmed === '.q') {
+            rl.close();
+            return;
+        } else if (trimmed && !trimmed.startsWith('.')) {
+            console.log('Unknown command. Use .assert, .prove, .list, .clear, or .quit');
+        }
+        rl.prompt();
+    });
+    
+    rl.on('close', () => process.exit(0));
+}
+
+main().catch(e => {
+    console.error('Error:', e.message);
+    process.exit(1);
+});
 ```
 
-**Migration:** Non-breaking; `engine` defaults to `'auto'`.
-
----
-
-### 5.2 DIMACS Export
-
-**Goal:** Export CNF clauses in DIMACS format for external SAT solvers.
-
-**Files:** `src/clausifier.ts`
-
-**Tasks:**
-- [ ] Add `clausesToDIMACS(clauses: Clause[]): DIMACSResult`
-- [ ] Include variable mapping in result
-- [ ] Add tests for DIMACS roundtrip
-
-```typescript
-export interface DIMACSResult {
-  dimacs: string;           // "p cnf 5 3\n1 -2 0\n3 4 0\n..."
-  varMap: Map<string, number>;  // "foo" -> 1, "bar" -> 2
-  stats: { variables: number; clauses: number };
-}
-
-export function clausesToDIMACS(clauses: Clause[]): DIMACSResult {
-  // Assign each unique literal a positive integer
-  // Format: "p cnf <vars> <clauses>\n" followed by clauses
-}
-```
-
-**Use Cases:**
-- Interop with external solvers (CryptoMiniSat, Kissat)
-- Benchmarking against industrial SAT solvers
-- Proof logging for verification
-
----
-
-### 5.3 Engine Info Resource
-
-**Goal:** Expose engine capabilities as MCP resource.
-
-**Files:** `src/server.ts`
-
-**Tasks:**
-- [ ] Add `logic://engines` resource listing available engines
-- [ ] Include capabilities, status, and usage statistics
-
+Update `package.json`:
 ```json
 {
-  "engines": [
-    {
-      "name": "prolog/tau-prolog",
-      "capabilities": { "horn": true, "fullFol": false, "equality": true, "arithmetic": true },
-      "recommended_for": "Horn clauses, Datalog, simple inference"
-    },
-    {
-      "name": "sat/minisat",
-      "capabilities": { "horn": true, "fullFol": true, "equality": false, "arithmetic": false },
-      "recommended_for": "Non-Horn formulas, SAT problems, model finding"
+    "bin": {
+        "mcplogic": "./dist/cli.js"
     }
-  ]
 }
 ```
 
----
-
-## Phase 6: Advanced Engines 🟣
-
-*Estimated: 2-4 weeks each · Prerequisites: Stable Phase 1-5*
-
-### Phase 6 Overview
-
-**Goal:** Expand engine federation with specialized solvers.
-
-| Engine | Domain | JS Status | Effort | Priority |
-|--------|--------|-----------|--------|----------|
-| **SMT (Z3)** | Arithmetic + theories | z3-solver (WASM) | High | Medium |
-| **ASP (Clingo)** | Non-monotonic, defaults | clingo-wasm (exists) | High | Low |
-| **Neural-Guided** | Complex proofs | Custom implementation | Medium | Medium |
+#### Done When
+- [x] `npm run build` succeeds
+- [x] `npm link` creates global command
+- [x] All acceptance criteria verified manually
+- [x] `mcplogic --help` outputs usage
 
 ---
 
-### 6.1 SMT via Z3
+### 1.4 TPTP Benchmark Subset 📊
 
-**Goal:** Theory reasoning (linear arithmetic, bitvectors, arrays).
+**Effort:** ~2 hours | **Impact:** Medium | **Risk:** None | **Depends:** 0.2
 
-**Package:** [`z3-solver`](https://www.npmjs.com/package/z3-solver) (Z3 compiled to WASM, ~15MB)
+Add standard ATP benchmarks for regression testing.
 
-**Tasks:**
-- [ ] Add `z3-solver` dependency
-- [ ] Implement `SMTEngine` adapter
-- [ ] Translation: FOL + arithmetic → SMT-LIB2
-- [ ] Support uninterpreted functions and arrays
+#### Acceptance Criteria
+- [x] At least 5 TPTP problems translated to our syntax
+- [x] Benchmark script reports pass/fail + timing
+- [x] CI can run benchmarks
 
-```typescript
-// src/engines/smt.ts
-import { init } from 'z3-solver';
+#### Implementation
 
-export class SMTEngine implements ReasoningEngine {
-  readonly name = 'smt/z3';
-  readonly capabilities = { 
-    horn: true, fullFol: true, equality: true, 
-    arithmetic: true, streaming: false 
-  };
-
-  async prove(premises, conclusion, options) {
-    const { Context } = await init();
-    const ctx = new Context('main');
-    // Translate to Z3 AST and check
-  }
-}
-```
-
-**Trade-offs:**
-- ✅ Full arithmetic, equality built-in
-- ⚠️ Large WASM binary (~15MB)
-- ⚠️ Cold start latency (~500ms)
-
-**References:**
-- [z3-solver npm](https://www.npmjs.com/package/z3-solver)
-- [Z3 JavaScript Tutorial](https://microsoft.github.io/z3guide/programming/Z3%20JavaScript%20Examples)
-- [SMT-LIB Standard](https://smtlib.cs.uiowa.edu/language.shtml)
-
----
-
-### 6.2 Answer Set Programming (ASP)
-
-**Goal:** Non-monotonic reasoning, defaults, preferences.
-
-**Status:** 🔬 *Research — evaluate feasibility*
-
-**Options:**
-| Option | Pros | Cons |
-|--------|------|------|
-| **clingo-wasm** | Full Clingo power | 5MB binary, complex setup |
-| **Remote API** | No local deps | Network latency, external dependency |
-| **Minimal ASP** | Lightweight, educational | Limited expressiveness |
-
-**ASP Syntax Extensions:**
+1. Create `benchmarks/tptp/PUZ001-1.p` (Dreadbury Mansion):
 ```prolog
-{ bird(X) } :- animal(X).              % Choice rule
-:- flies(X), penguin(X).               % Constraint
-flies(X) :- bird(X), not penguin(X).   % Default
-#minimize { cost(X) : assign(X) }.     % Optimization
+% Aunt Agatha lives in Dreadbury Mansion
+% Someone who lives there killed Aunt Agatha
+% A killer always hates and is not richer than the victim
+% Charles hates everyone except Aunt Agatha
+% Agatha hates everyone except the butler
+% The butler hates everyone not richer than Agatha
+% The butler hates everyone Aunt Agatha hates
+% No one hates everyone
+% Agatha is not the butler
+% CONCLUSION: Agatha killed herself
+
+lives(agatha)
+lives(butler)
+lives(charles)
+exists x (lives(x) & killed(x, agatha))
+all x all y (killed(x, y) -> (hates(x, y) & -richer(x, y)))
+all x (lives(x) & -(x = agatha) -> hates(charles, x))
+all x (lives(x) & -(x = butler) -> hates(agatha, x))
+all x (lives(x) & -richer(x, agatha) -> hates(butler, x))
+all x (hates(agatha, x) -> hates(butler, x))
+all x -(all y (lives(y) -> hates(x, y)))
+-(agatha = butler)
+---
+killed(agatha, agatha)
 ```
 
-**Recommendation:** Start with remote API wrapper if demand exists.
+2. Create `benchmarks/run-tptp.ts` (see previous version)
 
-**References:**
-- [Clingo](https://potassco.org/clingo/) — ASP solver
-- [clingo-wasm](https://github.com/niclasmattsson/clingo-wasm) — Browser port
+3. Add npm script: `"benchmark:tptp": "tsx benchmarks/run-tptp.ts"`
+
+#### Done When
+- [x] `npm run benchmark:tptp` runs without error
+- [x] Results show pass/fail for each problem
+- [x] README.md line 63 updated: `[ ]` → `[x]`
 
 ---
 
-### 6.3 Neural-Guided Search
+## 🚀 Phase 2: Ecosystem Leverage (4-8 hours each)
 
-**Goal:** LLM-suggested proof paths validated symbolically.
+### 2.1 Library Export 📦
 
-**Architecture:**
-```
-Query → LLM proposes lemmas → Symbolic validation → Accept/Reject
-                 ↑                                       ↓
-                 └─────── Refinement on rejection ───────┘
-```
+**Effort:** ~4 hours | **Impact:** Very High | **Risk:** Low | **Depends:** 0.3
 
-**Tasks:**
-- [ ] Define `NeuralGuide` interface for LLM integration
-- [ ] Implement beam search with symbolic scoring
-- [ ] Refinement loop: feed back errors to LLM
-- [ ] MCP client integration for LLM access
-- [ ] Confidence calibration: `P(correct) = P(symbolic) * P(neural)`
+#### Acceptance Criteria
+- [x] `import { createLogicEngine } from '@mcplogic/core'` works
+- [x] TypeScript declarations included
+- [x] No MCP SDK dependency in library export
+- [x] Example project compiles and runs
 
-```typescript
-// src/engines/neural.ts
-export interface NeuralGuide {
-  suggestNextStep(state: ProofState): Promise<ProofStep[]>;
-  refineOnFailure(step: ProofStep, error: string): Promise<ProofStep>;
-}
-
-export class NeuralGuidedEngine implements ReasoningEngine {
-  constructor(
-    private symbolic: ReasoningEngine,  // Prolog or SAT
-    private guide: NeuralGuide
-  ) {}
-
-  async prove(premises: string[], conclusion: string): Promise<ProveResult> {
-    // 1. Try pure symbolic first (fast path)
-    const direct = await this.symbolic.prove(premises, conclusion);
-    if (direct.success) return direct;
-
-    // 2. Neural-guided search with validation
-    return this.neuralGuidedSearch(premises, conclusion);
-  }
-}
-```
-
-**Concerns:**
-- LLM latency adds 500-2000ms per step
-- Hallucination risk → always validate symbolically
-- Token costs for complex proofs
-- Need MCP client API or direct LLM integration
-
-**Potential Approaches:**
-1. **MCP-native**: Use MCP sampling to request LLM help
-2. **OpenAI/Anthropic API**: Direct integration (requires API key)
-3. **Local LLM**: llama.cpp integration (high effort, no external deps)
+[Full implementation details in previous version...]
 
 ---
 
-## Phase 7: Frontier Logic 🟣
+### 2.2 Browser/WASM Compatibility 🌐
 
-*Long-term vision · Prerequisites: Stable Phase 1-6*
+**Effort:** ~6 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 0.4, 2.1
 
-### Phase 7 Overview
+#### Acceptance Criteria
+- [x] Browser spike (0.4) confirmed both deps work
+- [x] `npm run build:browser` produces working bundle
+- [x] Test HTML page can prove simple theorem
+- [x] No Node.js-specific code in browser bundle
 
-**Goal:** Extend beyond classical FOL to advanced logic systems.
-
-| System | Complexity | JS Feasibility | Applications |
-|--------|------------|----------------|--------------|
-| Higher-Order Logic | High | Feasible (shallow) | Math proofs, type theory |
-| Modal Logic | Medium | Feasible | Necessity, possibility |
-| Temporal Logic | Medium | Feasible | Verification, planning |
-| Probabilistic Logic | High | Feasible (sampling) | Uncertainty, Bayesian |
-| Distributed Proofs | Very High | Research | P2P verification |
+[Full implementation details in previous version...]
 
 ---
 
-### 7.1 Higher-Order Logic (HOL)
+### 2.3 Web Playground with Offline LLM 🎮🧠
 
-**Goal:** Quantify over predicates and functions.
+**Effort:** ~8-12 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 2.2
 
-**Syntax:**
-```
-all P (P(a) -> P(b))              # ∀ over predicates
-lambda x. f(x, x)                 # λ-abstraction  
-apply(F, X)                       # Function application
-```
+#### Acceptance Criteria
+- [x] Modern, dark-mode UI with glassmorphism
+- [x] NL input → FOL output via Transformers.js
+- [x] FOL → Proof/Model via browser MCP Logic
+- [x] Works 100% offline after initial LLM download
+- [ ] Deploy to GitHub Pages
 
-**Implementation Options:**
-| Approach | Effort | Expressiveness |
-|----------|--------|----------------|
-| Shallow embedding in FOL | Low | Partial HOL |
-| λProlog (ELPI) via WASM | High | Full |
-| Custom type checker | Medium | Educational |
-
-**Recommendation:** Start with shallow embedding for quick wins.
-
-**References:**
-- [ELPI](https://github.com/LPCIC/elpi) — λProlog implementation
-- [HOL Light](https://github.com/jrh13/hol-light) — Interactive theorem prover
+[Full implementation details in previous version...]
 
 ---
 
-### 7.2 Modal & Temporal Logic
+## 🧠 Phase 3: AI Integration
 
-**Goal:** Necessity (□), possibility (◊), temporal operators.
+### 3.1 Natural Language Interface 🗣️
 
-**Syntax:**
-```
-box(P)               # □P necessarily P
-diamond(P)           # ◊P possibly P
-always(P)            # □P (temporal)
-eventually(P)        # ◊P (temporal)
-until(P, Q)          # P U Q
-next(P)              # ○P
-```
+**Effort:** ~4 hours | **Impact:** High | **Risk:** Low | **Depends:** 0.3
 
-**Implementation:** Kripke model construction + FOL encoding.
+#### Acceptance Criteria
+- [x] `translate-text` MCP tool accepts natural language
+- [x] Returns structured `{ premises, conclusion }`
+- [x] Validates all formulas before returning
+- [x] Works with or without external LLM (uses offline model)
 
-```prolog
-% Encode Kripke accessibility as a relation
-accessible(World1, World2).
-
-% Box: true in all accessible worlds
-holds(box(P), W) :- forall(accessible(W, W2), holds(P, W2)).
-
-% Diamond: true in some accessible world  
-holds(diamond(P), W) :- accessible(W, W2), holds(P, W2).
-```
-
-**Effort:** Medium — mostly parser + encoding layer.
-
-**References:**
-- [Kripke Semantics](https://plato.stanford.edu/entries/logic-modal/)
-- [Temporal Logic](https://plato.stanford.edu/entries/logic-temporal/)
+[Full implementation details in previous version...]
 
 ---
 
-### 7.3 Probabilistic Reasoning
+### 3.2 Heuristic Strategy Selection 🎲
 
-**Goal:** Weighted facts, Bayesian inference.
+**Effort:** ~2 hours | **Impact:** Medium | **Risk:** None
 
-**Syntax:**
-```
-0.7 :: rain.                      # P(rain) = 0.7
-0.9 :: wet_ground :- rain.        # P(wet|rain) = 0.9
-query(wet_ground).                # Compute P(wet_ground)
-```
+#### Acceptance Criteria
+- [x] Equality-heavy proofs auto-select `iterative` strategy
+- [x] Pure Horn clauses prefer `prolog` engine
+- [x] Strategy choice logged in verbose output
 
-**Implementation Options:**
-| Method | Accuracy | Performance | Effort |
-|--------|----------|-------------|--------|
-| Enumeration | Exact | O(2^n) | Low |
-| Sampling (MCMC) | Approx | O(samples) | Medium |
-| Knowledge compilation | Exact | Precompute | High |
-
-**Recommendation:** Start with enumeration for small problems, add sampling for scale.
-
-**References:**
-- [ProbLog](https://dtai.cs.kuleuven.be/problog/)
-- [Probabilistic Logic Programming](https://www.cambridge.org/core/books/introduction-to-statistical-relational-learning/69F3D5F43BEC5F6C9E0B2ABF7E1DBD32)
+[Full implementation details in previous version...]
 
 ---
 
-### 7.4 Distributed Proof Networks (Vision)
+## 🏗️ Phase 4: Neurosymbolic Features
 
-**Goal:** P2P theorem proving swarms, on-chain verification.
+### 4.1 Ontology Support 🗂️
 
-**Concepts:**
-- **Proof obligation distribution**: Shard large proofs across nodes
-- **Proof-of-proof**: Consensus via verified inference
-- **On-chain anchoring**: Hash proofs to blockchain
-- **Gossip protocol**: Efficient proof fragment sharing
+**Effort:** ~6 hours | **Impact:** High | **Risk:** Medium | **Depends:** 0.3
 
-**Status:** 🔮 *Visionary — significant research required*
+#### Acceptance Criteria
+- [x] Sessions can be created with ontology constraints
+- [x] Invalid predicates rejected with clear error
+- [x] Synonym expansion works (`human` → `person`)
+- [x] Ontology can be updated dynamically
 
-**Potential Stack:**
-- libp2p for networking
-- IPFS for proof storage
-- Ethereum/Solana for on-chain anchors
+[Full implementation details in previous version...]
 
 ---
 
-## Implementation Sequence (Recommended)
+### 4.2 Agentic Reasoning Loop 🤖
 
-```mermaid
-graph LR
-    subgraph "Completed"
-        P1[Phase 1 ✅] --> P2[Phase 2 ✅]
-        P2 --> P3[Phase 3 ✅]
-        P3 --> P4[Phase 4 ✅]
-    end
-    
-    subgraph "Near-term (1-2 weeks)"
-        P4 --> P5[Phase 5: MCP Integration]
-    end
-    
-    subgraph "Medium-term (2-4 weeks)"
-        P5 --> P6A[6.1 SMT/Z3]
-        P5 --> P6C[6.3 Neural-Guided]
-    end
-    
-    subgraph "Research"
-        P6A --> P6B[6.2 ASP]
-        P6C --> P7[Phase 7: Frontier]
-    end
-```
+**Effort:** ~8 hours | **Impact:** Very High | **Risk:** Medium | **Depends:** 3.1, 4.1
 
-**Strategic Priorities:**
-1. **Phase 5** — Low effort, high value: expose existing SAT backend to clients
-2. **Phase 6.1 (SMT)** — Enables arithmetic reasoning without custom axioms
-3. **Phase 6.3 (Neural)** — High potential, requires LLM integration design
-4. **Phase 6.2 (ASP)** — Niche use case, defer unless demand
-5. **Phase 7** — Long-term research, build incrementally
+#### Acceptance Criteria
+- [x] Multi-step reasoning with assert/query/conclude
+- [x] Confidence scoring based on proof success
+- [x] Max steps limit prevents infinite loops
+- [x] Full trace of all reasoning steps
 
+[Full implementation details in previous version...]
 
 ---
 
-## Technical Debt 📚
+## 🧬 Phase 5: Evolution Engine
 
-### Test Coverage
+**Effort:** ~2-4 weeks | **Depends:** 4.2
 
-**Current Status (Post-Phase 2):**
-- `tests/basic.test.ts` — Core functionality
-- `tests/parser.test.ts` — Parsing edge cases
-- `tests/prover.test.ts` — Theorem proving
-- `tests/errors.test.ts` — Structured error system ✅ Phase 1
-- `tests/session.test.ts` — Session management ✅ Phase 1
-- `tests/verbosity.test.ts` — Response verbosity ✅ Phase 1
-- `tests/clausifier.test.ts` — CNF transformation ✅ Phase 2 (32 tests)
-- `tests/equality.test.ts` — Equality axioms ✅ Phase 2 (24 tests)
-- `tests/arithmetic.test.ts` — Arithmetic support ✅ Phase 2 (30 tests)
+[Full details in MCR1.md architecture...]
 
-**Coverage:** 80%+ line coverage (185 tests passing)
+---
 
-**Remaining Tasks:**
-- [ ] Edge cases: Empty premises, recursive formulas, deep nesting (>10 levels)
-- [x] Error paths: All `LogicErrorCode` variants ✅ Done in Phase 1
-- [ ] Integration: Full MCP round-trip with mock client
-- [ ] Performance: Benchmarks for large formulas (>100 clauses)
-- [ ] Property-based: Roundtrip parsing with fast-check
-- [ ] Regression: Capture failing cases as golden tests
+## ❌ Deprioritized
 
-**Testing Tools:**
+| Item | Why Defer |
+|------|-----------|
+| Prover9 WASM | SAT+iterative handles most cases |
+| SMT/Z3 | Large WASM, complex integration |
+| Modal Logic | Research; no demand |
+
+---
+
+## 📋 Optimal Workflow
+
+### Daily Routine
+
 ```bash
-npm test                          # All tests
-npm test -- --coverage            # With coverage report
-npm test -- --testPathPattern=parser  # Parser tests only
+# Start of day
+npm run check              # Verify everything works
+npm run todo               # Review outstanding TODOs
+
+# During development
+npm run build:watch        # Auto-rebuild on changes
+npm run test:watch         # Auto-test on changes
+
+# Before commit
+npm run check              # Final verification
+git add -p                 # Review changes
+git commit -m "feat: ..."
 ```
 
----
+### Task Completion Checklist
 
-### Code Quality (Phase 2 Preparation)
-
-**Recommended Cleanups Before Phase 2:**
-
-| Area | Recommendation | Priority |
-|------|----------------|----------|
-| `translator.ts` | Refactor `astToMetaProlog` for clausifier integration | High |
-| `modelFinder.ts` | Extract signature extraction as shared utility | Medium |
-| Type exports | Consolidate re-exports in `src/types/index.ts` | Medium |
-| Error creation | Add factory functions mimicking Phase 1 pattern | Low |
-
-**Architecture Notes for Phase 2:**
-- Keep clausifier as standalone module (import AST types only)
-- Equality axioms should be Prolog strings, not intermediate AST
-- Model finder enhancement can share signature extraction with clausifier
+For each task:
+1. [ ] Read acceptance criteria
+2. [ ] Implement code changes
+3. [ ] Add/update tests
+4. [ ] Run `npm run check`
+5. [ ] Update README.md status if applicable
+6. [ ] Mark "Done When" items checked
+7. [ ] Commit with descriptive message
 
 ---
 
-### Type Safety
+## 🏁 Recommended Start Order
 
-- [x] Created `src/types/tau-prolog.d.ts`
-- [x] Removed `@ts-ignore` comments
-- [x] TypeScript compiles cleanly with zero errors ✅
-- [ ] Enable `strict: true` in tsconfig (optional, low priority)
-- [ ] Expand Tau-Prolog type coverage
-- [ ] Add branded types for SessionId, Formula, etc.
+1. **Phase 0 (all)** - Do these first, enables everything else
+2. **Phase 1.1** - Trivial win, immediately useful
+3. **Phase 1.2** - Already done, just verify
+4. **Phase 1.3** - High visibility, enables testing
+5. **Phase 2.1** - Foundation for browser work
+6. Continue per dependency graph...
 
----
-
-### Documentation
-
-- [ ] JSDoc on all public exports
-- [ ] Architecture diagram (Mermaid) in README
-- [x] Session tools documented in README ✅
-- [x] Verbosity control documented in README ✅
-- [ ] Formula syntax reference card (markdown)
-- [ ] Example gallery with 10+ patterns
-- [ ] API changelog for breaking changes
-
----
-
-## Known Limitations
-
-| Limitation | Impact | Mitigation |
-|------------|--------|------------|
-| Inference depth (Tau-Prolog default) | Truncates valid proofs | Increase via `inferenceLimit` param |
-| Non-termination | Infinite loops possible | Timeout protection |
-| Negation as failure | `¬P` = "cannot prove P" | Document clearly; use NAF syntax |
-| Closed-world assumption | Missing facts = false | Document; consider open-world mode |
-| No native arithmetic | `2+2=4` fails | Enable Tau-Prolog arithmetic module |
-| Model finder ≤10 | Large domains impossible | SAT backend (Phase 4) |
-
----
-
-## External References
-
-| Topic | Resource |
-|-------|----------|
-| **Tau-Prolog** | [Documentation](https://tau-prolog.org/documentation) · [Modules](https://tau-prolog.org/documentation#modules) · [npm](https://www.npmjs.com/package/tau-prolog) |
-| **MCP** | [Specification](https://modelcontextprotocol.io/docs) · [SDK](https://github.com/modelcontextprotocol/typescript-sdk) · [Progress](https://modelcontextprotocol.io/docs/concepts/utilities#progress) |
-| **SAT** | [logic-solver npm](https://www.npmjs.com/package/logic-solver) · [MiniSat](http://minisat.se/) · [DIMACS](https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/satformat.ps) |
-| **Logic** | [Prover9 Manual](https://www.cs.unm.edu/~mccune/prover9/manual/) · [Clausification](https://en.wikipedia.org/wiki/Conjunctive_normal_form) · [Model Theory](https://plato.stanford.edu/entries/model-theory/) |
-| **Modal** | [Kripke Semantics](https://plato.stanford.edu/entries/logic-modal/) · [Temporal Logic](https://plato.stanford.edu/entries/logic-temporal/) |
-| **Probabilistic** | [ProbLog](https://dtai.cs.kuleuven.be/problog/) · [Probabilistic Logic](https://plato.stanford.edu/entries/logic-probability/) |
-
----
-
-## File Structure (Target)
-
+**First command:** 
+```bash
+mkdir -p spikes scripts tests/fixtures
+npm run check
 ```
-src/
-├── index.ts                    # Entry point
-├── server.ts                   # MCP server (tools, resources, prompts)
-├── parser.ts                   # FOL tokenizer & parser
-├── translator.ts               # FOL ↔ Prolog conversion
-├── clausifier.ts               # [Phase 2] CNF conversion, Skolemization
-├── logicEngine.ts              # Tau-Prolog wrapper
-├── modelFinder.ts              # Finite model enumeration  
-├── syntaxValidator.ts          # Formula validation
-├── categoricalHelpers.ts       # Category theory axioms
-├── sessionManager.ts           # [Phase 1] Session lifecycle
-├── equalityAxioms.ts           # [Phase 2] Auto-generated equality
-├── types/
-│   ├── index.ts
-│   ├── errors.ts               # [Phase 1] Structured errors
-│   ├── clause.ts               # [Phase 2] ✅ CNF clause types
-│   ├── ast.ts                  # [Phase 2] Typed AST (planned)
-│   └── tau-prolog.d.ts
-├── engines/                    # [Phase 4] Backend federation
-│   ├── interface.ts            # ReasoningEngine interface
-│   ├── prolog.ts               # Tau-Prolog adapter
-│   ├── sat.ts                  # SAT solver adapter (logic-solver)
-│   └── neural.ts               # Neural-guided search
-├── resources/                  # [Phase 3] MCP resources
-│   └── axioms/
-│       ├── category.fol
-│       ├── group.fol
-│       ├── peano.fol
-│       └── propositional.fol
-└── prompts/                    # [Phase 3] MCP prompts
-    ├── prove-by-contradiction.ts
-    ├── verify-equivalence.ts
-    └── formalize.ts
-tests/
-├── basic.test.ts
-├── parser.test.ts
-├── prover.test.ts
-├── errors.test.ts              # [Phase 1] ✅
-├── session.test.ts             # [Phase 1] ✅
-├── verbosity.test.ts           # [Phase 1] ✅
-├── clausifier.test.ts          # [Phase 2] ✅ 32 tests
-├── equality.test.ts            # [Phase 2] ✅ 24 tests
-├── arithmetic.test.ts          # [Phase 2] ✅ 30 tests
-├── sat.test.ts                 # [Phase 4]
-└── integration.test.ts         # [Phase 3]
-```
-
----
-
-## Implementation Order (Recommended)
-
-```mermaid
-graph LR
-    subgraph "Week 1-2"
-        A[1.1 Structured Errors] --> B[1.2 Verbosity]
-        B --> C[1.3 Sessions]
-    end
-    
-    subgraph "Week 3-4"
-        C --> D[2.1 CNF]
-        D --> E[2.2 Equality]
-        E --> F[2.5 Arithmetic]
-    end
-    
-    subgraph "Week 5-6"
-        D --> G[4.1 SAT Backend]
-        C --> H[3.1 Resources]
-        H --> I[3.2 Prompts]
-    end
-    
-    subgraph "Week 7+"
-        G --> J[4.3 Neural-Guided]
-        F --> K[2.4 Typed FOL]
-    end
-```
-
-**Parallel Tracks:**
-- **Track A (Core):** 1.1 → 1.2 → 1.3 → 2.1 ✅ → 4.1
-- **Track B (MCP):** 3.1 → 3.2 → 3.3 (can run in parallel)
-- **Track C (Expressiveness):** 2.2 ✅ → 2.5 ✅ → 2.4 (after 1.1)
-
----
-
-## Implementation Notes & Lessons Learned
-
-### Phase 2 Insights (2024-12-05)
-
-1. **Clausifier Independence**: The clausifier works as a standalone transformation without translator integration. This is cleaner and more testable than tight coupling.
-
-2. **Equality Guard Pattern**: Instead of counters (`N > 0, N1 is N - 1`), simple Prolog inequality guards (`X \\== Y`) effectively prevent infinite loops and are more idiomatic.
-
-3. **Arithmetic via Axioms**: Implementing arithmetic through Prolog predicate axioms (`lt(X, Y) :- X < Y.`) rather than parser extensions:
-   - Provides immediate functionality
-   - Avoids tokenizer complexity
-   - Parser numeric literal support can be added incrementally
-
-4. **Skolem Tracking**: The `SkolemEnv.skolemMap` is transient during processing; added `generatedSkolems` map for persistent tracking in results.
-
-5. **Test-First Development**: Writing tests alongside implementation caught issues early (Skolem function tracking, blowup protection).
-
-### Recommendations for Future Phases
-
-- **Phase 3 (MCP Resources)**: Start with axiom files using existing `categoricalHelpers.ts` patterns
-- **Phase 4 (SAT)**: The clausifier output (`Clause[]`) is ready for DIMACS conversion; focus on the `FOL→Prop→CNF→DIMACS` pipeline
-- **Phase 2.4 (Typed FOL)**: Consider post-processing approach from signature extraction rather than heavy parser modifications

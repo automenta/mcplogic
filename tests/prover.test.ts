@@ -2,14 +2,15 @@
  * Integration tests for the MCP Logic prover functionality
  */
 
-import { LogicEngine, createLogicEngine } from '../src/logicEngine.js';
-import { buildPrologProgram, folGoalToProlog, folToProlog } from '../src/translator.js';
+import { PrologEngine, createPrologEngine } from '../src/engines/prolog.js';
+import { buildPrologProgram, folGoalToProlog, folToProlog } from '../src/engines/prolog/translator.js';
+import { createTestEngine } from './fixtures.js';
 
-describe('LogicEngine', () => {
-    let engine: LogicEngine;
+describe('PrologEngine', () => {
+    let engine: PrologEngine;
 
     beforeEach(() => {
-        engine = createLogicEngine(5000);
+        engine = createPrologEngine(5000);
     });
 
     describe('prove', () => {
@@ -18,10 +19,7 @@ describe('LogicEngine', () => {
                 ['all x (man(x) -> mortal(x))', 'man(socrates)'],
                 'mortal(socrates)'
             );
-            // Note: Tau-Prolog may not handle all FOL constructs perfectly
-            // The test validates the engine doesn't crash
-            expect(result).toBeDefined();
-            expect(result.result).toBeDefined();
+            expect(result.result).toBe('proved');
         });
 
         test('handles simple facts', async () => {
@@ -47,17 +45,18 @@ describe('LogicEngine', () => {
         });
     });
 
-    describe('checkSatisfiability', () => {
-        test('does not crash on valid premises', async () => {
-            const result = await engine.checkSatisfiability(['P(a)']);
-            // checkSatisfiability checks if program can be consulted
-            expect(typeof result).toBe('boolean');
-        });
+});
 
-        test('returns true for empty premises', async () => {
-            const result = await engine.checkSatisfiability([]);
-            expect(result).toBe(true);
-        });
+describe('HighPower Mode', () => {
+    test('highPower mode increases inference limit', async () => {
+        // This test doesn't need to prove anything hard,
+        // just verify the limit is applied
+        const engine = createTestEngine({ highPower: true });
+        // Access private property or inferred behavior?
+        // LogicEngine wraps ReasoningEngine.
+        // We can check if `engine` (LogicEngine) has `inferenceLimit` property if we cast to any,
+        // or check configuration via reflection.
+        expect((engine as any)['inferenceLimit']).toBe(100000);
     });
 });
 

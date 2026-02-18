@@ -9,11 +9,11 @@ import {
     skolemize,
     dropUniversals,
     isHornFormula,
-    clausesToProlog,
     clausesToDIMACS,
-} from '../src/clausifier';
-import { parse } from '../src/parser';
-import { createSkolemEnv, clauseToString, cnfToString } from '../src/types/clause';
+} from '../src/logic/clausifier.js';
+import { clausesToProlog } from '../src/engines/prolog/translator.js';
+import { parse } from '../src/parser/index.js';
+import { createSkolemEnv, clauseToString, cnfToString } from '../src/logic/clause';
 
 describe('Clausifier', () => {
     describe('toNNF - Negation Normal Form', () => {

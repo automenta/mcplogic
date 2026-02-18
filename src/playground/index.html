@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Logic Playground</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Shims and Vendor Loading -->
+    <script>
+        // Polyfill process
+        window.process = {
+            env: { NODE_ENV: 'production' },
+            platform: 'browser',
+            browser: true,
+            version: 'v16.0.0',
+            binding: function(name) { return {}; },
+            cwd: function() { return '/'; },
+            nextTick: function(cb) { setTimeout(cb, 0); },
+            argv: []
+        };
+        window.Buffer = { isBuffer: () => false };
+
+        // Polyfill module/require for logic-solver
+        window.module = { exports: {} };
+        window.exports = window.module.exports;
+        window.require = function(name) {
+            if (name === './minisat.js') return window.minisat;
+            if (name === './minisat_wrapper.js') return window.minisat_wrapper;
+            return {};
+        };
+
+        // Polyfill underscore for logic-solver
+        window._ = {
+            extend: function(obj) {
+                for (var i = 1; i < arguments.length; i++) {
+                    var source = arguments[i];
+                    for (var prop in source) {
+                        obj[prop] = source[prop];
+                    }
+                }
+                return obj;
+            },
+            clone: function(obj) { return {...obj}; },
+            isArray: Array.isArray,
+            isObject: function(obj) { return typeof obj === 'object' && obj !== null; },
+            isFunction: function(obj) { return typeof obj === 'function'; },
+            isString: function(obj) { return typeof obj === 'string'; },
+            isNumber: function(obj) { return typeof obj === 'number'; },
+            isBoolean: function(obj) { return typeof obj === 'boolean'; },
+            isUndefined: function(obj) { return typeof obj === 'undefined'; },
+            keys: Object.keys,
+            has: function(obj, key) { return Object.prototype.hasOwnProperty.call(obj, key); },
+            defaults: function(obj) {
+                for (var i = 1; i < arguments.length; i++) {
+                    var source = arguments[i];
+                    for (var prop in source) {
+                        if (obj[prop] === void 0) obj[prop] = source[prop];
+                    }
+                }
+                return obj;
+            }
+        };
+    </script>
+
+    <!-- Load Vendor Scripts -->
+    <script src="/dist-browser/vendor/tau-prolog/core.js"></script>
+    <script>
+        window.pl = window.module.exports;
+        window.module = { exports: {} };
+        window.exports = window.module.exports;
+    </script>
+
+    <script src="/dist-browser/vendor/logic-solver/minisat.js"></script>
+    <script src="/dist-browser/vendor/logic-solver/minisat_wrapper.js"></script>
+    <script>
+        window.minisat = {};
+        window.minisat_wrapper = {};
+    </script>
+    <script src="/dist-browser/vendor/logic-solver/logic-solver.js"></script>
+    <script>
+        window.Logic = window.module.exports;
+    </script>
+
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "tau-prolog": "/src/playground/vendor-wrappers/tau-prolog.js",
+            "logic-solver": "/src/playground/vendor-wrappers/logic-solver.js",
+            "@mcplogic/core": "/dist-browser/lib.js"
+        }
+    }
+    </script>
+
+    <!-- Transformers.js -->
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.14.0';
+        window.pipeline = pipeline;
+        window.env = env;
+        // Skip local model checks
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MCP Logic Playground</h1>
+            <p>First-order logic reasoning in your browser</p>
+        </header>
+
+        <main>
+            <div class="panel input-panel">
+                <div class="panel-header">
+                    <h2>Input</h2>
+                    <div class="actions">
+                        <button id="btn-example">Load Example</button>
+                        <button id="btn-ask-ai">✨ AI Translate</button>
+                    </div>
+                </div>
+                <div class="editor-container">
+                    <textarea id="input-editor" placeholder="% Enter FOL formulas...
+all x (man(x) -> mortal(x))
+man(socrates)
+mortal(socrates)"></textarea>
+                </div>
+            </div>
+
+            <div class="panel output-panel">
+                <div class="panel-header">
+                    <h2>Output</h2>
+                    <div class="actions">
+                        <button id="btn-prove" class="primary">Prove (Last Line)</button>
+                        <button id="btn-model">Find Model</button>
+                    </div>
+                </div>
+                <div id="output-log" class="log-container"></div>
+            </div>
+        </main>
+
+        <div id="ai-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Natural Language to FOL</h3>
+                <textarea id="ai-input" placeholder="e.g., Socrates is a man. All men are mortal. Therefore, Socrates is mortal."></textarea>
+                <div class="modal-actions">
+                    <button id="btn-ai-cancel">Cancel</button>
+                    <button id="btn-ai-convert" class="primary">Convert</button>
+                </div>
+                <div id="ai-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/dist-browser/playground/app.js"></script>
+</body>
+</html>

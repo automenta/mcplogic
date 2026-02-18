@@ -2,7 +2,7 @@
  * Tests for session management
  */
 
-import { SessionManager, createSessionManager, Session } from '../src/sessionManager.js';
+import { SessionManager, createSessionManager, Session } from '../src/session/manager.js';
 import { LogicException } from '../src/types/errors.js';
 
 describe('SessionManager', () => {

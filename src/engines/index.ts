@@ -4,7 +4,7 @@
  * Re-exports all engine-related types and classes.
  */
 
-export {
+export type {
     ReasoningEngine,
     EngineCapabilities,
     EngineProveOptions,
@@ -14,16 +14,19 @@ export {
 export {
     PrologEngine,
     createPrologEngine,
-} from './prolog.js';
+} from './prolog/index.js';
 
 export {
     SATEngine,
     createSATEngine,
-} from './sat.js';
+} from './sat/index.js';
 
 export {
     EngineManager,
+    createEngineManager,
+} from './manager.js';
+
+export type {
     EngineSelection,
     ManagerProveOptions,
-    createEngineManager,
 } from './manager.js';

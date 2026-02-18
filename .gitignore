@@ -24,3 +24,5 @@ coverage/
 # Environment
 .env
 .env.local
+benchmarks
+dist-browser/

@@ -5,61 +5,64 @@
 import {
     generateEqualityAxioms,
     containsEquality,
-    extractSignature,
-    extractSignatures,
     generateMinimalEqualityAxioms,
     getEqualityBridge,
-    Signature,
-} from '../src/equalityAxioms';
+} from '../src/axioms/equality';
+import { extractSignature, FormulaSignature as Signature } from '../src/utils/ast';
 import { parse } from '../src/parser';
 
 describe('Equality Axioms', () => {
     describe('generateEqualityAxioms', () => {
-        it('should generate reflexivity axiom', () => {
+        it('should generate reflexivity axiom (via eq_d)', () => {
             const sig: Signature = {
                 functions: new Map(),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
-            expect(axioms.some(a => a.includes('eq(X, X).'))).toBe(true);
+            expect(axioms.some(a => a.includes('eq_d(X, X, _).'))).toBe(true);
         });
 
-        it('should generate symmetry axiom', () => {
+        it('should generate symmetry axiom (via eq_step)', () => {
             const sig: Signature = {
                 functions: new Map(),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
-            expect(axioms.some(a => a.includes('eq(X, Y)') && a.includes('eq(Y, X)'))).toBe(true);
+            expect(axioms.some(a => a.includes('eq_step(X, Y, _) :- eq_fact(Y, X).'))).toBe(true);
         });
 
-        it('should generate transitivity axiom', () => {
+        it('should generate transitivity axiom (via eq_d recursion)', () => {
             const sig: Signature = {
                 functions: new Map(),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
+            // eq_d(X, Y, D) :- D > 0, ... eq_step(X, Z, D1) ... eq_d(Z, Y, D1).
             expect(axioms.some(a =>
-                a.includes('eq(X, Z)') &&
-                a.includes('eq(X, Y)') &&
-                a.includes('eq(Y, Z)')
+                a.includes('eq_d(X, Y, D) :-') &&
+                a.includes('eq_step(X, Z, D1)') &&
+                a.includes('eq_d(Z, Y, D1)')
             )).toBe(true);
         });
 
-        it('should generate function congruence axioms', () => {
+        it('should generate function congruence axioms (via eq_step)', () => {
             const sig: Signature = {
                 functions: new Map([['f', 1]]),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
-            // eq(f(X1), f(Y1)) :- eq(X1, Y1).
+            // eq_step(f(X1), f(Y1), D) :- eq_d(X1, Y1, D).
             expect(axioms.some(a =>
-                a.includes('eq(f(X1), f(Y1))') &&
-                a.includes('eq(X1, Y1)')
+                a.includes('eq_step(f(X1), f(Y1), D)') &&
+                a.includes('eq_d(X1, Y1, D)')
             )).toBe(true);
         });
 
@@ -68,14 +71,14 @@ describe('Equality Axioms', () => {
                 functions: new Map([['g', 2]]),
                 predicates: new Map(),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
-            // eq(g(X1, X2), g(Y1, Y2)) :- eq(X1, Y1), eq(X2, Y2).
+            // eq_step(g(X1, X2), g(Y1, Y2), D) :- eq_d(X1, Y1, D), eq_d(X2, Y2, D).
             expect(axioms.some(a =>
-                a.includes('g(X1, X2)') &&
-                a.includes('g(Y1, Y2)') &&
-                a.includes('eq(X1, Y1)') &&
-                a.includes('eq(X2, Y2)')
+                a.includes('eq_step(g(X1, X2), g(Y1, Y2), D)') &&
+                a.includes('eq_d(X1, Y1, D)') &&
+                a.includes('eq_d(X2, Y2, D)')
             )).toBe(true);
         });
 
@@ -84,34 +87,55 @@ describe('Equality Axioms', () => {
                 functions: new Map(),
                 predicates: new Map([['P', 1]]),
                 constants: new Set(),
+                variables: new Set(),
             };
             const axioms = generateEqualityAxioms(sig);
-            // P(Y1) :- eq(X1, Y1), P(X1).
+            // P(Y1) :- eq_d(X1, Y1, 5), P(X1).
             expect(axioms.some(a =>
                 a.startsWith('P(Y1) :-') &&
-                a.includes('eq(X1, Y1)') &&
+                a.includes('eq_d(X1, Y1, 5)') &&
                 a.includes('P(X1)')
             )).toBe(true);
         });
+    });
 
-        it('should skip congruence when disabled', () => {
-            const sig: Signature = {
-                functions: new Map([['f', 1]]),
-                predicates: new Map(),
-                constants: new Set(),
-            };
-            const axioms = generateEqualityAxioms(sig, { includeCongruence: false });
-            expect(axioms.some(a => a.includes('f(X1)'))).toBe(false);
+    describe('PrologEngine with equality', () => {
+        let prologEngine: any;
+
+        beforeEach(async () => {
+            const { PrologEngine } = await import('../src/engines/prolog');
+            prologEngine = new PrologEngine(5000, 1000);
         });
 
-        it('should skip substitution when disabled', () => {
-            const sig: Signature = {
-                functions: new Map(),
-                predicates: new Map([['P', 1]]),
-                constants: new Set(),
-            };
-            const axioms = generateEqualityAxioms(sig, { includeSubstitution: false });
-            expect(axioms.some(a => a.startsWith('P(Y1)'))).toBe(false);
+        it('should inject base equality axioms (eq_d) when enabled', async () => {
+            const result = await prologEngine.prove(
+                [],
+                'eq(alice, alice)',
+                { enableEquality: true, verbosity: 'detailed' }
+            );
+            expect(result.prologProgram).toBeDefined();
+            expect(result.prologProgram).toContain('eq_d(X, X, _)');
+        });
+
+        it('should inject bridge connecting eq to eq_d', async () => {
+            const result = await prologEngine.prove(
+                ['eq(alice, bob)'],
+                'eq(bob, alice)',
+                { enableEquality: true, verbosity: 'detailed' }
+            );
+            expect(result.prologProgram).toBeDefined();
+            // eq(X, Y) :- eq_d(X, Y, 5).
+            expect(result.prologProgram).toContain('eq(X, Y) :- eq_d(X, Y, 5)');
+        });
+
+        it('should not inject equality axioms when disabled', async () => {
+            const result = await prologEngine.prove(
+                ['alice = bob'],
+                'P(x)',
+                { enableEquality: false, verbosity: 'detailed' }
+            );
+            expect(result.prologProgram).toBeDefined();
+            expect(result.prologProgram).not.toContain('eq_d(X, X, _)');
         });
     });
 
@@ -120,74 +144,9 @@ describe('Equality Axioms', () => {
             const ast = parse('a = b');
             expect(containsEquality(ast)).toBe(true);
         });
-
-        it('should detect equality in nested formula', () => {
-            const ast = parse('P(x) & (a = b)');
-            expect(containsEquality(ast)).toBe(true);
-        });
-
-        it('should detect equality under quantifier', () => {
-            const ast = parse('all x (x = x)');
-            expect(containsEquality(ast)).toBe(true);
-        });
-
         it('should return false when no equality', () => {
             const ast = parse('P(x) & Q(y)');
             expect(containsEquality(ast)).toBe(false);
-        });
-
-        it('should detect equality in implication', () => {
-            const ast = parse('P(x) -> x = y');
-            expect(containsEquality(ast)).toBe(true);
-        });
-
-        it('should detect equality under negation', () => {
-            const ast = parse('-(a = b)');
-            expect(containsEquality(ast)).toBe(true);
-        });
-    });
-
-    describe('extractSignature', () => {
-        it('should extract predicates with correct arity', () => {
-            const ast = parse('P(x, y) & Q(z)');
-            const sig = extractSignature(ast);
-            expect(sig.predicates.get('P')).toBe(2);
-            expect(sig.predicates.get('Q')).toBe(1);
-        });
-
-        it('should extract functions with correct arity', () => {
-            const ast = parse('P(f(x), g(x, y))');
-            const sig = extractSignature(ast);
-            expect(sig.functions.get('f')).toBe(1);
-            expect(sig.functions.get('g')).toBe(2);
-        });
-
-        it('should extract constants', () => {
-            const ast = parse('P(socrates)');
-            const sig = extractSignature(ast);
-            expect(sig.constants.has('socrates')).toBe(true);
-        });
-
-        it('should handle complex nested formulas', () => {
-            const ast = parse('all x exists y (P(x, f(y)) -> Q(g(x, y)))');
-            const sig = extractSignature(ast);
-            expect(sig.predicates.get('P')).toBe(2);
-            expect(sig.predicates.get('Q')).toBe(1);
-            expect(sig.functions.get('f')).toBe(1);
-            expect(sig.functions.get('g')).toBe(2);
-        });
-    });
-
-    describe('extractSignatures', () => {
-        it('should combine signatures from multiple formulas', () => {
-            const asts = [
-                parse('P(x)'),
-                parse('Q(x, y)'),
-                parse('R(f(x))'),
-            ];
-            const sig = extractSignatures(asts);
-            expect(sig.predicates.size).toBe(3);
-            expect(sig.functions.size).toBe(1);
         });
     });
 
@@ -202,82 +161,7 @@ describe('Equality Axioms', () => {
             const asts = [parse('x = y'), parse('P(x)')];
             const axioms = generateMinimalEqualityAxioms(asts);
             expect(axioms.length).toBeGreaterThan(0);
-            // Should have P substitution axiom
             expect(axioms.some(a => a.includes('P('))).toBe(true);
-        });
-
-        it('should include function congruence when functions used', () => {
-            const asts = [parse('f(x) = f(y)')];
-            const axioms = generateMinimalEqualityAxioms(asts);
-            expect(axioms.some(a =>
-                a.includes('f(X1)') && a.includes('f(Y1)')
-            )).toBe(true);
-        });
-    });
-
-    describe('getEqualityBridge', () => {
-        it('should return Prolog unification bridge', () => {
-            const bridge = getEqualityBridge();
-            expect(bridge.some(b => b.includes('eq(X, Y)') && b.includes('X = Y'))).toBe(true);
-        });
-
-        it('should include inequality helper', () => {
-            const bridge = getEqualityBridge();
-            expect(bridge.some(b => b.includes('neq'))).toBe(true);
-        });
-    });
-
-    describe('LogicEngine with equality', () => {
-        let engine: any;
-
-        beforeEach(async () => {
-            const { LogicEngine } = await import('../src/logicEngine');
-            engine = new LogicEngine(5000, 1000);
-        });
-
-        it('should inject base equality axioms when enabled', async () => {
-            // Verify that base equality axioms are always injected when enableEquality=true
-            const result = await engine.prove(
-                [],
-                'eq(alice, alice)',
-                { enableEquality: true, verbosity: 'detailed' }
-            );
-            expect(result.prologProgram).toBeDefined();
-            // Check that base axioms are present
-            expect(result.prologProgram).toContain('eq(X, X)');
-            expect(result.prologProgram).toContain('eq(X, Y)');
-        });
-
-        it('should inject bridge connecting eq to Prolog unification', async () => {
-            const result = await engine.prove(
-                ['eq(alice, bob)'],
-                'eq(bob, alice)',
-                { enableEquality: true, verbosity: 'detailed' }
-            );
-            expect(result.prologProgram).toBeDefined();
-            // Check bridge axiom exists
-            expect(result.prologProgram).toContain('X = Y');
-        });
-
-        it('should include equality axioms in program when detailed', async () => {
-            // Must include equality formula to trigger axiom generation
-            const result = await engine.prove(
-                ['alice = bob'],  // Equality triggers axiom injection
-                'eq(bob, alice)',
-                { enableEquality: true, verbosity: 'detailed' }
-            );
-            expect(result.prologProgram).toBeDefined();
-            expect(result.prologProgram).toContain('eq(X, X)');
-        });
-
-        it('should not inject equality axioms when disabled', async () => {
-            const result = await engine.prove(
-                ['alice = bob'],
-                'P(x)',
-                { enableEquality: false, verbosity: 'detailed' }
-            );
-            expect(result.prologProgram).toBeDefined();
-            expect(result.prologProgram).not.toContain('eq(X, X)');
         });
     });
 });

@@ -5,7 +5,7 @@
  * via the MCP resources protocol.
  */
 
-import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../categoricalHelpers.js';
+import { CategoricalHelpers, monoidAxioms, groupAxioms } from '../axioms/categorical.js';
 
 /**
  * Resource definition
@@ -40,6 +40,24 @@ export const RESOURCES: Resource[] = [
         mimeType: 'text/plain',
     },
     {
+        uri: 'logic://axioms/ring',
+        name: 'Ring Axioms',
+        description: 'Ring structure: abelian group for addition, monoid for multiplication, distributivity',
+        mimeType: 'text/plain',
+    },
+    {
+        uri: 'logic://axioms/lattice',
+        name: 'Lattice Axioms',
+        description: 'Lattice structure: two idempotent, commutative, associative, absorptive operations',
+        mimeType: 'text/plain',
+    },
+    {
+        uri: 'logic://axioms/equivalence',
+        name: 'Equivalence Relation Axioms',
+        description: 'Reflexive, symmetric, and transitive relation',
+        mimeType: 'text/plain',
+    },
+    {
         uri: 'logic://axioms/peano',
         name: 'Peano Arithmetic',
         description: 'Peano axioms for natural numbers',
@@ -69,6 +87,29 @@ export const RESOURCES: Resource[] = [
         description: 'List of available reasoning engines with their capabilities',
         mimeType: 'application/json',
     },
+];
+
+export const RING_AXIOMS = [
+    'all X (add(zero, X) = X)',
+    'all X (add(neg(X), X) = zero)',
+    'all X all Y (add(X, Y) = add(Y, X))',
+    'all X all Y all Z (add(add(X, Y), Z) = add(X, add(Y, Z)))',
+    'all X all Y all Z (mul(mul(X, Y), Z) = mul(X, mul(Y, Z)))',
+    'all X all Y all Z (mul(X, add(Y, Z)) = add(mul(X, Y), mul(X, Z)))',
+];
+
+export const LATTICE_AXIOMS = [
+    'all X (meet(X, X) = X)', 'all X (join(X, X) = X)',
+    'all X all Y (meet(X, Y) = meet(Y, X))', 'all X all Y (join(X, Y) = join(Y, X))',
+    'all X all Y all Z (meet(meet(X, Y), Z) = meet(X, meet(Y, Z)))',
+    'all X all Y all Z (join(join(X, Y), Z) = join(X, join(Y, Z)))',
+    'all X all Y (meet(X, join(X, Y)) = X)', 'all X all Y (join(X, meet(X, Y)) = X)',
+];
+
+export const EQUIVALENCE_AXIOMS = [
+    'all X (equiv(X, X))',
+    'all X all Y (equiv(X, Y) -> equiv(Y, X))',
+    'all X all Y all Z ((equiv(X, Y) & equiv(Y, Z)) -> equiv(X, Z))',
 ];
 
 // Lazy-initialized helpers
@@ -191,6 +232,12 @@ export function getResourceContent(uri: string): string | null {
             return formatAxioms('Monoid Axioms', monoidAxioms());
         case 'logic://axioms/group':
             return formatAxioms('Group Axioms', groupAxioms());
+        case 'logic://axioms/ring':
+            return formatAxioms('Ring Axioms', RING_AXIOMS);
+        case 'logic://axioms/lattice':
+            return formatAxioms('Lattice Axioms', LATTICE_AXIOMS);
+        case 'logic://axioms/equivalence':
+            return formatAxioms('Equivalence Relation Axioms', EQUIVALENCE_AXIOMS);
         case 'logic://axioms/peano':
             return formatAxioms('Peano Arithmetic', peanoAxioms());
         case 'logic://axioms/set-zfc':
@@ -258,4 +305,3 @@ function getEngineInfo(): string {
 
     return JSON.stringify({ engines }, null, 2);
 }
-

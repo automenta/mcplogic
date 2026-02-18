@@ -35,6 +35,20 @@ export interface EngineProveOptions {
     enableEquality?: boolean;
     /** Force clausification for SAT fallback */
     enableClausify?: boolean;
+    /** Search strategy (e.g., iterative deepening) */
+    strategy?: 'auto' | 'breadth' | 'depth' | 'iterative';
+    /** Maximum inference steps */
+    maxInferences?: number;
+    /** Maximum time in seconds */
+    maxSeconds?: number;
+    /** Include step-by-step inference trace */
+    includeTrace?: boolean;
+    /**
+     * Callback for progress updates.
+     * @param progress A number between 0 and 1 (if known) or undefined.
+     * @param message A descriptive message about the current step.
+     */
+    onProgress?: (progress: number | undefined, message: string) => void;
 }
 
 /**

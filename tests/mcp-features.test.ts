@@ -4,14 +4,14 @@
  * Tests the new Phase 3 features: axiom libraries and reasoning templates.
  */
 
-import { listResources, getResourceContent, RESOURCES } from '../src/resources/index.js';
-import { listPrompts, getPrompt, PROMPTS } from '../src/prompts/index.js';
+import { listResources, getResourceContent } from '../src/resources/index.js';
+import { listPrompts, getPrompt } from '../src/prompts/index.js';
 
 describe('MCP Resources', () => {
     describe('listResources', () => {
         test('returns all resources', () => {
             const resources = listResources();
-            expect(resources.length).toBe(8);  // 7 axiom resources + 1 engine info
+            expect(resources.length).toBe(11);  // 10 axiom resources + 1 engine info
         });
 
         test('each resource has required fields', () => {

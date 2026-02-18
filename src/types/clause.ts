@@ -5,6 +5,7 @@
  * Used by the clausifier to transform arbitrary FOL into clause form.
  */
 
+import { ASTNode } from './ast.js';
 import { LogicError } from './errors.js';
 
 /**
@@ -15,7 +16,7 @@ export interface Literal {
     /** Predicate name */
     predicate: string;
     /** Arguments (variable or constant names) */
-    args: string[];
+    args: ASTNode[];
     /** Whether this literal is negated */
     negated: boolean;
 }
@@ -83,68 +84,6 @@ export interface SkolemEnv {
 }
 
 /**
- * Create a new Skolem environment.
- */
-export function createSkolemEnv(): SkolemEnv {
-    return {
-        counter: 0,
-        skolemMap: new Map(),
-        universalVars: [],
-        generatedSkolems: new Map(),
-    };
-}
-
-/**
- * Check if two literals are complementary (same predicate, opposite sign).
- */
-export function areComplementary(l1: Literal, l2: Literal): boolean {
-    if (l1.predicate !== l2.predicate) return false;
-    if (l1.negated === l2.negated) return false;
-    if (l1.args.length !== l2.args.length) return false;
-    return l1.args.every((arg, i) => arg === l2.args[i]);
-}
-
-/**
- * Check if a clause is a tautology (contains complementary literals).
- */
-export function isTautology(clause: Clause): boolean {
-    for (let i = 0; i < clause.literals.length; i++) {
-        for (let j = i + 1; j < clause.literals.length; j++) {
-            if (areComplementary(clause.literals[i], clause.literals[j])) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-/**
- * Format a literal as a string.
- */
-export function literalToString(lit: Literal): string {
-    const atom = lit.args.length > 0
-        ? `${lit.predicate}(${lit.args.join(', ')})`
-        : lit.predicate;
-    return lit.negated ? `¬${atom}` : atom;
-}
-
-/**
- * Format a clause as a string (disjunction of literals).
- */
-export function clauseToString(clause: Clause): string {
-    if (clause.literals.length === 0) return '□'; // Empty clause = false
-    return clause.literals.map(literalToString).join(' ∨ ');
-}
-
-/**
- * Format CNF as a string (conjunction of clauses).
- */
-export function cnfToString(clauses: Clause[]): string {
-    if (clauses.length === 0) return '⊤'; // No clauses = true
-    return clauses.map(c => `(${clauseToString(c)})`).join(' ∧ ');
-}
-
-/**
  * Result of converting clauses to DIMACS format.
  */
 export interface DIMACSResult {
@@ -155,13 +94,3 @@ export interface DIMACSResult {
     /** Statistics about the DIMACS output */
     stats: { variables: number; clauses: number };
 }
-
-/**
- * Convert a literal to its unique atom key (without negation).
- */
-export function atomToKey(lit: Literal): string {
-    return lit.args.length > 0
-        ? `${lit.predicate}(${lit.args.join(',')})`
-        : lit.predicate;
-}
-

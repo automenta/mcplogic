@@ -18,7 +18,8 @@ export type LogicErrorCode =
   | 'SESSION_LIMIT'         // Max sessions reached
   | 'ENGINE_ERROR'          // Internal Prolog error
   | 'CLAUSIFICATION_ERROR'  // Error during CNF conversion
-  | 'CLAUSIFICATION_BLOWUP'; // CNF blowup exceeded limits
+  | 'CLAUSIFICATION_BLOWUP' // CNF blowup exceeded limits
+  | 'INVALID_PREDICATE';    // Predicate not allowed by ontology
 
 /**
  * Source location span for error reporting
@@ -234,6 +235,61 @@ export function createEngineError(
 }
 
 /**
+ * Create an unsatisfiable error
+ */
+export function createUnsatisfiableError(
+  message: string = 'The premises are unsatisfiable'
+): LogicException {
+  return new LogicException({
+    code: 'UNSATISFIABLE',
+    message,
+    suggestion: 'Check for contradictory premises',
+  });
+}
+
+/**
+ * Create a timeout error
+ */
+export function createTimeoutError(
+  limitMs: number,
+  operation: string = 'Operation'
+): LogicException {
+  return new LogicException({
+    code: 'TIMEOUT',
+    message: `${operation} timed out after ${limitMs}ms`,
+    suggestion: 'Try simplifying the problem or increasing the timeout',
+    details: { limitMs },
+  });
+}
+
+/**
+ * Create an invalid domain error
+ */
+export function createInvalidDomainError(
+  message: string
+): LogicException {
+  return new LogicException({
+    code: 'INVALID_DOMAIN',
+    message,
+    suggestion: 'Ensure domain size is positive and within limits',
+  });
+}
+
+/**
+ * Create a clausification error
+ */
+export function createClausificationError(
+  message: string,
+  details?: Record<string, unknown>
+): LogicException {
+  return new LogicException({
+    code: 'CLAUSIFICATION_ERROR',
+    message: `Clausification failed: ${message}`,
+    details,
+  });
+}
+
+/**
  * Get line number from position in string
  */
 function getLineNumber(input: string, position: number): number {
@@ -276,4 +332,20 @@ export function createError(
     message,
     details,
   };
+}
+
+/**
+ * Create a generic logic error exception.
+ * Use this when no specific factory is available.
+ */
+export function createGenericError(
+  code: LogicErrorCode,
+  message: string,
+  details?: Record<string, unknown>
+): LogicException {
+  return new LogicException({
+    code,
+    message,
+    details,
+  });
 }
