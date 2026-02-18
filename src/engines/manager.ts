@@ -14,7 +14,8 @@ import {
     EngineCapabilities,
     EngineProveOptions,
     SatResult,
-    ReasoningEngine
+    ReasoningEngine,
+    EngineSession
 } from './interface.js';
 import { containsArithmetic } from '../axioms/arithmetic.js';
 
@@ -70,8 +71,7 @@ export class EngineManager {
             },
             capabilities: {
                 horn: true,
-                fullFol: false,
-                equality: false,
+                fullFol: false,                equality: false,
                 arithmetic: false,
                 streaming: false
             },
@@ -149,6 +149,17 @@ export class EngineManager {
             }
         }
         return entry.instance;
+    }
+
+    /**
+     * Create a new persistent session with the specified engine.
+     */
+    async createSession(engineName: string): Promise<EngineSession> {
+        const engine = await this.getEngine(engineName);
+        if (engine.createSession) {
+            return engine.createSession();
+        }
+        throw new Error(`Engine ${engineName} does not support sessions.`);
     }
 
     /**

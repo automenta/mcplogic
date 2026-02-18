@@ -1,5 +1,5 @@
 import clingo from 'clingo-wasm';
-import { ReasoningEngine, EngineCapabilities, EngineProveOptions, SatResult } from '../interface.js';
+import { ReasoningEngine, EngineCapabilities, EngineProveOptions, SatResult, EngineSession } from '../interface.js';
 import { ProveResult, createEngineError } from '../../types/index.js';
 import { buildProveResult } from '../../utils/response.js';
 import { parse } from '../../parser/index.js';
@@ -7,6 +7,7 @@ import { createNot, createAnd } from '../../ast/index.js';
 import { clausify } from '../../logic/clausifier.js';
 import { clausesToASP } from './translator.js';
 import { Clause } from '../../types/clause.js';
+import { ClingoSession } from './session.js';
 
 export class ClingoEngine implements ReasoningEngine {
     readonly name = 'clingo';
@@ -28,6 +29,11 @@ export class ClingoEngine implements ReasoningEngine {
         } catch (e) {
             throw createEngineError(`Failed to initialize Clingo: ${e}`);
         }
+    }
+
+    async createSession(): Promise<EngineSession> {
+        if (!this.initialized) await this.init();
+        return new ClingoSession();
     }
 
     async prove(

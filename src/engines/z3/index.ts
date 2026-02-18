@@ -1,11 +1,12 @@
 import { init } from 'z3-solver';
-import { ReasoningEngine, EngineCapabilities, EngineProveOptions, SatResult } from '../interface.js';
+import { ReasoningEngine, EngineCapabilities, EngineProveOptions, SatResult, EngineSession } from '../interface.js';
 import { ProveResult, createEngineError } from '../../types/index.js';
 import { buildProveResult } from '../../utils/response.js';
 import { parse } from '../../parser/index.js';
 import { createNot } from '../../ast/index.js';
 import { Z3Translator } from './translator.js';
 import { Clause } from '../../types/clause.js';
+import { Z3Session } from './session.js';
 
 export class Z3Engine implements ReasoningEngine {
     readonly name = 'z3';
@@ -31,6 +32,16 @@ export class Z3Engine implements ReasoningEngine {
         } catch (e) {
             throw createEngineError(`Failed to initialize Z3: ${e}`);
         }
+    }
+
+    async createSession(): Promise<EngineSession> {
+        if (!this.ctx) await this.init();
+        // Create a new session sharing the Context (or maybe a fresh context?)
+        // Sharing context allows sharing symbols? Z3Py usually uses one context.
+        // But if sessions run in parallel, sharing context might be thread-unsafe if not careful?
+        // JS is single threaded. Z3 WASM is likely single threaded.
+        // Sharing context is fine.
+        return new Z3Session(this.ctx);
     }
 
     async prove(
