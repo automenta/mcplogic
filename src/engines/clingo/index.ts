@@ -67,8 +67,8 @@ export class ClingoEngine implements ReasoningEngine {
 
             // 4. Run Clingo
             // We want to find if there are ANY models.
-            // options: { maxModels: 1 } to stop early if one is found
-            const result = await clingo.run(aspProgram, { maxModels: 1 });
+            // run(program: string, models?: number, options?: string[])
+            const result = await clingo.run(aspProgram, 1);
 
             // 5. Interpret result
             // If models found -> SAT (Counterexample) -> Failed to prove
@@ -96,13 +96,22 @@ export class ClingoEngine implements ReasoningEngine {
                     ],
                     timeMs: Date.now() - startTime,
                 }, verbosity);
-            } else {
-                 // Include output/errors if available
-                 const errorMsg = result.Errors ? result.Errors.join('\n') : (result.Output ? result.Output.join('\n') : `Clingo returned ${result.Result}`);
+            } else if (result.Result === 'ERROR') {
+                 // Handle ClingoError
+                 const errorMsg = (result as any).Error || 'Unknown Clingo Error';
                  return buildProveResult({
                     success: false,
                     result: 'error',
                     error: `Clingo Error: ${errorMsg}`,
+                    timeMs: Date.now() - startTime,
+                }, verbosity);
+            } else {
+                 // UNKNOWN or other
+                 const warnings = (result as any).Warnings ? (result as any).Warnings.join('\n') : '';
+                 return buildProveResult({
+                    success: false,
+                    result: 'error',
+                    error: `Clingo returned ${result.Result}. ${warnings}`,
                     timeMs: Date.now() - startTime,
                 }, verbosity);
             }
@@ -124,14 +133,17 @@ export class ClingoEngine implements ReasoningEngine {
             if (!this.initialized) await this.init();
 
             const aspProgram = clausesToASP(clauses);
-            const result = await clingo.run(aspProgram, { maxModels: 1 });
+            const result = await clingo.run(aspProgram, 1);
 
             if (result.Result === 'SATISFIABLE') {
                 // Extract model if needed.
-                // result.Models[0].Atoms is a list of strings
+                // Models are in result.Call[0].Witnesses[0].Value (array of strings)
                 const model = new Map<string, boolean>();
-                if (result.Models && result.Models.length > 0) {
-                     result.Models[0].Atoms.forEach(atom => model.set(atom, true));
+                if ('Call' in result && result.Call && result.Call.length > 0) {
+                     const witnesses = result.Call[result.Call.length - 1].Witnesses;
+                     if (witnesses && witnesses.length > 0) {
+                         witnesses[0].Value.forEach((atom: string) => model.set(atom, true));
+                     }
                 }
 
                 return {
