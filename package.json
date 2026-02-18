@@ -41,8 +41,10 @@
     "license": "MIT",
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.0.0",
+        "clingo-wasm": "^0.3.2",
         "logic-solver": "^2.0.1",
-        "tau-prolog": "^0.3.4"
+        "tau-prolog": "^0.3.4",
+        "z3-solver": "^4.15.8"
     },
     "devDependencies": {
         "@playwright/test": "^1.57.0",

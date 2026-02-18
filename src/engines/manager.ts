@@ -17,11 +17,14 @@ import {
 } from './interface.js';
 import { PrologEngine, createPrologEngine } from './prolog/index.js';
 import { SATEngine, createSATEngine } from './sat/index.js';
+import { Z3Engine } from './z3/index.js';
+import { ClingoEngine } from './clingo/index.js';
+import { containsArithmetic } from '../axioms/arithmetic.js';
 
 /**
  * Engine selection mode
  */
-export type EngineSelection = 'prolog' | 'sat' | 'auto';
+export type EngineSelection = 'prolog' | 'sat' | 'z3' | 'clingo' | 'auto';
 
 /**
  * Extended prove options with engine selection
@@ -37,19 +40,23 @@ export interface ManagerProveOptions extends EngineProveOptions {
  * In 'auto' mode:
  * - Analyzes formula structure
  * - Uses Prolog for Horn clauses (fast, proven)
- * - Falls back to SAT for non-Horn clauses
+ * - Uses Z3 for arithmetic, equality, and complex FOL (SMT)
+ * - Falls back to SAT for non-Horn clauses if Z3 unavailable/unsuitable
  */
 export class EngineManager {
     private prolog: PrologEngine;
     private sat: SATEngine;
+    private z3: Z3Engine;
+    private clingo: ClingoEngine;
 
     constructor(
-        timeout: number = 5000,
+        timeout: number = 5000, // kept for compatibility signature
         inferenceLimit: number = 1000
     ) {
-        // Prolog engine now only accepts inferenceLimit
         this.prolog = createPrologEngine(inferenceLimit);
         this.sat = createSATEngine();
+        this.z3 = new Z3Engine();
+        this.clingo = new ClingoEngine();
     }
 
     /**
@@ -66,6 +73,14 @@ export class EngineManager {
         return this.sat;
     }
 
+    getZ3Engine(): Z3Engine {
+        return this.z3;
+    }
+
+    getClingoEngine(): ClingoEngine {
+        return this.clingo;
+    }
+
     /**
      * Prove a conclusion from premises with automatic engine selection.
      */
@@ -77,18 +92,23 @@ export class EngineManager {
         const engine = options?.engine ?? 'auto';
 
         // Explicit engine selection
-        if (engine === 'prolog') {
-            const result = await this.prolog.prove(premises, conclusion, options);
-            return { ...result, engineUsed: this.prolog.name };
+        switch (engine) {
+            case 'prolog':
+                const resProlog = await this.prolog.prove(premises, conclusion, options);
+                return { ...resProlog, engineUsed: this.prolog.name };
+            case 'sat':
+                const resSat = await this.sat.prove(premises, conclusion, options);
+                return { ...resSat, engineUsed: this.sat.name };
+            case 'z3':
+                const resZ3 = await this.z3.prove(premises, conclusion, options);
+                return { ...resZ3, engineUsed: this.z3.name };
+            case 'clingo':
+                const resClingo = await this.clingo.prove(premises, conclusion, options);
+                return { ...resClingo, engineUsed: this.clingo.name };
+            case 'auto':
+            default:
+                return this.autoProve(premises, conclusion, options);
         }
-
-        if (engine === 'sat') {
-            const result = await this.sat.prove(premises, conclusion, options);
-            return { ...result, engineUsed: this.sat.name };
-        }
-
-        // Auto mode: analyze formula structure
-        return this.autoProve(premises, conclusion, options);
     }
 
     /**
@@ -100,37 +120,59 @@ export class EngineManager {
         options?: EngineProveOptions
     ): Promise<ProveResult & { engineUsed?: string }> {
         try {
-            // Build the refutation formula: premises & -conclusion
+            // Build the AST to analyze structure
             const premiseNodes = premises.map(p => parse(p));
             const conclusionNode = parse(conclusion);
-            const negatedConclusion = createNot(conclusionNode);
 
-            // Combine all formulas with AND
+            // Check for Arithmetic
+            const hasArithmetic = premiseNodes.some(containsArithmetic) || containsArithmetic(conclusionNode);
+            if (hasArithmetic || options?.enableArithmetic) {
+                // Z3 is best for arithmetic
+                const res = await this.z3.prove(premises, conclusion, options);
+                return { ...res, engineUsed: this.z3.name };
+            }
+
+            // Check for non-Horn structure via Clausification
+            // Build refutation AST
+            const negatedConclusion = createNot(conclusionNode);
             const allNodes = [...premiseNodes, negatedConclusion];
             const refutationAST = allNodes.length > 0
                 ? allNodes.reduce((acc, node) => createAnd(acc, node))
                 : negatedConclusion;
 
-            // Try to clausify to analyze structure
             const clausifyResult = clausify(refutationAST);
 
-            // If clausification fails or formula is Horn, use Prolog
+            // If clausification fails, fallback to Z3 (it handles raw AST)
             if (!clausifyResult.success || !clausifyResult.clauses) {
-                const result = await this.prolog.prove(premises, conclusion, options);
-                return { ...result, engineUsed: this.prolog.name };
+                const res = await this.z3.prove(premises, conclusion, options);
+                return { ...res, engineUsed: this.z3.name };
             }
 
-            // Check if Horn (Prolog-compatible)
+            // If Horn, Prolog is fastest
             if (isHornFormula(clausifyResult.clauses)) {
-                const result = await this.prolog.prove(premises, conclusion, options);
-                return { ...result, engineUsed: this.prolog.name };
+                const res = await this.prolog.prove(premises, conclusion, options);
+                return { ...res, engineUsed: this.prolog.name };
             }
 
-            // Non-Horn: use SAT solver
-            const result = await this.sat.prove(premises, conclusion, options);
-            return { ...result, engineUsed: this.sat.name };
+            // Non-Horn: Z3 is preferred over SAT (MiniSat) because Z3 is a stronger solver
+            // But if Z3 fails (e.g. WASM issue), we might want fallback?
+            // For now, prioritize Z3.
+            try {
+                const resZ3 = await this.z3.prove(premises, conclusion, options);
+                if (resZ3.result !== 'error') {
+                    return { ...resZ3, engineUsed: this.z3.name };
+                }
+            } catch (e) {
+                // Z3 failed, fallback to SAT
+            }
+
+            // Fallback to SAT
+            const resSat = await this.sat.prove(premises, conclusion, options);
+            return { ...resSat, engineUsed: this.sat.name };
+
         } catch (e) {
-            // If parsing fails, fall back to Prolog (it handles errors gracefully or we just default to it)
+            // If parsing fails or analysis fails, default to Prolog (robust) or Z3?
+            // Prolog is the legacy default.
             const result = await this.prolog.prove(premises, conclusion, options);
             return { ...result, engineUsed: this.prolog.name };
         }
@@ -143,19 +185,18 @@ export class EngineManager {
     async checkSat(clauses: Clause[], engine?: EngineSelection): Promise<SatResult> {
         const selectedEngine = engine ?? 'auto';
 
-        if (selectedEngine === 'prolog') {
-            return this.prolog.checkSat(clauses);
-        }
+        if (selectedEngine === 'prolog') return this.prolog.checkSat(clauses);
+        if (selectedEngine === 'sat') return this.sat.checkSat(clauses);
+        if (selectedEngine === 'z3') return this.z3.checkSat(clauses);
+        if (selectedEngine === 'clingo') return this.clingo.checkSat(clauses);
 
-        if (selectedEngine === 'sat') {
-            return this.sat.checkSat(clauses);
-        }
-
-        // Auto: use Prolog for Horn, SAT otherwise
+        // Auto
         if (isHornFormula(clauses)) {
             return this.prolog.checkSat(clauses);
         }
-
+        // Use Z3 for SAT checks if possible, it's faster than MiniSat-in-JS usually
+        // But for consistency with legacy, maybe SAT engine?
+        // Let's use SAT engine for now as it's proven for this codebase's SAT tasks (Model Finding)
         return this.sat.checkSat(clauses);
     }
 
@@ -166,6 +207,8 @@ export class EngineManager {
         return [
             { name: this.prolog.name, capabilities: this.prolog.capabilities },
             { name: this.sat.name, capabilities: this.sat.capabilities },
+            { name: this.z3.name, capabilities: this.z3.capabilities },
+            { name: this.clingo.name, capabilities: this.clingo.capabilities },
         ];
     }
 }

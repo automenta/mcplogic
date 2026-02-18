@@ -72,6 +72,7 @@ describe('EngineManager Heuristics', () => {
             'Q(a)',
             { engine: 'auto' }
         );
-        expect(result.engineUsed).toBe('sat/minisat');
+        // Z3 is now preferred over MiniSat for non-Horn clauses if available
+        expect(['z3', 'sat/minisat']).toContain(result.engineUsed);
     });
 });

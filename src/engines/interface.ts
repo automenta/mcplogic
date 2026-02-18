@@ -96,4 +96,9 @@ export interface ReasoningEngine {
      * @returns SatResult indicating sat/unsat and model
      */
     checkSat(clauses: Clause[]): Promise<SatResult>;
+
+    /**
+     * Optional initialization for lazy-loaded engines (e.g., WASM modules).
+     */
+    init?(): Promise<void>;
 }
