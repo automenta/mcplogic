@@ -16,6 +16,7 @@ Original: https://github.com/angrysky56/mcp-logic/
 - [x] **Counterexample Detection** — Find models refuting conclusions
 - [x] **Syntax Validation** — Pre-validate formulas with detailed errors
 - [x] **CNF Clausification** — Transform FOL to Conjunctive Normal Form
+- [x] **Tseitin Transformation** — Linear-size CNF conversion for SAT (avoids exponential blowup)
 - [x] **DIMACS Export** — Export CNF for external SAT solvers
 - [x] **Symmetry Breaking** — Lex-leader for model search (reduces search space exponentially)
 - [x] **SAT-Backed Model Finding** — Scale to domain 25+ with automatic SAT threshold
@@ -36,6 +37,7 @@ Original: https://github.com/angrysky56/mcp-logic/
 ### Logic Features
 - [x] **Arithmetic Support** — Built-in: `lt`, `gt`, `plus`, `minus`, `times`, `divides`
 - [x] **Equality Reasoning** — Reflexivity, symmetry, transitivity, congruence
+- [x] **Rewriting System** — Knuth-Bendix style term rewriting for efficient equality handling (Prolog)
 - [x] **Extended Axiom Library** — Ring, field, lattice, equivalence relation axioms
 - [x] **Function Interpretation** — Full function support in model finding
 - [ ] **Typed/Sorted FOL** — Domain-constraining type annotations (research)

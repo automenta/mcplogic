@@ -44,6 +44,11 @@ export class PrologEngine implements ReasoningEngine {
         this.engine = new LogicEngine(inferenceLimit);
     }
 
+    async init(): Promise<void> {
+        // No-op for Prolog engine (initialized in constructor/sync)
+        return Promise.resolve();
+    }
+
     /**
      * Prove a conclusion from premises using Prolog resolution.
      */

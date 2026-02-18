@@ -39,6 +39,11 @@ export class SATEngine implements ReasoningEngine {
         streaming: false,
     };
 
+    async init(): Promise<void> {
+        // No-op for SAT engine (initialized in constructor/sync)
+        return Promise.resolve();
+    }
+
     /**
      * Check satisfiability of clauses using the SAT solver.
      */
@@ -155,7 +160,8 @@ export class SATEngine implements ReasoningEngine {
                 : negatedConclusion; // Should not happen given premises+conclusion
 
             // Clausify 
-            const clausifyResult = clausify(refutationAST);
+            // Use Tseitin strategy for SAT to avoid exponential blowup
+            const clausifyResult = clausify(refutationAST, { strategy: 'tseitin' });
 
             if (!clausifyResult.success || !clausifyResult.clauses) {
                 return buildProveResult({

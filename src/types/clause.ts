@@ -42,6 +42,8 @@ export interface ClausifyOptions {
     maxClauseSize?: number;
     /** Timeout in milliseconds (default: 5000) */
     timeout?: number;
+    /** CNF transformation strategy: 'standard' (distribution) or 'tseitin' (variable introduction) */
+    strategy?: 'standard' | 'tseitin';
 }
 
 /**

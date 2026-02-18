@@ -31,12 +31,14 @@ import {
 } from './transform/index.js';
 import { createClausificationError, createGenericError } from '../types/errors.js';
 import { toCNF } from './cnf.js';
+import { toCNFTseitin } from './transform/tseitin.js';
 
 /** Default clausification options */
 const DEFAULT_OPTIONS: Required<ClausifyOptions> = {
     maxClauses: 10000,
     maxClauseSize: 50,
     timeout: 5000,
+    strategy: 'standard',
 };
 
 /**
@@ -68,7 +70,12 @@ export function clausify(formula: string | ASTNode, options: ClausifyOptions = {
         const quantifierFree = dropUniversals(skolemized);
 
         // Step 7-8: Convert to CNF and extract clauses
-        const clauses = toCNF(quantifierFree, opts, startTime);
+        let clauses: Clause[];
+        if (opts.strategy === 'tseitin') {
+            clauses = toCNFTseitin(quantifierFree);
+        } else {
+            clauses = toCNF(quantifierFree, opts, startTime);
+        }
 
         // Filter tautologies
         const filteredClauses = clauses.filter(c => !isTautology(c));
