@@ -158,13 +158,21 @@ async function runRepl(highPower: boolean) {
     });
 
     console.log(`MCP Logic REPL v${VERSION}${highPower ? ' [HIGH-POWER]' : ''}`);
-    console.log('Commands: .assert <formula>, .prove <goal>, .list, .clear, .quit\n');
+    console.log('Commands: .assert <formula>, .prove <goal>, .list, .clear, .quit, .help\n');
     rl.prompt();
 
     rl.on('line', async (line) => {
         const trimmed = line.trim();
 
-        if (trimmed.startsWith('.assert ')) {
+        if (trimmed === '.help') {
+            console.log('Commands:');
+            console.log('  .assert <formula>   Add a premise to the session');
+            console.log('  .prove <goal>       Try to prove goal from premises');
+            console.log('  .list               List current premises');
+            console.log('  .clear              Clear all premises');
+            console.log('  .quit, .exit, .q    Exit REPL');
+            console.log('  .help               Show this help');
+        } else if (trimmed.startsWith('.assert ')) {
             const formula = trimmed.slice(8).trim();
             try {
                 parse(formula);
