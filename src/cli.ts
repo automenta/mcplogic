@@ -5,6 +5,7 @@ import { createEngineManager, EngineSelection } from './engines/manager.js';
 import { createModelFinder } from './model/index.js';
 import { parse } from './parser/index.js';
 import { DEFAULTS } from './types/index.js';
+import { ReasoningAgent } from './agent/core.js';
 
 const VERSION = '1.1.1';
 const HELP = `
@@ -146,10 +147,9 @@ async function main() {
 }
 
 async function runRepl(highPower: boolean) {
-    const limit = highPower ? DEFAULTS.highPowerMaxInferences : 5000;
     const timeout = highPower ? 300000 : 30000;
-    const engineManager = createEngineManager(timeout, limit);
-    const premises: string[] = [];
+    // Use ReasoningAgent instead of raw EngineManager
+    const agent = new ReasoningAgent({ timeout, verbose: true });
 
     const rl = readline.createInterface({
         input: process.stdin,
@@ -175,35 +175,44 @@ async function runRepl(highPower: boolean) {
         } else if (trimmed.startsWith('.assert ')) {
             const formula = trimmed.slice(8).trim();
             try {
-                parse(formula);
-                premises.push(formula);
-                console.log(`✓ Asserted (${premises.length} total)`);
+                agent.assert(formula);
+                console.log(`✓ Asserted (${agent.getPremises().length} total)`);
             } catch (e) {
                 console.log(`✗ ${(e as Error).message}`);
             }
         } else if (trimmed.startsWith('.prove ')) {
             const goal = trimmed.slice(7).trim();
             try {
-                parse(goal);
-                const result = await engineManager.prove(premises, goal, {
-                    includeTrace: true,
-                    maxSeconds: timeout / 1000,
-                    maxInferences: limit
-                });
-                console.log(result.success ? '✓ Proved' : '✗ Not proved');
-                console.log(`Engine: ${result.engineUsed || 'unknown'}`);
-                if (result.inferenceSteps) console.log(result.inferenceSteps.join('\n'));
+                console.log(`Reasoning...`);
+                const result = await agent.prove(goal);
+
+                if (result.answer === 'True') {
+                    console.log('✓ Proved (TRUE)');
+                } else if (result.answer === 'False') {
+                    console.log('✗ Disproved (FALSE) - Counterexample found');
+                } else {
+                    console.log('? Unknown (Cannot prove or disprove)');
+                }
+
+                // Show trace/explanation if available
+                if (result.steps.length > 0) {
+                    console.log('\nSteps:');
+                    result.steps.forEach(s => {
+                        console.log(`- [${s.action.type}] ${s.action.content} -> ${s.action.explanation || ''}`);
+                    });
+                }
             } catch (e) {
                 console.log(`✗ ${(e as Error).message}`);
             }
         } else if (trimmed === '.list') {
+            const premises = agent.getPremises();
             if (premises.length === 0) {
                 console.log('(no premises)');
             } else {
                 premises.forEach((p, i) => console.log(`${i + 1}. ${p}`));
             }
         } else if (trimmed === '.clear') {
-            premises.length = 0;
+            agent.clear();
             console.log('Cleared.');
         } else if (trimmed === '.quit' || trimmed === '.exit' || trimmed === '.q') {
             rl.close();
