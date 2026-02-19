@@ -7,7 +7,7 @@ import { createNot } from '../../ast/index.js';
 import { Z3Translator } from './translator.js';
 import { Clause, Literal } from '../../types/clause.js';
 import { Z3Session } from './session.js';
-import { Z3Context, Z3Solver } from './types.js';
+import { Z3Context, Z3Solver, Z3Bool } from './types.js';
 import { ASTNode } from '../../types/ast.js';
 
 export class Z3Engine implements ReasoningEngine {
@@ -40,6 +40,10 @@ export class Z3Engine implements ReasoningEngine {
         return new Z3Session(this.ctx!);
     }
 
+    async close(): Promise<void> {
+        this.ctx = null;
+    }
+
     async prove(
         premises: string[],
         conclusion: string,
@@ -57,7 +61,7 @@ export class Z3Engine implements ReasoningEngine {
             solver = new this.ctx!.Solver() as unknown as Z3Solver;
 
             // Create translator
-            const translator = new Z3Translator(this.ctx, {
+            const translator = new Z3Translator(this.ctx!, {
                 enableArithmetic: options?.enableArithmetic,
                 enableEquality: options?.enableEquality
             });
@@ -66,14 +70,14 @@ export class Z3Engine implements ReasoningEngine {
             for (const p of premises) {
                 const ast = parse(p);
                 const z3Expr = translator.translate(ast);
-                solver.add(z3Expr);
+                solver.add(z3Expr as unknown as Z3Bool);
             }
 
             // Translate negated conclusion
             const conclusionAst = parse(conclusion);
             const negatedConclusion = createNot(conclusionAst);
             const z3NegConclusion = translator.translate(negatedConclusion);
-            solver.add(z3NegConclusion);
+            solver.add(z3NegConclusion as unknown as Z3Bool);
 
             // Check satisfiability with timeout wrapper
             const checkPromise = solver.check();
@@ -139,9 +143,7 @@ export class Z3Engine implements ReasoningEngine {
                 timeMs: Date.now() - startTime,
             }, verbosity);
         } finally {
-            if (solver && typeof solver.delete === 'function') {
-                solver.delete();
-            }
+            // Context handles cleanup
         }
     }
 
@@ -164,7 +166,7 @@ export class Z3Engine implements ReasoningEngine {
                 // Convert literals to Z3 Exprs
                 const litExprs = clause.literals.map(lit => {
                     const ast = this.literalToAST(lit);
-                    return translator.translate(ast);
+                    return translator.translate(ast) as unknown as Z3Bool;
                 });
 
                 if (litExprs.length === 0) {
@@ -198,9 +200,7 @@ export class Z3Engine implements ReasoningEngine {
                 statistics: { timeMs: Date.now() - startTime }
             };
         } finally {
-            if (solver && typeof solver.delete === 'function') {
-                solver.delete();
-            }
+            // Context handles cleanup
         }
     }
 

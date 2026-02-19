@@ -140,9 +140,9 @@ export class EngineManager {
                 const engine = await this.getEngine(name);
                 const res = await engine.prove(premises, conclusion, options);
 
-                // If the result is definitive (proved, disproved, failed/counterexample), return it.
+                // If the result is definitive (proved, failed/counterexample), return it.
                 // If it's a timeout or error, throw so Promise.any keeps looking.
-                if (res.result === 'proved' || res.result === 'disproved' || res.result === 'failed') {
+                if (res.result === 'proved' || res.result === 'failed') {
                     return { ...res, engineUsed: engine.name };
                 }
 
@@ -280,6 +280,10 @@ export class EngineManager {
             name: entry.actualName,
             capabilities: entry.capabilities
         }));
+    }
+
+    async close(): Promise<void> {
+        await this.registry.close();
     }
 }
 

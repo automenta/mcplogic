@@ -6,8 +6,17 @@
  * server-specific dependencies.
  */
 
-// Core Engine
+// Core Engine (Prolog)
 export { createLogicEngine, LogicEngine } from './engines/prolog/engine.js';
+
+// Engine Manager (Federation)
+export { createEngineManager, EngineManager } from './engines/manager.js';
+
+// Engines
+export { Z3Engine } from './engines/z3/index.js';
+export { ClingoEngine } from './engines/clingo/index.js';
+export { createSATEngine, SATEngine } from './engines/sat/index.js';
+export { createPrologEngine, PrologEngine } from './engines/prolog/index.js';
 
 // Model Finder
 export { createModelFinder, ModelFinder } from './model/index.js';
