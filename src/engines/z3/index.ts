@@ -151,7 +151,6 @@ export class Z3Engine implements ReasoningEngine {
                  this.ctx = null;
              }
 
-             console.error('Z3 Proof Error:', error); // Debug logging
              return buildProveResult({
                 success: false,
                 result: 'error',

@@ -18,6 +18,7 @@ import {
     EngineSession
 } from './interface.js';
 import { containsArithmetic } from '../axioms/arithmetic.js';
+import { EngineRegistry } from './registry.js';
 
 // Import types only to avoid eager loading
 import type { PrologEngine } from './prolog/index.js';
@@ -38,13 +39,6 @@ export interface ManagerProveOptions extends EngineProveOptions {
     engine?: EngineSelection;
 }
 
-interface EngineEntry {
-    factory: () => Promise<ReasoningEngine>;
-    capabilities: EngineCapabilities;
-    instance?: ReasoningEngine;
-    actualName: string;
-}
-
 /**
  * Engine Manager - orchestrates multiple reasoning engines.
  * 
@@ -55,100 +49,20 @@ interface EngineEntry {
  * - Falls back to SAT for non-Horn clauses if Z3 unavailable/unsuitable
  */
 export class EngineManager {
-    private registry: Map<string, EngineEntry>;
+    private registry: EngineRegistry;
 
     constructor(
         timeout: number = 5000, // kept for compatibility signature
         inferenceLimit: number = 1000
     ) {
-        this.registry = new Map();
-
-        // Register Prolog
-        this.registry.set('prolog', {
-            factory: async () => {
-                const { createPrologEngine } = await import('./prolog/index.js');
-                return createPrologEngine(inferenceLimit);
-            },
-            capabilities: {
-                horn: true,
-                fullFol: false,                equality: false,
-                arithmetic: false,
-                streaming: false
-            },
-            actualName: 'prolog/tau-prolog'
-        });
-
-        // Register SAT
-        this.registry.set('sat', {
-            factory: async () => {
-                const { createSATEngine } = await import('./sat/index.js');
-                return createSATEngine();
-            },
-            capabilities: {
-                horn: true,
-                fullFol: true, // via clausify
-                equality: false,
-                arithmetic: false,
-                streaming: false
-            },
-            actualName: 'sat/minisat'
-        });
-
-        // Register Z3
-        this.registry.set('z3', {
-            factory: async () => {
-                const { Z3Engine } = await import('./z3/index.js');
-                return new Z3Engine();
-            },
-            capabilities: {
-                horn: true,
-                fullFol: true,
-                equality: true,
-                arithmetic: true,
-                streaming: false
-            },
-            actualName: 'z3'
-        });
-
-        // Register Clingo
-        this.registry.set('clingo', {
-            factory: async () => {
-                const { ClingoEngine } = await import('./clingo/index.js');
-                return new ClingoEngine();
-            },
-            capabilities: {
-                horn: true,
-                fullFol: true,
-                equality: true, // Limited (ASP has =)
-                arithmetic: true, // ASP has arithmetic
-                streaming: false
-            },
-            actualName: 'clingo'
-        });
+        this.registry = new EngineRegistry(inferenceLimit);
     }
 
     /**
      * Get an engine instance by name, initializing it if necessary.
      */
     async getEngine(name: string): Promise<ReasoningEngine> {
-        const entry = this.registry.get(name);
-        if (!entry) {
-            // Handle aliases if necessary, or throw
-            // 'prolog/tau-prolog' -> 'prolog'
-            if (name === 'prolog/tau-prolog') return this.getEngine('prolog');
-            if (name === 'sat/minisat') return this.getEngine('sat');
-
-            throw new Error(`Engine ${name} not registered`);
-        }
-
-        if (!entry.instance) {
-            entry.instance = await entry.factory();
-            // Initialize if the engine has an init method
-            if (entry.instance.init) {
-                await entry.instance.init();
-            }
-        }
-        return entry.instance;
+        return this.registry.getEngine(name);
     }
 
     /**
@@ -305,7 +219,7 @@ export class EngineManager {
         }
 
         // Score engines
-        const scores = Array.from(this.registry.entries()).map(([name, entry]) => {
+        const scores = this.registry.getEntries().map(([name, entry]) => {
             let score = 0;
             const caps = entry.capabilities;
 
@@ -370,7 +284,7 @@ export class EngineManager {
      */
     getEngines(): { name: string; capabilities: EngineCapabilities }[] {
         // Return static capabilities from registry
-        return Array.from(this.registry.entries()).map(([name, entry]) => ({
+        return this.registry.getEntries().map(([name, entry]) => ({
             name: entry.actualName,
             capabilities: entry.capabilities
         }));
