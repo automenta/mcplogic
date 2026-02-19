@@ -16,11 +16,13 @@ import {
     ReasoningEngine,
     EngineCapabilities,
     EngineProveOptions,
-    SatResult
+    SatResult,
+    EngineSession
 } from '../interface.js';
 import { instantiateClauses } from '../../logic/herbrand/index.js';
 import { generateEqualityAxiomsForSAT } from '../../axioms/equality.js';
 import { literalToKey } from './serialization.js';
+import { SATSession } from './session.js';
 
 /**
  * SAT solver-based reasoning engine.
@@ -38,6 +40,20 @@ export class SATEngine implements ReasoningEngine {
         arithmetic: false, // No built-in arithmetic
         streaming: false,
     };
+
+    async init(): Promise<void> {
+        // No-op for SAT engine (initialized in constructor/sync)
+        return Promise.resolve();
+    }
+
+    async createSession(): Promise<EngineSession> {
+        return new SATSession();
+    }
+
+    async close(): Promise<void> {
+        // No cleanup needed for SAT engine
+        return Promise.resolve();
+    }
 
     /**
      * Check satisfiability of clauses using the SAT solver.
@@ -155,7 +171,8 @@ export class SATEngine implements ReasoningEngine {
                 : negatedConclusion; // Should not happen given premises+conclusion
 
             // Clausify 
-            const clausifyResult = clausify(refutationAST);
+            // Use Tseitin strategy for SAT to avoid exponential blowup
+            const clausifyResult = clausify(refutationAST, { strategy: 'tseitin' });
 
             if (!clausifyResult.success || !clausifyResult.clauses) {
                 return buildProveResult({

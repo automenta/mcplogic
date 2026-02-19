@@ -12,11 +12,13 @@ import {
     generateMinimalEqualityAxioms,
     getEqualityBridge
 } from '../../axioms/equality.js';
+import { generateRewritingAxioms } from '../../logic/equality/rewriting.js';
 import {
     ProveResult,
     createInferenceLimitError,
     createEngineError,
 } from '../../types/index.js';
+import { clausify } from '../../logic/clausifier.js';
 import { buildProveResult } from '../../utils/response.js';
 import { ProveOptions } from '../../types/options.js';
 import { META_INTERPRETER, generateDynamicDirectives, parseTraceOutput } from './trace.js';
@@ -254,11 +256,28 @@ export class LogicEngine {
      */
     private setupEquality(program: string, premises: string[], conclusion: string): string {
         try {
-            // Add signature-specific axioms (congruence, substitution) only when = is used
             const parsedFormulas = [...premises, conclusion].map(p => parse(p));
-            const equalityAxioms = generateMinimalEqualityAxioms(parsedFormulas);
 
-            // Only add bridge if we have equality axioms
+            // Convert premises to clauses to get proper Skolem constants for rewriting
+            // Only use premises for rewrite rules, not the conclusion (goal)
+            const allClauses = premises.flatMap(p => clausify(p).clauses || []);
+
+            // Use improved rewriting logic (Knuth-Bendix style) which handles congruence dynamically
+            const rewritingAxioms = generateRewritingAxioms(allClauses);
+
+            if (rewritingAxioms.length > 0) {
+                return rewritingAxioms.join('\n') + '\n' + program;
+            }
+
+            // Fallback to legacy axioms if rewriting generation produced nothing (e.g. no facts)
+            // But wait, rewriting system handles reflexivity via normalize.
+            // If rewritingAxioms is empty, it means no rules found, but we still need the 'eq' definition?
+            // Actually generateRewritingAxioms returns [] if no rules.
+            // But we need 'eq' to be defined if the query uses it.
+            // Let's modify generateRewritingAxioms to always return the engine if requested?
+            // Or just use the minimal ones if no rules.
+
+            const equalityAxioms = generateMinimalEqualityAxioms(parsedFormulas);
             if (equalityAxioms.length === 0) {
                 return program;
             }
@@ -267,8 +286,6 @@ export class LogicEngine {
             const allAxioms = [...bridge, ...equalityAxioms];
             return allAxioms.join('\n') + '\n' + program;
         } catch {
-            // If parsing fails for equality extraction, continue without equality axioms
-            // The main validation will catch syntax errors
             return program;
         }
     }

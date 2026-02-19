@@ -33,6 +33,22 @@ export interface Clause {
 }
 
 /**
+ * Environment for Skolemization and auxiliary symbol generation.
+ */
+export interface SkolemEnv {
+    /** Counter for generating unique Skolem function names */
+    counter: number;
+    /** Map of existentially quantified variables to their Skolem terms */
+    skolemMap: Map<string, { name: string; args: string[] }>;
+    /** Currently bound universal variables (for creating Skolem function arguments) */
+    universalVars: string[];
+    /** Permanent record of all generated Skolem functions (name → arity) */
+    generatedSkolems: Map<string, number>;
+    /** Counter for generating unique Tseitin predicate names */
+    tseitinCounter?: number;
+}
+
+/**
  * Options for the clausification process.
  */
 export interface ClausifyOptions {
@@ -42,6 +58,12 @@ export interface ClausifyOptions {
     maxClauseSize?: number;
     /** Timeout in milliseconds (default: 5000) */
     timeout?: number;
+    /** CNF transformation strategy: 'standard' (distribution) or 'tseitin' (variable introduction) */
+    strategy?: 'standard' | 'tseitin';
+    /** Optional existing Skolem environment to maintain consistent function names across calls */
+    skolemEnv?: SkolemEnv;
+    /** Internal node count for OOM protection */
+    _nodeCount?: number;
 }
 
 /**
@@ -67,20 +89,6 @@ export interface ClausifyResult {
         /** Time taken in milliseconds */
         timeMs: number;
     };
-}
-
-/**
- * Environment for Skolemization, tracking free variables and generated function names.
- */
-export interface SkolemEnv {
-    /** Counter for generating unique Skolem function names */
-    counter: number;
-    /** Map of existentially quantified variables to their Skolem terms */
-    skolemMap: Map<string, { name: string; args: string[] }>;
-    /** Currently bound universal variables (for creating Skolem function arguments) */
-    universalVars: string[];
-    /** Permanent record of all generated Skolem functions (name → arity) */
-    generatedSkolems: Map<string, number>;
 }
 
 /**

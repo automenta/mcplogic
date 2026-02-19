@@ -15,22 +15,38 @@ describe('EngineManager', () => {
         manager = createEngineManager();
     });
 
+    afterEach(async () => {
+        await manager.close();
+    });
+
     describe('engine access', () => {
-        it('should provide access to Prolog engine', () => {
-            const prolog = manager.getPrologEngine();
+        it('should provide access to Prolog engine', async () => {
+            const prolog = await manager.getPrologEngine();
             expect(prolog.name).toBe('prolog/tau-prolog');
         });
 
-        it('should provide access to SAT engine', () => {
-            const sat = manager.getSATEngine();
+        it('should provide access to SAT engine', async () => {
+            const sat = await manager.getSATEngine();
             expect(sat.name).toBe('sat/minisat');
+        });
+
+        it('should provide access to Z3 engine', async () => {
+            const z3 = await manager.getZ3Engine();
+            expect(z3.name).toBe('z3');
+        });
+
+        it('should provide access to Clingo engine', async () => {
+            const clingo = await manager.getClingoEngine();
+            expect(clingo.name).toBe('clingo');
         });
 
         it('should list available engines', () => {
             const engines = manager.getEngines();
-            expect(engines.length).toBe(2);
+            expect(engines.length).toBe(4);
             expect(engines.map(e => e.name)).toContain('prolog/tau-prolog');
             expect(engines.map(e => e.name)).toContain('sat/minisat');
+            expect(engines.map(e => e.name)).toContain('z3');
+            expect(engines.map(e => e.name)).toContain('clingo');
         });
     });
 
@@ -54,6 +70,16 @@ describe('EngineManager', () => {
             expect(result.success).toBe(true);
             expect(result.engineUsed).toBe('sat/minisat');
         });
+
+        it('should use Z3 when explicitly requested', async () => {
+            const result = await manager.prove(
+                ['p -> q', 'p'],
+                'q',
+                { engine: 'z3' }
+            );
+            expect(result.success).toBe(true);
+            expect(result.engineUsed).toBe('z3');
+        });
     });
 
     describe('automatic engine selection', () => {
@@ -68,7 +94,7 @@ describe('EngineManager', () => {
             expect(result.engineUsed).toBe('prolog/tau-prolog');
         });
 
-        it('should use SAT for non-Horn formulas (auto mode)', async () => {
+        it('should use Z3 or SAT for non-Horn formulas (auto mode)', async () => {
             // foo ∨ bar (two positive literals = non-Horn)
             // Using explicit disjunction in premises forces non-Horn
             const result = await manager.prove(
@@ -77,8 +103,22 @@ describe('EngineManager', () => {
                 { engine: 'auto' }
             );
             expect(result.success).toBe(true);
-            // Should use SAT for non-Horn
-            expect(result.engineUsed).toBe('sat/minisat');
+            // Z3 is prioritized over SAT now
+            expect(['z3', 'sat/minisat']).toContain(result.engineUsed);
+        });
+
+        it('should use Z3 for arithmetic (auto mode)', async () => {
+            // Use functional syntax to avoid parser limitations if any
+            // plus(x, y) = 3
+            // equals(plus(x, y), 3)
+            // But verify parser supports '=' infix which it should.
+            const result = await manager.prove(
+                ['x = 1', 'y = 2'],
+                'plus(x, y) = 3',
+                { engine: 'auto', enableArithmetic: true }
+            );
+            expect(result.success).toBe(true);
+            expect(result.engineUsed).toBe('z3');
         });
 
         it('should default to auto mode', async () => {
