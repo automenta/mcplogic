@@ -15,6 +15,7 @@ Usage:
   mcplogic prove <file.p>     Prove last line from preceding premises
   mcplogic model <file.p>     Find model satisfying all lines
   mcplogic validate <file.p>  Check syntax of all lines
+  mcplogic check              Verify engine availability
   mcplogic repl               Interactive mode
 
 Options:
@@ -71,6 +72,10 @@ async function main() {
 
     if (commandName === 'repl') {
         return runRepl(highPower);
+    }
+
+    if (commandName === 'check') {
+        return runCheck();
     }
 
     if (!fileName) {
@@ -144,6 +149,30 @@ async function main() {
             console.log(HELP);
             process.exit(1);
     }
+}
+
+async function runCheck() {
+    console.log(`MCP Logic v${VERSION} - System Check\n`);
+    const manager = createEngineManager();
+    const engines = manager.getEngines();
+
+    console.log(`Detected ${engines.length} engine configurations:`);
+    for (const e of engines) {
+        process.stdout.write(`- ${e.name.padEnd(20)} ... `);
+        try {
+            const engine = await manager.getEngine(e.name);
+            // Run a trivial proof
+            const res = await engine.prove(['p'], 'p');
+            if (res.result === 'proved') {
+                console.log('OK ✓');
+            } else {
+                console.log(`FAIL ✗ (Unexpected result: ${res.result})`);
+            }
+        } catch (err) {
+            console.log(`FAIL ✗ (${(err as Error).message})`);
+        }
+    }
+    await manager.close();
 }
 
 async function runRepl(highPower: boolean) {

@@ -21,6 +21,12 @@ export { createPrologEngine, PrologEngine } from './engines/prolog/index.js';
 // Model Finder
 export { createModelFinder, ModelFinder } from './model/index.js';
 
+// Evolution Engine
+export { CurriculumGenerator } from './evolution/curriculumGenerator.js';
+export { Evaluator } from './evolution/evaluator.js';
+export { StrategyEvolver } from './evolution/strategyEvolver.js';
+export { InputRouter } from './evolution/inputRouter.js';
+
 // Parser
 export { parse } from './parser/index.js';
 
