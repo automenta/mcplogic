@@ -140,9 +140,9 @@ export class EngineManager {
                 const engine = await this.getEngine(name);
                 const res = await engine.prove(premises, conclusion, options);
 
-                // If the result is definitive (proved, disproved, failed/counterexample), return it.
+                // If the result is definitive (proved, failed/counterexample), return it.
                 // If it's a timeout or error, throw so Promise.any keeps looking.
-                if (res.result === 'proved' || res.result === 'disproved' || res.result === 'failed') {
+                if (res.result === 'proved' || res.result === 'failed') {
                     return { ...res, engineUsed: engine.name };
                 }
 
@@ -157,14 +157,20 @@ export class EngineManager {
             return await Promise.any(promises);
         } catch (e) {
             // All engines failed/timed out
-            const error = e instanceof AggregateError
-                ? `All engines failed: ${e.errors.map(err => err.message).join('; ')}`
-                : 'All engines failed in race mode';
+            let errorMsg = 'All engines failed in race mode';
+
+            // Check if it's an AggregateError (standard in ES2021)
+            if (e instanceof Error && 'errors' in e && Array.isArray((e as any).errors)) {
+                 const errors = (e as any).errors as Error[];
+                 errorMsg = `All engines failed: ${errors.map(err => err.message).join('; ')}`;
+            } else if (e instanceof Error) {
+                errorMsg = e.message;
+            }
 
             return {
                 success: false,
                 result: 'error',
-                error,
+                error: errorMsg,
                 engineUsed: 'race',
                 found: false
             };
@@ -280,6 +286,10 @@ export class EngineManager {
             name: entry.actualName,
             capabilities: entry.capabilities
         }));
+    }
+
+    async close(): Promise<void> {
+        await this.registry.close();
     }
 }
 

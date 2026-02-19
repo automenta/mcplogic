@@ -17,7 +17,8 @@ describe('Z3 checkSat', () => {
     test('should solve satisfiable set of clauses', async () => {
         const manager = createEngineManager();
 
-        // P(a) | Q(a)
+        try {
+            // P(a) | Q(a)
         const clause1: Clause = {
             literals: [
                 lit('P', [constant('a')], false),
@@ -32,14 +33,18 @@ describe('Z3 checkSat', () => {
             ]
         };
 
-        const result = await manager.checkSat([clause1, clause2], 'z3');
-        expect(result.sat).toBe(true);
+            const result = await manager.checkSat([clause1, clause2], 'z3');
+            expect(result.sat).toBe(true);
+        } finally {
+            await manager.close();
+        }
     });
 
     test('should solve unsatisfiable set of clauses', async () => {
         const manager = createEngineManager();
 
-        // P(a)
+        try {
+            // P(a)
         const clause1: Clause = {
             literals: [
                 lit('P', [constant('a')], false)
@@ -53,14 +58,18 @@ describe('Z3 checkSat', () => {
             ]
         };
 
-        const result = await manager.checkSat([clause1, clause2], 'z3');
-        expect(result.sat).toBe(false);
+            const result = await manager.checkSat([clause1, clause2], 'z3');
+            expect(result.sat).toBe(false);
+        } finally {
+            await manager.close();
+        }
     });
 
     test('should solve clauses with equality', async () => {
         const manager = createEngineManager();
 
-        // a = b
+        try {
+            // a = b
         const clause1: Clause = {
             literals: [
                 lit('=', [constant('a'), constant('b')], false)
@@ -74,7 +83,10 @@ describe('Z3 checkSat', () => {
             ]
         };
 
-        const result = await manager.checkSat([clause1, clause2], 'z3');
-        expect(result.sat).toBe(false);
+            const result = await manager.checkSat([clause1, clause2], 'z3');
+            expect(result.sat).toBe(false);
+        } finally {
+            await manager.close();
+        }
     });
 });
