@@ -60,6 +60,7 @@ export interface CreateSessionOptions {
  */
 export class SessionManager {
     private sessions = new Map<string, Session>();
+    private locks = new Map<string, Promise<void>>();
     private gcIntervalId: ReturnType<typeof setInterval> | null = null;
     private engineManager?: EngineManager;
 
@@ -76,6 +77,26 @@ export class SessionManager {
         this.engineManager = engineManager;
         // Start garbage collection
         this.gcIntervalId = setInterval(() => this.gc(), this.gcIntervalMs);
+    }
+
+    /**
+     * Execute a function with a session lock to prevent race conditions
+     */
+    private async withLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
+        let release: () => void;
+        const next = new Promise<void>((resolve) => { release = resolve; });
+        const previous = this.locks.get(id) || Promise.resolve();
+        this.locks.set(id, next);
+
+        try {
+            await previous.catch(() => {}); // Wait for previous, ignoring errors
+            return await fn();
+        } finally {
+            release!();
+            if (this.locks.get(id) === next) {
+                this.locks.delete(id);
+            }
+        }
     }
 
     /**
@@ -123,12 +144,22 @@ export class SessionManager {
     }
 
     /**
-     * Delete a session
+     * Delete a session and clean up resources
      */
-    delete(id: string): boolean {
-        if (!this.sessions.has(id)) {
+    async delete(id: string): Promise<boolean> {
+        const session = this.sessions.get(id);
+        if (!session) {
             throw createSessionNotFoundError(id);
         }
+
+        if (session.engineSession) {
+            try {
+                await session.engineSession.close();
+            } catch (e) {
+                console.warn(`Error closing engine session for ${id}:`, e);
+            }
+        }
+
         return this.sessions.delete(id);
     }
 
@@ -136,31 +167,32 @@ export class SessionManager {
      * Assert a premise into a session's knowledge base
      */
     async assertPremise(id: string, formula: string): Promise<Session> {
-        const session = this.get(id);
+        return this.withLock(id, async () => {
+            const session = this.get(id);
 
-        let processedFormula = formula;
-        if (session.ontology) {
-            processedFormula = session.ontology.expandSynonyms(formula);
-            session.ontology.validate(processedFormula);
-        }
+            let processedFormula = formula;
+            if (session.ontology) {
+                processedFormula = session.ontology.expandSynonyms(formula);
+                session.ontology.validate(processedFormula);
+            }
 
-        // Add to premises list (Source of Truth)
-        session.premises.push(processedFormula);
+            // Add to premises list (Source of Truth)
+            session.premises.push(processedFormula);
 
-        // Legacy support: update prolog program string (cheap)
-        // This ensures code relying on session.prologProgram still works if engine session fails
-        try {
-            session.prologProgram = buildPrologProgram(session.premises);
-        } catch (e) {
-            // Ignore prolog build errors if we are switching to non-prolog engine
-        }
+            // Legacy support: update prolog program string (cheap)
+            try {
+                session.prologProgram = buildPrologProgram(session.premises);
+            } catch (e) {
+                // Ignore prolog build errors
+            }
 
-        // Handle Engine Session Logic
-        if (this.engineManager) {
-            await this.updateEngineSession(session, processedFormula);
-        }
+            // Handle Engine Session Logic
+            if (this.engineManager) {
+                await this.updateEngineSession(session, processedFormula);
+            }
 
-        return session;
+            return session;
+        });
     }
 
     private async updateEngineSession(session: Session, newPremise: string) {
@@ -202,6 +234,16 @@ export class SessionManager {
     private async rebuildSession(session: Session) {
         if (!this.engineManager) return;
 
+        // Close existing session if any
+        if (session.engineSession) {
+            try {
+                await session.engineSession.close();
+            } catch (e) {
+                console.warn(`Error closing old engine session for ${session.id}:`, e);
+            }
+            session.engineSession = undefined;
+        }
+
         // Re-evaluate best engine based on premises
         const hasArithmetic = session.premises.some(p => {
             try { return containsArithmetic(parse(p)); } catch { return false; }
@@ -230,27 +272,29 @@ export class SessionManager {
      * Returns true if the premise was found and removed
      */
     async retractPremise(id: string, formula: string): Promise<boolean> {
-        const session = this.get(id);
-        const index = session.premises.indexOf(formula);
-        if (index === -1) {
-            return false;
-        }
-        session.premises.splice(index, 1);
-
-        // Update Prolog legacy
-        session.prologProgram = buildPrologProgram(session.premises);
-
-        // Update Engine Session
-        if (session.engineSession) {
-            try {
-                await session.engineSession.retract(formula);
-            } catch (e) {
-                // If retraction not supported incrementally, rebuild
-                await this.rebuildSession(session);
+        return this.withLock(id, async () => {
+            const session = this.get(id);
+            const index = session.premises.indexOf(formula);
+            if (index === -1) {
+                return false;
             }
-        }
+            session.premises.splice(index, 1);
 
-        return true;
+            // Update Prolog legacy
+            session.prologProgram = buildPrologProgram(session.premises);
+
+            // Update Engine Session
+            if (session.engineSession) {
+                try {
+                    await session.engineSession.retract(formula);
+                } catch (e) {
+                    // If retraction not supported incrementally, rebuild
+                    await this.rebuildSession(session);
+                }
+            }
+
+            return true;
+        });
     }
 
     /**
@@ -265,11 +309,23 @@ export class SessionManager {
      * Clear all premises from a session (keeps session alive)
      */
     async clear(id: string): Promise<Session> {
-        const session = this.get(id);
-        session.premises = [];
-        session.prologProgram = '';
-        session.engineSession = undefined; // Will be recreated on next assert
-        return session;
+        return this.withLock(id, async () => {
+            const session = this.get(id);
+
+            if (session.engineSession) {
+                try {
+                    await session.engineSession.close();
+                } catch (e) {
+                    console.warn(`Error closing engine session for ${id}:`, e);
+                }
+            }
+
+            session.premises = [];
+            session.prologProgram = '';
+            session.engineSession = undefined;
+            session.engineName = undefined;
+            return session;
+        });
     }
 
     /**
@@ -309,10 +365,22 @@ export class SessionManager {
     /**
      * Garbage collect expired sessions
      */
-    private gc(): void {
+    private async gc(): Promise<void> {
         const now = Date.now();
+        const expiredIds: string[] = [];
+
         for (const [id, session] of this.sessions) {
             if (now - session.lastAccessedAt > session.ttlMs) {
+                expiredIds.push(id);
+            }
+        }
+
+        for (const id of expiredIds) {
+            try {
+                // Use public delete to ensure cleanup
+                await this.delete(id);
+            } catch (e) {
+                // Ignore errors during GC (session might be gone)
                 this.sessions.delete(id);
             }
         }
@@ -331,7 +399,10 @@ export class SessionManager {
     /**
      * Clear all sessions (for testing)
      */
-    clearAll(): void {
+    async clearAll(): Promise<void> {
+        for (const id of this.sessions.keys()) {
+            await this.delete(id).catch(() => {});
+        }
         this.sessions.clear();
     }
 }

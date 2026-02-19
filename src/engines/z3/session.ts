@@ -24,6 +24,7 @@ export class Z3Session implements EngineSession {
     }
 
     async assert(formula: string): Promise<void> {
+        if (!this.solver) throw createEngineError("Session closed");
         try {
             const node = parse(formula);
             const z3Expr = this.translator.translate(node);
@@ -49,6 +50,15 @@ export class Z3Session implements EngineSession {
     ): Promise<ProveResult> {
         const startTime = Date.now();
         const verbosity = options?.verbosity || 'standard';
+
+        if (!this.solver) {
+             return buildProveResult({
+                success: false,
+                result: 'error',
+                error: 'Session closed',
+                timeMs: Date.now() - startTime,
+            }, verbosity);
+        }
 
         try {
             // Use push/pop to avoid polluting the session with the negated goal
@@ -105,8 +115,11 @@ export class Z3Session implements EngineSession {
     }
 
     async close(): Promise<void> {
-        if (this.solver && typeof this.solver.delete === 'function') {
-            this.solver.delete();
+        if (this.solver) {
+            if (typeof this.solver.delete === 'function') {
+                this.solver.delete();
+            }
+            this.solver = null;
         }
     }
 }
