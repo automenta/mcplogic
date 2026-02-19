@@ -30,6 +30,7 @@
         "demo": "tsx scripts/demo.ts",
         "test:llm": "tsx scripts/test_llm.ts",
         "benchmark:setup": "tsx scripts/download-benchmarks.ts",
+        "verify": "tsx scripts/verify-all.ts",
         "prepublishOnly": "npm run build"
     },
     "keywords": [

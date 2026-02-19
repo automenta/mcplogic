@@ -157,14 +157,20 @@ export class EngineManager {
             return await Promise.any(promises);
         } catch (e) {
             // All engines failed/timed out
-            const error = e instanceof AggregateError
-                ? `All engines failed: ${e.errors.map(err => err.message).join('; ')}`
-                : 'All engines failed in race mode';
+            let errorMsg = 'All engines failed in race mode';
+
+            // Check if it's an AggregateError (standard in ES2021)
+            if (e instanceof Error && 'errors' in e && Array.isArray((e as any).errors)) {
+                 const errors = (e as any).errors as Error[];
+                 errorMsg = `All engines failed: ${errors.map(err => err.message).join('; ')}`;
+            } else if (e instanceof Error) {
+                errorMsg = e.message;
+            }
 
             return {
                 success: false,
                 result: 'error',
-                error,
+                error: errorMsg,
                 engineUsed: 'race',
                 found: false
             };
