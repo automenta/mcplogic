@@ -6,7 +6,7 @@ import { createModelFinder } from './model/index.js';
 import { parse } from './parser/index.js';
 import { DEFAULTS } from './types/index.js';
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const HELP = `
 MCP Logic CLI v${VERSION}
 
