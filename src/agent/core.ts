@@ -8,6 +8,13 @@ import {
 import { EngineManager, createEngineManager } from '../engines/manager.js';
 import { parse } from '../parser/index.js';
 import { ModelFinder, createModelFinder } from '../model/index.js';
+import { OntologyManager } from '../ontology/manager.js';
+import { OntologyConfig } from '../types/ontology.js';
+import { HeuristicTranslator } from '../llm/translator.js';
+
+export interface AgentOptions extends ReasonOptions {
+    ontology?: OntologyConfig;
+}
 
 /**
  * An agent that reasons about a goal using available tools.
@@ -16,6 +23,8 @@ import { ModelFinder, createModelFinder } from '../model/index.js';
 export class ReasoningAgent {
     private engine: EngineManager;
     private modelFinder: ModelFinder;
+    private ontology?: OntologyManager;
+    private translator: HeuristicTranslator;
     private maxSteps: number;
     private timeout: number;
     private verbose: boolean;
@@ -23,7 +32,7 @@ export class ReasoningAgent {
     // Stateful memory
     private premises: string[] = [];
 
-    constructor(options?: ReasonOptions) {
+    constructor(options?: AgentOptions) {
         // Defaults: 30s timeout, 10 steps, verbose false
         this.timeout = options?.timeout ?? 30000;
         this.maxSteps = options?.maxSteps ?? 10;
@@ -32,14 +41,51 @@ export class ReasoningAgent {
         // Initialize engines
         this.engine = createEngineManager(this.timeout);
         this.modelFinder = createModelFinder(this.timeout);
+        this.translator = new HeuristicTranslator();
+
+        if (options?.ontology) {
+            this.ontology = new OntologyManager(options.ontology);
+        }
     }
 
     /**
      * Assert a premise into the agent's knowledge base.
      */
     assert(premise: string): void {
-        parse(premise); // Validation
-        this.premises.push(premise);
+        let formula = premise;
+
+        // Apply ontology
+        if (this.ontology) {
+            formula = this.ontology.expandSynonyms(formula);
+            this.ontology.validate(formula);
+        }
+
+        parse(formula); // Syntax Validation
+        this.premises.push(formula);
+    }
+
+    /**
+     * Translate natural language text to FOL formulas.
+     * Does NOT automatically assert them.
+     */
+    async translate(text: string): Promise<string[]> {
+        const result = await this.translator.translate(text);
+        if (result.errors) {
+            throw new Error(result.errors.join('; '));
+        }
+
+        // If there's a conclusion, return it as well?
+        // Usually translate returns premises + conclusion.
+        // For .tell, we probably just want assertions.
+        // If there is a conclusion, we might want to return it differently?
+        // For now, return premises. If conclusion exists, append it?
+        // Standard .tell usually adds facts/rules.
+
+        const formulas = [...result.premises];
+        if (result.conclusion) {
+            formulas.push(result.conclusion);
+        }
+        return formulas;
     }
 
     /**
@@ -60,7 +106,12 @@ export class ReasoningAgent {
      * Prove a goal using the current knowledge base.
      */
     async prove(goal: string): Promise<ReasoningResult> {
-        return this.reasonLoop(goal, this.premises);
+        let formula = goal;
+        if (this.ontology) {
+            formula = this.ontology.expandSynonyms(formula);
+            this.ontology.validate(formula);
+        }
+        return this.reasonLoop(formula, this.premises);
     }
 
     /**
@@ -68,19 +119,12 @@ export class ReasoningAgent {
      * @deprecated Use assert() and prove() for stateful interaction.
      */
     async run(goal: string, premises: string[] = []): Promise<ReasoningResult> {
-        // Use provided premises + internal premises?
-        // For backward compatibility, treat 'premises' arg as the FULL set context if provided,
-        // or just use internal.
-        // But usually 'run' implies stateless one-off.
-        // Let's assume stateless execution uses ONLY the provided premises.
         const effectivePremises = premises.length > 0 ? premises : this.premises;
         return this.reasonLoop(goal, effectivePremises);
     }
 
     private async reasonLoop(goal: string, premises: string[]): Promise<ReasoningResult> {
         const steps: ReasoningStep[] = [];
-        const startTime = Date.now();
-
         // Helper to add steps
         const addStep = (type: AgentActionType, content: string, explanation?: string, result?: unknown) => {
             steps.push({

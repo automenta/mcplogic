@@ -167,11 +167,24 @@ async function runRepl(highPower: boolean) {
         if (trimmed === '.help') {
             console.log('Commands:');
             console.log('  .assert <formula>   Add a premise to the session');
+            console.log('  .tell <text>        Translate natural language and assert');
             console.log('  .prove <goal>       Try to prove goal from premises');
             console.log('  .list               List current premises');
             console.log('  .clear              Clear all premises');
             console.log('  .quit, .exit, .q    Exit REPL');
             console.log('  .help               Show this help');
+        } else if (trimmed.startsWith('.tell ')) {
+            const text = trimmed.slice(6).trim();
+            try {
+                const formulas = await agent.translate(text);
+                for (const f of formulas) {
+                    agent.assert(f);
+                    console.log(`✓ Asserted: ${f}`);
+                }
+                console.log(`(${agent.getPremises().length} total premises)`);
+            } catch (e) {
+                console.log(`✗ Translation error: ${(e as Error).message}`);
+            }
         } else if (trimmed.startsWith('.assert ')) {
             const formula = trimmed.slice(8).trim();
             try {
