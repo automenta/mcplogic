@@ -16,6 +16,7 @@ import { EngineSession } from '../engines/interface.js';
 import { EngineManager } from '../engines/manager.js';
 import { parse } from '../parser/index.js';
 import { containsArithmetic } from '../axioms/arithmetic.js';
+import { SessionStorage, SavedSession } from './storage.js';
 
 // Browser-safe UUID generation
 function generateUUID(): string {
@@ -63,6 +64,7 @@ export class SessionManager {
     private locks = new Map<string, Promise<void>>();
     private gcIntervalId: ReturnType<typeof setInterval> | null = null;
     private engineManager?: EngineManager;
+    private storage?: SessionStorage;
 
     /** GC runs every minute */
     private readonly gcIntervalMs = 60_000;
@@ -73,10 +75,68 @@ export class SessionManager {
     /** Maximum number of concurrent sessions */
     static readonly MAX_SESSIONS = 1000;
 
-    constructor(engineManager?: EngineManager) {
+    constructor(engineManager?: EngineManager, storage?: SessionStorage) {
         this.engineManager = engineManager;
+        this.storage = storage;
         // Start garbage collection
         this.gcIntervalId = setInterval(() => this.gc(), this.gcIntervalMs);
+
+        // Initial load
+        if (this.storage) {
+            this.loadSessions().catch(err => console.error('Failed to load sessions:', err));
+        }
+    }
+
+    private async loadSessions() {
+        if (!this.storage) return;
+        const ids = await this.storage.list();
+        for (const id of ids) {
+            try {
+                const saved = await this.storage.load(id);
+                if (saved) {
+                    const session: Session = {
+                        id: saved.id,
+                        premises: saved.premises,
+                        prologProgram: buildPrologProgram(saved.premises), // Rebuild prolog program
+                        createdAt: saved.createdAt,
+                        lastAccessedAt: saved.lastAccessedAt,
+                        ttlMs: saved.ttlMs,
+                        engineName: saved.engineName,
+                        ontology: saved.ontologyConfig ? new OntologyManager(saved.ontologyConfig) : undefined
+                    };
+
+                    this.sessions.set(session.id, session);
+
+                    // Lazily rebuild engine session if needed?
+                    // Better to wait until first access or rebuild now.
+                    // Let's rebuild lazily or on demand.
+                    // But if we don't rebuild, engineSession is undefined.
+                    // `updateEngineSession` logic handles missing engineSession by rebuilding.
+                }
+            } catch (e) {
+                console.error(`Failed to load session ${id}:`, e);
+            }
+        }
+    }
+
+    private async persistSession(session: Session) {
+        if (!this.storage) return;
+
+        const saved: SavedSession = {
+            id: session.id,
+            premises: session.premises,
+            createdAt: session.createdAt,
+            lastAccessedAt: session.lastAccessedAt,
+            ttlMs: session.ttlMs,
+            engineName: session.engineName,
+            ontologyConfig: session.ontology?.config // Assuming we can access config or recreate it
+        };
+
+        try {
+            await this.storage.save(saved);
+        } catch (e) {
+            console.error(`Failed to save session ${session.id}:`, e);
+        }
     }
 
     /**
@@ -121,6 +181,7 @@ export class SessionManager {
         };
 
         this.sessions.set(session.id, session);
+        this.persistSession(session);
         return session;
     }
 
@@ -191,6 +252,7 @@ export class SessionManager {
                 await this.updateEngineSession(session, processedFormula);
             }
 
+        await this.persistSession(session);
             return session;
         });
     }
@@ -293,6 +355,7 @@ export class SessionManager {
                 }
             }
 
+            await this.persistSession(session);
             return true;
         });
     }
@@ -324,6 +387,7 @@ export class SessionManager {
             session.prologProgram = '';
             session.engineSession = undefined;
             session.engineName = undefined;
+            await this.persistSession(session);
             return session;
         });
     }

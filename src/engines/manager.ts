@@ -28,7 +28,7 @@ import type { ClingoEngine } from './clingo/index.js';
 /**
  * Engine selection mode
  */
-export type EngineSelection = 'prolog' | 'sat' | 'z3' | 'clingo' | 'auto';
+export type EngineSelection = 'prolog' | 'sat' | 'z3' | 'clingo' | 'auto' | 'race';
 
 /**
  * Extended prove options with engine selection
@@ -193,6 +193,10 @@ export class EngineManager {
         options?: ManagerProveOptions
     ): Promise<ProveResult & { engineUsed?: string }> {
         try {
+            if (options?.engine === 'race') {
+                return await this.proveRace(premises, conclusion, options);
+            }
+
             const engine = await this.selectEngine(premises, conclusion, options);
             const res = await engine.prove(premises, conclusion, options);
             return { ...res, engineUsed: engine.name };
@@ -204,6 +208,58 @@ export class EngineManager {
                 result: 'error',
                 error: e instanceof Error ? e.message : String(e),
                 engineUsed: 'unknown',
+                found: false
+            };
+        }
+    }
+
+    /**
+     * Race all capable engines in parallel
+     */
+    private async proveRace(
+        premises: string[],
+        conclusion: string,
+        options?: ManagerProveOptions
+    ): Promise<ProveResult & { engineUsed?: string }> {
+        const engines = [
+            this.getEngine('z3'),
+            this.getEngine('prolog'),
+            this.getEngine('sat')
+        ];
+
+        // Add clingo if not explicitly excluded or unavailable (it's always available via WASM but might be slow to init)
+        // For race, we just try all standard ones.
+
+        const promises = engines.map(async (enginePromise) => {
+            try {
+                const engine = await enginePromise;
+                // Basic capability check (skip SAT if arithmetic needed, though SAT handles it poorly rather than crashing)
+                // Actually, just let them fail.
+                const res = await engine.prove(premises, conclusion, options);
+                return { ...res, engineUsed: engine.name };
+            } catch (e) {
+                // If an engine fails, we return a failed result but don't reject,
+                // so Promise.any/race can ignore it unless all fail.
+                // However, Promise.race returns the *first* settled, even rejection.
+                // We want Promise.any behavior (first success), but Promise.any waits for all rejections if none succeed.
+
+                // Let's implement a custom race where we ignore failures unless all fail.
+                throw e;
+            }
+        });
+
+        // We want the first *successful* result (proved or disproved/counterexample), ignoring errors/timeouts.
+        // If all timeout/error, return one of the errors.
+
+        try {
+            return await Promise.any(promises);
+        } catch (e) {
+            // Aggregate errors
+            return {
+                success: false,
+                result: 'error',
+                error: 'All engines failed in race mode',
+                engineUsed: 'race',
                 found: false
             };
         }

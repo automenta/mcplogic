@@ -29,6 +29,7 @@
         "tasks": "tsx scripts/task-status.ts",
         "demo": "tsx scripts/demo.ts",
         "test:llm": "tsx scripts/test_llm.ts",
+        "benchmark:setup": "tsx scripts/download-benchmarks.ts",
         "prepublishOnly": "npm run build"
     },
     "keywords": [

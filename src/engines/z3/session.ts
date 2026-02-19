@@ -4,17 +4,18 @@ import { buildProveResult } from '../../utils/response.js';
 import { parse } from '../../parser/index.js';
 import { createNot } from '../../ast/index.js';
 import { Z3Translator } from './translator.js';
+import { Z3Context, Z3Solver } from './types.js';
 
 export class Z3Session implements EngineSession {
-    private ctx: any;
-    private solver: any;
+    private ctx: Z3Context;
+    private solver: Z3Solver | null;
     private translator: Z3Translator;
     private initialized = false;
 
-    constructor(ctx: any, enableArithmetic: boolean = true, enableEquality: boolean = true) {
+    constructor(ctx: Z3Context, enableArithmetic: boolean = true, enableEquality: boolean = true) {
         this.ctx = ctx;
         // Create a persistent solver
-        this.solver = new this.ctx.Solver();
+        this.solver = new this.ctx.Solver() as unknown as Z3Solver;
         // Create a persistent translator to maintain symbol tables
         this.translator = new Z3Translator(this.ctx, {
             enableArithmetic,
