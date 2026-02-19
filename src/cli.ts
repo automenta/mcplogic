@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { readFileSync } from 'fs';
 import * as readline from 'readline';
-import { createEngineManager } from './engines/manager.js';
+import { createEngineManager, EngineSelection } from './engines/manager.js';
 import { createModelFinder } from './model/index.js';
 import { parse } from './parser/index.js';
 import { DEFAULTS } from './types/index.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const HELP = `
 MCP Logic CLI v${VERSION}
 
@@ -17,23 +17,48 @@ Usage:
   mcplogic repl               Interactive mode
 
 Options:
+  --engine=<name>    Select reasoning engine (auto, prolog, sat, z3, clingo, race)
   --high-power, -H   Enable extended limits (300s, 100k inferences)
   --help, -h         Show this help
   --version, -v      Show version
 
 Examples:
-  mcplogic prove problem.p
+  mcplogic prove --engine=z3 problem.p
   mcplogic model --high-power theory.p
   mcplogic repl
 `;
 
 const args = process.argv.slice(2);
 const highPower = args.includes('--high-power') || args.includes('-H');
-const command = args.find(a => !a.startsWith('-'));
-const file = args.find(a => !a.startsWith('-') && a !== command);
+
+let engine: string | undefined;
+const cleanArgs: string[] = [];
+
+for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--engine=')) {
+        engine = arg.split('=')[1];
+    } else if (arg === '--engine') {
+        if (i + 1 < args.length) {
+            engine = args[i + 1];
+            i++;
+        }
+    } else if (!arg.startsWith('-')) {
+        cleanArgs.push(arg);
+    }
+}
+
+const VALID_ENGINES = ['auto', 'prolog', 'sat', 'z3', 'clingo', 'race'];
+if (engine && !VALID_ENGINES.includes(engine)) {
+    console.error(`Error: Invalid engine '${engine}'. Valid options are: ${VALID_ENGINES.join(', ')}`);
+    process.exit(1);
+}
+
+const commandName = cleanArgs[0];
+const fileName = cleanArgs[1];
 
 async function main() {
-    if (args.includes('--help') || args.includes('-h') || !command) {
+    if (args.includes('--help') || args.includes('-h') || !commandName) {
         console.log(HELP);
         return;
     }
@@ -43,16 +68,16 @@ async function main() {
         return;
     }
 
-    if (command === 'repl') {
+    if (commandName === 'repl') {
         return runRepl(highPower);
     }
 
-    if (!file) {
+    if (!fileName) {
         console.error('Error: file argument required');
         process.exit(1);
     }
 
-    const content = readFileSync(file, 'utf-8');
+    const content = readFileSync(fileName, 'utf-8');
     const lines = content.split('\n')
         .map(l => l.trim())
         .filter(l => l && !l.startsWith('#') && !l.startsWith('%'));
@@ -60,16 +85,18 @@ async function main() {
     const limit = highPower ? DEFAULTS.highPowerMaxInferences : DEFAULTS.maxInferences;
     const timeout = highPower ? DEFAULTS.highPowerMaxSeconds * 1000 : DEFAULTS.maxSeconds * 1000;
 
-    switch (command) {
+    switch (commandName) {
         case 'prove': {
             const premises = lines.slice(0, -1);
             const conclusion = lines[lines.length - 1];
             console.log(`Proving: ${conclusion}`);
             console.log(`From ${premises.length} premises...`);
+            if (engine) console.log(`Engine: ${engine}`);
 
             const engineManager = createEngineManager(timeout, limit);
             const start = Date.now();
             const result = await engineManager.prove(premises, conclusion, {
+                engine: engine as EngineSelection,
                 includeTrace: true,
                 maxSeconds: timeout / 1000,
                 maxInferences: limit
@@ -112,7 +139,7 @@ async function main() {
             break;
         }
         default:
-            console.error(`Unknown command: ${command}`);
+            console.error(`Unknown command: ${commandName}`);
             console.log(HELP);
             process.exit(1);
     }

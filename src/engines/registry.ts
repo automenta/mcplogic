@@ -24,8 +24,8 @@ export class EngineRegistry {
             capabilities: {
                 horn: true,
                 fullFol: false,
-                equality: false,
-                arithmetic: false,
+                equality: true,
+                arithmetic: true,
                 streaming: false
             },
             actualName: 'prolog/tau-prolog'
