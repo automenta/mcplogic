@@ -15,6 +15,7 @@ Usage:
   mcplogic prove <file.p>     Prove last line from preceding premises
   mcplogic model <file.p>     Find model satisfying all lines
   mcplogic validate <file.p>  Check syntax of all lines
+  mcplogic check              Check availability of reasoning engines
   mcplogic repl               Interactive mode
 
 Options:
@@ -73,15 +74,18 @@ async function main() {
         return runRepl(highPower);
     }
 
-    if (!fileName) {
+    if (commandName !== 'check' && !fileName) {
         console.error('Error: file argument required');
         process.exit(1);
     }
 
-    const content = readFileSync(fileName, 'utf-8');
-    const lines = content.split('\n')
-        .map(l => l.trim())
-        .filter(l => l && !l.startsWith('#') && !l.startsWith('%'));
+    let lines: string[] = [];
+    if (fileName) {
+        const content = readFileSync(fileName, 'utf-8');
+        lines = content.split('\n')
+            .map(l => l.trim())
+            .filter(l => l && !l.startsWith('#') && !l.startsWith('%'));
+    }
 
     const limit = highPower ? DEFAULTS.highPowerMaxInferences : DEFAULTS.maxInferences;
     const timeout = highPower ? DEFAULTS.highPowerMaxSeconds * 1000 : DEFAULTS.maxSeconds * 1000;
@@ -137,6 +141,29 @@ async function main() {
                 }
             }
             process.exit(allValid ? 0 : 1);
+            break;
+        }
+        case 'check': {
+            console.log('Checking engines...');
+            const manager = createEngineManager();
+            const engines = ['prolog', 'sat', 'z3', 'clingo'];
+            let failures = 0;
+
+            for (const name of engines) {
+                process.stdout.write(`- ${name}: `);
+                try {
+                    const engine = await manager.getEngine(name);
+                    // Simple SAT check: empty clauses is satisfiable
+                    await engine.checkSat([]);
+                    console.log('OK');
+                } catch (e) {
+                    console.log(`FAILED - ${(e as Error).message}`);
+                    failures++;
+                }
+            }
+
+            await manager.close();
+            process.exit(failures === 0 ? 0 : 1);
             break;
         }
         default:

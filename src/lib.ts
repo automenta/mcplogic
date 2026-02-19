@@ -32,3 +32,6 @@ export { DEFAULTS } from './types/options.js';
 
 // Axioms
 export * from './axioms/index.js';
+
+// Evolution Engine
+export * from './evolution/index.js';

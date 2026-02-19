@@ -1,6 +1,6 @@
 import { Model, ModelOptions, Literal } from '../../types/index.js';
 import { parse } from '../../parser/index.js';
-import { astToString } from '../../ast/index.js';
+import { astToString, createConstant } from '../../ast/index.js';
 import { clausify } from '../../logic/clausifier.js';
 import { groundFormula } from '../../logic/grounding.js';
 import { SATEngine } from '../../engines/sat/index.js';
@@ -40,11 +40,14 @@ export async function findModelsSAT(
         // Add blocking clause (negation of current model)
         const literals: Literal[] = [];
         for (const [key, val] of satResult.model!) {
-            literals.push({
-                predicate: key,
-                args: [],
-                negated: val // If val=true, NOT key. If val=false, key.
-            });
+            const parsed = parseKey(key);
+            if (parsed) {
+                literals.push({
+                    predicate: parsed.predicate,
+                    args: parsed.args.map(arg => createConstant(arg)),
+                    negated: val // If val=true, NOT key. If val=false, key.
+                });
+            }
         }
         clauses.push({ literals });
     }
