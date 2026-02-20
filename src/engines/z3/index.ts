@@ -3,7 +3,7 @@ import { ReasoningEngine, EngineCapabilities, EngineProveOptions, SatResult, Eng
 import { ProveResult, createEngineError } from '../../types/index.js';
 import { buildProveResult } from '../../utils/response.js';
 import { parse } from '../../parser/index.js';
-import { createNot } from '../../ast/index.js';
+import { createNot, createEquals, createPredicate } from '../../ast/index.js';
 import { Z3Translator } from './translator.js';
 import { Clause, Literal } from '../../types/clause.js';
 import { Z3Session } from './session.js';
@@ -207,21 +207,13 @@ export class Z3Engine implements ReasoningEngine {
     private literalToAST(lit: Literal): ASTNode {
         let atom: ASTNode;
         if (lit.predicate === '=') {
-            atom = {
-                type: 'equals',
-                left: lit.args![0],
-                right: lit.args![1]
-            };
+            atom = createEquals(lit.args![0], lit.args![1]);
         } else {
-            atom = {
-                type: 'predicate',
-                name: lit.predicate,
-                args: lit.args
-            };
+            atom = createPredicate(lit.predicate, lit.args || []);
         }
 
         if (lit.negated) {
-            return { type: 'not', operand: atom };
+            return createNot(atom);
         }
         return atom;
     }

@@ -133,7 +133,8 @@ export class EngineManager {
         conclusion: string,
         options?: ManagerProveOptions
     ): Promise<ProveResult & { engineUsed?: string }> {
-        const engineNames = ['z3', 'prolog', 'sat', 'clingo'];
+        // Use all registered engines
+        const engineNames = this.registry.getEntries().map(([name]) => name);
 
         const promises = engineNames.map(async (name) => {
             try {
@@ -258,23 +259,31 @@ export class EngineManager {
      * Automatically selects the appropriate engine.
      */
     async checkSat(clauses: Clause[], engine?: EngineSelection): Promise<SatResult> {
-        // For checkSat, we usually use SAT or Z3.
         // If engine is specified, use it.
         if (engine && engine !== 'auto') {
             const e = await this.getEngine(engine);
             return e.checkSat(clauses);
         }
 
-        // Auto: Prefer SAT engine for raw CNF clauses as it is specialized and optimized for this format.
-        // Z3 is powerful but converting CNF to Z3 AST adds overhead, and the SAT engine (MiniSat) is sufficient.
-        try {
-            const sat = await this.getEngine('sat');
-            return sat.checkSat(clauses);
-        } catch (e) {
-            // Fallback to Z3 if SAT engine fails
-            const z3 = await this.getEngine('z3');
-            return z3.checkSat(clauses);
+        // Auto: Try engines in order: SAT (specialized), then Z3 (powerful), then Clingo (ASP).
+        const enginesToTry = ['sat', 'z3', 'clingo'];
+
+        for (const name of enginesToTry) {
+            try {
+                 const e = await this.getEngine(name);
+                 return await e.checkSat(clauses);
+            } catch (e) {
+                // Ignore error and try next engine, unless it's the last one
+                if (name === enginesToTry[enginesToTry.length - 1]) {
+                     console.warn(`All engines failed for checkSat. Last error from ${name}:`, e);
+                }
+            }
         }
+
+        return {
+            sat: false,
+            error: 'No suitable engine available or all failed for checkSat'
+        };
     }
 
     /**
