@@ -10,8 +10,7 @@ import { Clause, Literal } from '../../types/clause.js';
 import { ProveResult } from '../../types/index.js';
 import { buildProveResult } from '../../utils/response.js';
 import { clausify } from '../../logic/clausifier.js';
-import { parse } from '../../parser/index.js';
-import { createAnd, createNot, astToString } from '../../ast/index.js';
+import { createRefutation } from '../../logic/utils.js';
 import {
     ReasoningEngine,
     EngineCapabilities,
@@ -157,18 +156,7 @@ export class SATEngine implements ReasoningEngine {
 
         try {
             // Build the refutation formula: premises & -conclusion
-            // Use AST construction to avoid string parsing issues
-            const premiseNodes = premises.map(p => parse(p));
-            const conclusionNode = parse(conclusion);
-            const negatedConclusion = createNot(conclusionNode);
-
-            // Combine all formulas with AND
-            const allNodes = [...premiseNodes, negatedConclusion];
-            // If only one node (no premises), just use it. If multiple, reduce with AND.
-            // Note: createAnd takes 2 args.
-            const refutationAST = allNodes.length > 0
-                ? allNodes.reduce((acc, node) => createAnd(acc, node))
-                : negatedConclusion; // Should not happen given premises+conclusion
+            const refutationAST = createRefutation(premises, conclusion);
 
             // Clausify 
             // Use Tseitin strategy for SAT to avoid exponential blowup

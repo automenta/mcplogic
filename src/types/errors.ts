@@ -19,7 +19,8 @@ export type LogicErrorCode =
   | 'ENGINE_ERROR'          // Internal Prolog error
   | 'CLAUSIFICATION_ERROR'  // Error during CNF conversion
   | 'CLAUSIFICATION_BLOWUP' // CNF blowup exceeded limits
-  | 'INVALID_PREDICATE';    // Predicate not allowed by ontology
+  | 'INVALID_PREDICATE'     // Predicate not allowed by ontology
+  | 'MATH_ERROR';           // Math utility errors
 
 /**
  * Source location span for error reporting

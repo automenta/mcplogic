@@ -30,6 +30,25 @@ import * as AgentHandlers from './handlers/agent.js';
 import * as EvolutionHandlers from './handlers/evolution.js';
 import { TOOLS } from './tools/definitions.js';
 import { createContainer, ServerContainer } from './container.js';
+import {
+    ProveHandlerArgs,
+    CheckWellFormedHandlerArgs,
+    FindModelHandlerArgs,
+    FindCounterexampleHandlerArgs,
+    CreateSessionHandlerArgs,
+    AssertPremiseHandlerArgs,
+    QuerySessionHandlerArgs,
+    RetractPremiseHandlerArgs,
+    ListPremisesHandlerArgs,
+    ClearSessionHandlerArgs,
+    DeleteSessionHandlerArgs,
+    TranslateRequest,
+    ReasonArgs,
+    EvolutionStartArgs,
+    EvolutionGenerateCasesArgs,
+    VerifyCommutativityHandlerArgs,
+    GetCategoryAxiomsHandlerArgs
+} from './types/handlers.js';
 
 // Define the progress notification parameters
 interface ProgressParams {
@@ -48,60 +67,60 @@ type ToolHandler = (
 const toolHandlers: Record<string, ToolHandler> = {
     // ==================== CORE REASONING TOOLS ====================
     'prove': (args, c, opts) =>
-        Handlers.proveHandler(args as any, c.engineManager, args.verbosity, opts?.onProgress),
+        Handlers.proveHandler(args as unknown as ProveHandlerArgs, c.engineManager, args.verbosity, opts?.onProgress),
 
     'check-well-formed': (args) =>
-        Handlers.checkWellFormedHandler(args as any),
+        Handlers.checkWellFormedHandler(args as unknown as CheckWellFormedHandlerArgs),
 
     'find-model': (args, c) =>
-        Handlers.findModelHandler(args as any, c.modelFinder, args.verbosity),
+        Handlers.findModelHandler(args as unknown as FindModelHandlerArgs, c.modelFinder, args.verbosity),
 
     'find-counterexample': (args, c) =>
-        Handlers.findCounterexampleHandler(args as any, c.modelFinder, args.verbosity),
+        Handlers.findCounterexampleHandler(args as unknown as FindCounterexampleHandlerArgs, c.modelFinder, args.verbosity),
 
     'verify-commutativity': (args, c) =>
-        Handlers.verifyCommutativityHandler(args as any, c.categoricalHelpers),
+        Handlers.verifyCommutativityHandler(args as unknown as VerifyCommutativityHandlerArgs, c.categoricalHelpers),
 
     'get-category-axioms': (args, c) =>
-        Handlers.getCategoryAxiomsHandler(args as any, c.categoricalHelpers),
+        Handlers.getCategoryAxiomsHandler(args as unknown as GetCategoryAxiomsHandlerArgs, c.categoricalHelpers),
 
     'translate-text': (args, c) =>
-        LLMHandlers.translateTextHandler(args as any, c.inputRouter),
+        LLMHandlers.translateTextHandler(args as unknown as TranslateRequest, c.inputRouter),
 
     'agent-reason': (args) =>
-        AgentHandlers.reasonHandler(args as any),
+        AgentHandlers.reasonHandler(args as unknown as ReasonArgs),
 
     // ==================== EVOLUTION TOOLS ====================
     'evolution-start': (args, c) =>
-        EvolutionHandlers.startEvolutionHandler(args as any, c.optimizer, c),
+        EvolutionHandlers.startEvolutionHandler(args as unknown as EvolutionStartArgs, c.optimizer, c),
 
     'evolution-list-strategies': (args, c) =>
-        EvolutionHandlers.listStrategiesHandler(args as any, c.strategies),
+        EvolutionHandlers.listStrategiesHandler(args as {}, c.strategies),
 
     'evolution-generate-cases': (args, c) =>
-        EvolutionHandlers.generateCasesHandler(args as any, c.curriculumGenerator),
+        EvolutionHandlers.generateCasesHandler(args as unknown as EvolutionGenerateCasesArgs, c.curriculumGenerator),
 
     // ==================== SESSION MANAGEMENT TOOLS ====================
     'create-session': (args, c) =>
-        Handlers.createSessionHandler(args as any, c.sessionManager),
+        Handlers.createSessionHandler(args as unknown as CreateSessionHandlerArgs, c.sessionManager),
 
     'assert-premise': (args, c) =>
-        Handlers.assertPremiseHandler(args as any, c.sessionManager),
+        Handlers.assertPremiseHandler(args as unknown as AssertPremiseHandlerArgs, c.sessionManager),
 
     'query-session': (args, c) =>
-        Handlers.querySessionHandler(args as any, c.sessionManager, c.engineManager, args.verbosity),
+        Handlers.querySessionHandler(args as unknown as QuerySessionHandlerArgs, c.sessionManager, c.engineManager, args.verbosity),
 
     'retract-premise': (args, c) =>
-        Handlers.retractPremiseHandler(args as any, c.sessionManager),
+        Handlers.retractPremiseHandler(args as unknown as RetractPremiseHandlerArgs, c.sessionManager),
 
     'list-premises': (args, c) =>
-        Handlers.listPremisesHandler(args as any, c.sessionManager, args.verbosity),
+        Handlers.listPremisesHandler(args as unknown as ListPremisesHandlerArgs, c.sessionManager, args.verbosity),
 
     'clear-session': (args, c) =>
-        Handlers.clearSessionHandler(args as any, c.sessionManager),
+        Handlers.clearSessionHandler(args as unknown as ClearSessionHandlerArgs, c.sessionManager),
 
     'delete-session': (args, c) =>
-        Handlers.deleteSessionHandler(args as any, c.sessionManager),
+        Handlers.deleteSessionHandler(args as unknown as DeleteSessionHandlerArgs, c.sessionManager),
 };
 
 /**
