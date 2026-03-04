@@ -107,10 +107,11 @@ export class Z3Translator {
             const left = args[0] as unknown as Z3Arith;
             const right = args[1] as unknown as Z3Arith;
             switch (name) {
-                case 'lt': case 'less': return this.ctx.LT(left, right);
-                case 'gt': case 'greater': return this.ctx.GT(left, right);
-                case 'lte': case 'leq': return this.ctx.LE(left, right);
-                case 'gte': case 'geq': return this.ctx.GE(left, right);
+                case 'lt': case 'less': case '<': return this.ctx.LT(left, right);
+                case 'gt': case 'greater': case '>': return this.ctx.GT(left, right);
+                case 'lte': case 'leq': case '<=': return this.ctx.LE(left, right);
+                case 'gte': case 'geq': case '>=': return this.ctx.GE(left, right);
+                case '!=': return this.ctx.Not(this.ctx.Eq(left as any, right as any));
             }
         }
 
@@ -138,11 +139,12 @@ export class Z3Translator {
              const left = args[0] as unknown as Z3Arith;
              const right = args[1] as unknown as Z3Arith;
              switch (name) {
-                case 'plus': case 'add': return this.ctx.Sum(left, right);
-                case 'minus': case 'sub': return this.ctx.Sub(left, right);
-                case 'times': case 'mul': return this.ctx.Product(left, right);
-                case 'divide': case 'div': return this.ctx.Div(left, right);
+                case 'plus': case 'add': case '+': return this.ctx.Sum(left, right);
+                case 'minus': case 'sub': case '-': return this.ctx.Sub(left, right);
+                case 'times': case 'mul': case '*': return this.ctx.Product(left, right);
+                case 'divide': case 'div': case '/': return this.ctx.Div(left, right);
                 case 'mod': return this.ctx.Mod(left as any, right as any); // Mod might expect Int specifically
+                case 'unary_minus': return this.ctx.Neg(left);
             }
         }
 
