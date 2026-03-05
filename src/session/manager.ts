@@ -180,6 +180,14 @@ export class SessionManager {
             engineName: options?.engine
         };
 
+        // Automatically inject ontology constraints as premises
+        if (session.ontology) {
+            const config = session.ontology.getConfig();
+            if (config.constraints) {
+                session.premises.push(...config.constraints);
+            }
+        }
+
         this.sessions.set(session.id, session);
         this.persistSession(session);
         return session;
@@ -366,9 +374,11 @@ export class SessionManager {
     /**
      * List all premises in a session
      */
-    listPremises(id: string): string[] {
-        const session = this.get(id);
-        return [...session.premises];
+    async listPremises(id: string): Promise<string[]> {
+        return this.withLock(id, async () => {
+            const session = this.get(id);
+            return [...session.premises];
+        });
     }
 
     /**

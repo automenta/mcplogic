@@ -70,15 +70,26 @@ function extractAndOrientRules(clauses: Clause[]): RewriteRule[] {
         if (clause.literals.length === 1 && !clause.literals[0].negated) {
             const lit = clause.literals[0];
             if (lit.predicate === '=' || lit.predicate === 'eq_fact') {
-                const left = termToString(lit.args[0]);
-                const right = termToString(lit.args[1]);
-                const rule = orient(left, right);
-                if (rule) rules.push(rule);
+                // Ensure no variables are present in the rule to avoid infinite unification loops
+                if (!hasVariables(lit.args[0]) && !hasVariables(lit.args[1])) {
+                    const left = termToString(lit.args[0]);
+                    const right = termToString(lit.args[1]);
+                    const rule = orient(left, right);
+                    if (rule) rules.push(rule);
+                }
             }
         }
     }
 
     return rules;
+}
+
+function hasVariables(node: ASTNode): boolean {
+    if (node.type === 'variable') return true;
+    if (node.args) {
+        return node.args.some(hasVariables);
+    }
+    return false;
 }
 
 function orient(t1: string, t2: string): RewriteRule | null {

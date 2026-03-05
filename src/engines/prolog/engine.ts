@@ -266,24 +266,28 @@ export class LogicEngine {
             const rewritingAxioms = generateRewritingAxioms(allClauses);
 
             if (rewritingAxioms.length > 0) {
+                // If rewriting generated rules, we append them.
+                // However, rewrite rules involving variables can cause infinite loops.
+                // It's safer to ensure standard transitivity and symmetry are also available
+                // for general proving, or just rely on minimal axioms.
                 return rewritingAxioms.join('\n') + '\n' + program;
             }
 
-            // Fallback to legacy axioms if rewriting generation produced nothing (e.g. no facts)
-            // But wait, rewriting system handles reflexivity via normalize.
-            // If rewritingAxioms is empty, it means no rules found, but we still need the 'eq' definition?
-            // Actually generateRewritingAxioms returns [] if no rules.
-            // But we need 'eq' to be defined if the query uses it.
-            // Let's modify generateRewritingAxioms to always return the engine if requested?
-            // Or just use the minimal ones if no rules.
-
+            // Fallback to minimal equality axioms + bridge.
+            // But standard minimal equality axioms might not include transitivity explicitly in a way
+            // that Prolog can use safely without looping, but we must add them to allow basic eq reasoning.
             const equalityAxioms = generateMinimalEqualityAxioms(parsedFormulas);
-            if (equalityAxioms.length === 0) {
-                return program;
-            }
-
             const bridge = getEqualityBridge();
-            const allAxioms = [...bridge, ...equalityAxioms];
+
+            // Inject standard equality rules to support `a=b, b=c |- a=c` when rewritten rules fail
+            const standardEqAxioms = [
+                'eq(X, X).',
+                'eq(X, Y) :- eq_fact(X, Y).',
+                'eq(X, Y) :- eq_fact(Y, X).',
+                'eq(X, Z) :- eq_fact(X, Y), eq(Y, Z).'
+            ];
+
+            const allAxioms = [...bridge, ...standardEqAxioms, ...equalityAxioms];
             return allAxioms.join('\n') + '\n' + program;
         } catch {
             return program;

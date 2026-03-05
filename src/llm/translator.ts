@@ -15,7 +15,7 @@ export class HeuristicTranslator implements TranslationStrategy {
         for (const line of lines) {
             // Check for conclusion markers
             if (line.match(/^(therefore|thus|hence|conclusion:|prove:)/i)) {
-                const cleanLine = line.replace(/^(therefore|thus|hence|conclusion:|prove:)\s*/i, '');
+                const cleanLine = line.replace(/^(therefore|thus|hence|conclusion:|prove:)[,\s]*/i, '');
                 const form = this.parseSentence(cleanLine);
                 if (form) {
                     conclusion = form;
@@ -38,7 +38,19 @@ export class HeuristicTranslator implements TranslationStrategy {
     }
 
     private parseSentence(sentence: string): string | null {
-        const s = sentence.toLowerCase().replace(/[^\w\s\(\),]/g, '');
+        const s = sentence.toLowerCase()
+            .replace(/^(therefore|thus|hence|conclusion:|prove:)[,\s]*/i, '')
+            .replace(/[^\w\s\(\),]/g, '')
+            .replace(/^,\s*/, '')
+            .trim();
+
+        // 0. "There exists ..."
+        const existsThat = s.match(/^there exists (a|an|some) (.+?) that (is|are|has) (.+)$/);
+        if (existsThat) {
+            const sub = this.simplifyAtom(existsThat[2]);
+            const pred = this.simplifyAtom(existsThat[4]);
+            return `exists x (${sub}(x) & ${pred}(x))`;
+        }
 
         // 1. "Socrates is a man" -> man(socrates)
         // Regex: X is a Y
@@ -55,11 +67,12 @@ export class HeuristicTranslator implements TranslationStrategy {
 
         // 2. "All men are mortal" -> all x (man(x) -> mortal(x))
         // "All birds can fly" -> all x (bird(x) -> can_fly(x))
-        const allAre = s.match(/^all (\w+) (are|can) (.+)$/);
+        // "All birds fly" -> all x (bird(x) -> fly(x))
+        const allAre = s.match(/^all (\w+) (are|can )?(.+)$/);
         if (allAre) {
             const sub = this.singularize(allAre[1]);
             const predWords = allAre[3].trim().split(/\s+/);
-            const pred = (allAre[2] === 'can' ? 'can_' : '') + predWords.join('_');
+            const pred = (allAre[2] === 'can ' ? 'can_' : '') + predWords.join('_');
             const finalPred = this.singularize(pred);
             return `all x (${sub}(x) -> ${finalPred}(x))`;
         }
@@ -114,7 +127,7 @@ export class HeuristicTranslator implements TranslationStrategy {
         if (isAre) {
             // Check if it looks like X are Y (plural)
             if (isAre[2] === 'are') {
-                let sub = this.singularize(isAre[1].trim());
+                let sub = this.singularize(isAre[1].replace(/^,?\s*/, '').trim());
                 sub = sub.replace(/^(the\s+|a\s+|an\s+)/i, '').trim().replace(/\s+/g, '_');
                 let pred = this.singularize(isAre[3].trim());
                 pred = pred.replace(/^(the\s+|a\s+|an\s+)/i, '').trim().replace(/\s+/g, '_');

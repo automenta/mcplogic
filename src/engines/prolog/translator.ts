@@ -13,6 +13,7 @@ import {
 import { clausify } from '../../logic/clausifier.js';
 import { Clause, Literal } from '../../types/clause.js';
 import { astToString } from '../../ast/index.js';
+import { isArithmeticOperator, isArithmeticPredicate } from '../../axioms/arithmetic.js';
 
 /**
  * Options for translation
@@ -102,6 +103,10 @@ function literalToProlog(lit: Literal, useNegation: boolean, options?: Translato
         // Facts about equality are always stored as eq_fact
         // LogicEngine sets up axioms where eq_step uses eq_fact.
         predicate = 'eq_fact';
+    } else {
+        // In Prolog, predicates MUST start with a lowercase letter or be single-quoted.
+        // We'll just lowercase it to be safe.
+        predicate = predicate.toLowerCase();
     }
 
     const atom = lit.args.length > 0
@@ -142,12 +147,23 @@ function predicateToProlog(node: ASTNode, options?: TranslatorOptions): string {
         throw createEngineError(`Expected predicate, got ${node.type} during translation`);
     }
 
+    let name = node.name!.toLowerCase();
+
+    // Map comparison operators to arithmetic predicates
+    if (isArithmeticPredicate(name)) {
+        if (name === '<') name = 'lt';
+        else if (name === '>') name = 'gt';
+        else if (name === '<=') name = 'lte';
+        else if (name === '>=') name = 'gte';
+        else if (name === '!=') name = 'neq'; // Assuming there's a neq or we map it
+    }
+
     if (!node.args || node.args.length === 0) {
-        return node.name!;
+        return name;
     }
 
     const args = node.args.map(termToProlog).join(', ');
-    return `${node.name}(${args})`;
+    return `${name}(${args})`;
 }
 
 function termToProlog(node: ASTNode): string {
@@ -168,7 +184,19 @@ function termToProlog(node: ASTNode): string {
             return simpleFormatPrologTerm(node.name!);
         case 'function':
             const args = node.args!.map(termToProlog).join(', ');
-            return `${node.name!.toLowerCase()}(${args})`;
+            let funcName = node.name!.toLowerCase();
+            if (isArithmeticOperator(funcName)) {
+                if (funcName === '+') funcName = 'plus';
+                else if (funcName === '-') funcName = 'minus';
+                else if (funcName === '*') funcName = 'times';
+                else if (funcName === '/') funcName = 'divide';
+                else if (funcName === 'unary_minus') {
+                     // unary_minus expects 1 argument but functions like plus expect 2
+                     // Actually unary_minus is not easily mapped unless we define an axiom.
+                     // The parser gives it 1 arg. Let's let it pass as `unary_minus(X)`.
+                }
+            }
+            return `${funcName}(${args})`;
         // Helper for cases where we might have just a name string node (though AST should be stricter)
         default:
              if (node.type === 'predicate') {

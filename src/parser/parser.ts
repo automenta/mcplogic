@@ -129,19 +129,39 @@ export class Parser {
     private parseQuantified(): ASTNode {
         if (this.current().type === 'QUANTIFIER') {
             const quantifier = this.advance().value;
-            const varToken = this.expect('VARIABLE');
-            const variable = varToken.value;
 
-            this.boundVariables.add(variable);
+            // Support chained quantifiers: e.g. "exists x y z"
+            const variables: string[] = [];
 
-            // Parse the body - must be in parentheses after quantifier
+            do {
+                const varToken = this.expect('VARIABLE');
+                variables.push(varToken.value);
+                this.boundVariables.add(varToken.value);
+
+                // Check if the next token starts the body
+                if (this.current().type !== 'VARIABLE') break;
+
+                const nextType = this.peek(1).type;
+                // If the current variable token is followed by something that isn't a variable
+                // (like LPAREN for predicate application, or an operator), it's the start of the body.
+                if (nextType !== 'VARIABLE') break;
+
+            } while (true);
+
+            // Parse the body
             const body = this.parseUnary();
 
-            return {
-                type: quantifier === 'all' ? 'forall' : 'exists',
-                variable,
-                body
-            };
+            // Build nested quantifier nodes from right to left
+            let node = body;
+            for (let i = variables.length - 1; i >= 0; i--) {
+                node = {
+                    type: quantifier === 'all' ? 'forall' : 'exists',
+                    variable: variables[i],
+                    body: node
+                };
+            }
+
+            return node;
         }
 
         return this.parseAtom();

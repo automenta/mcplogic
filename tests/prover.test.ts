@@ -86,9 +86,9 @@ describe('Translator', () => {
     describe('buildPrologProgram', () => {
         test('builds program from multiple premises', () => {
             const program = buildPrologProgram(['P(a)', 'Q(b)', 'R(c)']);
-            expect(program).toContain('P');
-            expect(program).toContain('Q');
-            expect(program).toContain('R');
+            expect(program).toContain('p');
+            expect(program).toContain('q');
+            expect(program).toContain('r');
         });
     });
 });

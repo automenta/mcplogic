@@ -29,10 +29,12 @@ export class StandardLLMProvider implements LLMProvider {
     private apiKey: string;
     private model: string;
     private type: 'openai' | 'ollama';
+    private ollamaBaseUrl: string;
 
     constructor() {
         this.apiKey = process.env.OPENAI_API_KEY || '';
         const baseUrl = process.env.OPENAI_BASE_URL;
+        this.ollamaBaseUrl = 'http://localhost:11434';
 
         if (baseUrl) {
             // Custom OpenAI-compatible endpoint (e.g., local llama.cpp, vLLM)
@@ -53,15 +55,46 @@ export class StandardLLMProvider implements LLMProvider {
         } else {
             // Default to Ollama
             this.type = 'ollama';
-            this.apiUrl = process.env.OLLAMA_URL || 'http://localhost:11434/api/chat';
-            this.model = process.env.OLLAMA_MODEL || 'llama3';
+            this.ollamaBaseUrl = process.env.OLLAMA_URL
+                ? process.env.OLLAMA_URL.replace(/\/api\/chat\/?$/, '').replace(/\/$/, '')
+                : 'http://localhost:11434';
+            this.apiUrl = `${this.ollamaBaseUrl}/api/chat`;
+            this.model = process.env.OLLAMA_MODEL || 'llama3'; // Initial default, may be overridden later
         }
     }
 
+    private async resolveOllamaModel(): Promise<string> {
+        if (process.env.OLLAMA_MODEL) {
+            return process.env.OLLAMA_MODEL;
+        }
+
+        try {
+            const res = await fetch(`${this.ollamaBaseUrl}/api/tags`);
+            if (res.ok) {
+                const data = await res.json();
+                const models = data.models || [];
+                if (models.length > 0) {
+                    // Try to find a llama model first, otherwise just use the first available model
+                    const llama = models.find((m: any) => m.name.includes('llama'));
+                    return llama ? llama.name : models[0].name;
+                }
+            }
+        } catch (e) {
+            // Ignore errors and fallback
+        }
+
+        return 'llama3'; // ultimate fallback
+    }
+
     async complete(messages: LLMMessage[]): Promise<LLMResponse> {
+        let currentModel = this.model;
+        if (this.type === 'ollama' && !process.env.OLLAMA_MODEL) {
+            currentModel = await this.resolveOllamaModel();
+        }
+
         // Format messages for standard Chat API
         const payload = {
-            model: this.model,
+            model: currentModel,
             messages: messages,
             stream: false,
             // Ollama specific
