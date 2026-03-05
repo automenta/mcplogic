@@ -102,6 +102,10 @@ function literalToProlog(lit: Literal, useNegation: boolean, options?: Translato
         // Facts about equality are always stored as eq_fact
         // LogicEngine sets up axioms where eq_step uses eq_fact.
         predicate = 'eq_fact';
+    } else {
+        // In Prolog, predicates MUST start with a lowercase letter or be single-quoted.
+        // We'll just lowercase it to be safe.
+        predicate = predicate.toLowerCase();
     }
 
     const atom = lit.args.length > 0
@@ -142,12 +146,14 @@ function predicateToProlog(node: ASTNode, options?: TranslatorOptions): string {
         throw createEngineError(`Expected predicate, got ${node.type} during translation`);
     }
 
+    const name = node.name!.toLowerCase();
+
     if (!node.args || node.args.length === 0) {
-        return node.name!;
+        return name;
     }
 
     const args = node.args.map(termToProlog).join(', ');
-    return `${node.name}(${args})`;
+    return `${name}(${args})`;
 }
 
 function termToProlog(node: ASTNode): string {

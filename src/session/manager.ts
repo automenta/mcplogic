@@ -366,9 +366,11 @@ export class SessionManager {
     /**
      * List all premises in a session
      */
-    listPremises(id: string): string[] {
-        const session = this.get(id);
-        return [...session.premises];
+    async listPremises(id: string): Promise<string[]> {
+        return this.withLock(id, async () => {
+            const session = this.get(id);
+            return [...session.premises];
+        });
     }
 
     /**

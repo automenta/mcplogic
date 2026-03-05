@@ -147,14 +147,14 @@ export async function retractPremiseHandler(
     };
 }
 
-export function listPremisesHandler(
+export async function listPremisesHandler(
     args: { session_id: string },
     sessionManager: SessionManager,
     verbosity: Verbosity
-): object {
+): Promise<object> {
     const { session_id } = args;
 
-    const premises = sessionManager.listPremises(session_id);
+    const premises = await sessionManager.listPremises(session_id);
     const info = sessionManager.getInfo(session_id);
 
     return {

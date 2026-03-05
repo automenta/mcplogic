@@ -159,7 +159,7 @@ describe('SessionManager', () => {
             await manager.assertPremise(session.id, 'P(a)');
             await manager.assertPremise(session.id, 'Q(b)');
 
-            const premises = manager.listPremises(session.id);
+            const premises = await manager.listPremises(session.id);
 
             expect(premises).toEqual(['P(a)', 'Q(b)']);
             // Verify it's a copy
@@ -234,12 +234,12 @@ describe('Session workflow', () => {
         await manager.assertPremise(session.id, 'man(socrates)');
 
         // List
-        const premises = manager.listPremises(session.id);
+        const premises = await manager.listPremises(session.id);
         expect(premises).toHaveLength(2);
 
         // Clear
         await manager.clear(session.id);
-        expect(manager.listPremises(session.id)).toHaveLength(0);
+        expect(await manager.listPremises(session.id)).toHaveLength(0);
         expect(manager.exists(session.id)).toBe(true);
 
         // Delete

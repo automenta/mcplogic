@@ -100,12 +100,25 @@ export class ModelFinder {
                         result: 'model_found',
                         model: foundModels[0], // Primary model for backward compatibility
                         models: foundModels,
-                        interpretation: formatModelString(foundModels[0])
+                        interpretation: formatModelString(foundModels[0]),
+                        statistics: {
+                            domainSize: size,
+                            searchedSizes: Array.from({ length: size - startSize + 1 }, (_, i) => startSize + i),
+                            timeMs: Date.now() - startTime
+                        }
                     };
                 }
             }
 
-            return { success: false, result: 'no_model' };
+            return {
+                success: false,
+                result: 'no_model',
+                statistics: {
+                    domainSize: endSize,
+                    searchedSizes: Array.from({ length: endSize - startSize + 1 }, (_, i) => startSize + i),
+                    timeMs: Date.now() - startTime
+                }
+            };
         } catch (e) {
             const error = e instanceof Error ? e : createGenericError('ENGINE_ERROR', String(e));
             return {

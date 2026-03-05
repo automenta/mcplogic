@@ -227,7 +227,7 @@ describe('Clausifier', () => {
             const result = clausify('P');
             expect(result.success).toBe(true);
             const prolog = clausesToProlog(result.clauses!);
-            expect(prolog).toContain('P.');
+            expect(prolog).toContain('p.');
         });
 
         it('should convert rules', () => {

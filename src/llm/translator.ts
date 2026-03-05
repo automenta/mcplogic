@@ -15,7 +15,7 @@ export class HeuristicTranslator implements TranslationStrategy {
         for (const line of lines) {
             // Check for conclusion markers
             if (line.match(/^(therefore|thus|hence|conclusion:|prove:)/i)) {
-                const cleanLine = line.replace(/^(therefore|thus|hence|conclusion:|prove:)\s*/i, '');
+                const cleanLine = line.replace(/^(therefore|thus|hence|conclusion:|prove:)[,\s]*/i, '');
                 const form = this.parseSentence(cleanLine);
                 if (form) {
                     conclusion = form;
@@ -38,7 +38,15 @@ export class HeuristicTranslator implements TranslationStrategy {
     }
 
     private parseSentence(sentence: string): string | null {
-        const s = sentence.toLowerCase().replace(/[^\w\s\(\),]/g, '');
+        const s = sentence.toLowerCase().replace(/[^\w\s\(\),]/g, '').replace(/^,\s*/, '').trim();
+
+        // 0. "There exists ..."
+        const existsThat = s.match(/^there exists (a|an|some) (.+?) that (is|are|has) (.+)$/);
+        if (existsThat) {
+            const sub = this.simplifyAtom(existsThat[2]);
+            const pred = this.simplifyAtom(existsThat[4]);
+            return `exists x (${sub}(x) & ${pred}(x))`;
+        }
 
         // 1. "Socrates is a man" -> man(socrates)
         // Regex: X is a Y
