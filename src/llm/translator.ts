@@ -38,7 +38,11 @@ export class HeuristicTranslator implements TranslationStrategy {
     }
 
     private parseSentence(sentence: string): string | null {
-        const s = sentence.toLowerCase().replace(/[^\w\s\(\),]/g, '').replace(/^,\s*/, '').trim();
+        const s = sentence.toLowerCase()
+            .replace(/^(therefore|thus|hence|conclusion:|prove:)[,\s]*/i, '')
+            .replace(/[^\w\s\(\),]/g, '')
+            .replace(/^,\s*/, '')
+            .trim();
 
         // 0. "There exists ..."
         const existsThat = s.match(/^there exists (a|an|some) (.+?) that (is|are|has) (.+)$/);
@@ -122,7 +126,7 @@ export class HeuristicTranslator implements TranslationStrategy {
         if (isAre) {
             // Check if it looks like X are Y (plural)
             if (isAre[2] === 'are') {
-                let sub = this.singularize(isAre[1].trim());
+                let sub = this.singularize(isAre[1].replace(/^,?\s*/, '').trim());
                 sub = sub.replace(/^(the\s+|a\s+|an\s+)/i, '').trim().replace(/\s+/g, '_');
                 let pred = this.singularize(isAre[3].trim());
                 pred = pred.replace(/^(the\s+|a\s+|an\s+)/i, '').trim().replace(/\s+/g, '_');

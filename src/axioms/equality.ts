@@ -50,7 +50,7 @@ export function generateEqualityAxioms(
 
     // Recursive step: Transitivity via eq_step
     // eq_d(X, Y, D) :- D > 0, D1 is D - 1, eq_step(X, Z, D1), Z \== X, eq_d(Z, Y, D1).
-    axioms.push('eq_d(X, Y, D) :- D > 0, D1 is D - 1, eq_step(X, Z, D1), Z \\\\== X, eq_d(Z, Y, D1).');
+    axioms.push('eq_d(X, Y, D) :- D > 0, D1 is D - 1, eq_step(X, Z, D1), Z \\== X, eq_d(Z, Y, D1).');
 
     // eq_step: Single step of equality
     // 1. Unification (Bridge) - Removed to prevent trivial loops, handled by eq_d reflexivity
@@ -131,7 +131,7 @@ export function generateMinimalEqualityAxioms(
 export function getEqualityBridge(): string[] {
     return [
         '% Bridge handled by eq_step',
-        'neq(X, Y) :- X \\\\== Y.',
+        'neq(X, Y) :- X \\== Y.',
     ];
 }
 
