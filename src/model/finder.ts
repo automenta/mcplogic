@@ -6,7 +6,7 @@
 
 import { parse } from '../parser/index.js';
 import { Model, ModelResult, ModelOptions, DEFAULTS } from '../types/index.js';
-import { extractSignature, getFreeVariables } from '../ast/index.js';
+import { extractSignature, getFreeVariables, astToString } from '../ast/index.js';
 import { createGenericError } from '../types/errors.js';
 import { SATEngine } from '../engines/sat/index.js';
 import { findModelsSAT } from './strategies/sat.js';
@@ -64,13 +64,30 @@ export class ModelFinder {
                 signature.variables.delete(v);
             }
 
-            // First, quickly check if the premises are intrinsically contradictory using a theorem prover
-            // if we have an engine manager and they aren't inherently SAT-oriented.
+            // Restore contradiction check, but use safe premises
             if (this.engineManager && premises.length > 0) {
-                // Prove a trivial contradiction like 'a = b & -(a = b)' to see if premises are UNSAT
-                const contradictionCheck = await this.engineManager.prove(premises, 'contradiction_probe & -contradiction_probe', { maxSeconds: 2, engine: 'sat' });
+                // Ensure free variables parse as constants by renaming them before passing to the engine
+                const safeAsts = premises.map(p => parse(p));
+                for (const ast of safeAsts) {
+                    // We must use a custom traversal to mutate names safely
+                    const stack = [ast];
+                    while (stack.length > 0) {
+                        const node = stack.pop()!;
+                        if (node.type === 'variable' && node.name && freeVars.has(node.name)) {
+                            node.type = 'constant';
+                            node.name = `sk_c_${node.name}`;
+                        }
+                        if (node.left) stack.push(node.left);
+                        if (node.right) stack.push(node.right);
+                        if (node.operand) stack.push(node.operand);
+                        if (node.body) stack.push(node.body);
+                        if (node.args) stack.push(...node.args);
+                    }
+                }
+                const safePremises = safeAsts.map(a => astToString(a));
+
+                const contradictionCheck = await this.engineManager.prove(safePremises, 'contradiction_probe & -contradiction_probe', { maxSeconds: 2, engine: 'sat' });
                 if (contradictionCheck.result === 'proved') {
-                    // The premises entail false, meaning they are intrinsically contradictory
                     return { success: false, result: 'no_model', interpretation: 'Premises are contradictory' };
                 }
             }

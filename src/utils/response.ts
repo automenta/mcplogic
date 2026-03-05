@@ -200,6 +200,10 @@ export function formatModelString(model: Model): string {
 
     lines.push('Predicates:');
     for (const [name, extension] of model.predicates) {
+        // Filter out internal artifacts from human-readable model string
+        if (name === 'unary_minus' || name.startsWith('_tseitin_') || name.startsWith('sk')) {
+            continue;
+        }
         const tuples = Array.from(extension).map(s => `(${s})`).join(', ');
         lines.push(`  ${name}: {${tuples}}`);
     }

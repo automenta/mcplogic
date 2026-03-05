@@ -180,6 +180,14 @@ export class SessionManager {
             engineName: options?.engine
         };
 
+        // Automatically inject ontology constraints as premises
+        if (session.ontology) {
+            const config = session.ontology.getConfig();
+            if (config.constraints) {
+                session.premises.push(...config.constraints);
+            }
+        }
+
         this.sessions.set(session.id, session);
         this.persistSession(session);
         return session;
