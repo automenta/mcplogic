@@ -25,7 +25,7 @@ export class ModelFinder {
     private satEngine = new SATEngine();
     private engineManager?: EngineManager;
 
-    constructor(timeout: number = 5000, maxDomainSize: number = 10, engineManager?: EngineManager) {
+    constructor(timeout: number = 10000, maxDomainSize: number = 25, engineManager?: EngineManager) {
         this.timeout = timeout;
         this.maxDomainSize = maxDomainSize;
         this.engineManager = engineManager;

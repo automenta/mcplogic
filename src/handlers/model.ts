@@ -19,7 +19,7 @@ export async function findModelHandler(
 ): Promise<ModelResponse> {
     const { premises, domain_size, max_domain_size, use_sat, enable_symmetry, count } = args;
 
-    // Create finder with custom max domain size if specified
+    // Create finder with custom max domain size if specified (default 25 if not provided)
     const finder = max_domain_size ? createModelFinder(undefined, max_domain_size) : defaultFinder;
 
     // Determine bounds. If domain_size is set, use it as both min and max (exact search).
